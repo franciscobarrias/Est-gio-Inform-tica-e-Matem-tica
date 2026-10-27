@@ -61,7 +61,14 @@ export class AlertaService {
       INSERT INTO AlertaClinico (id_alerta, id_submissao, id_regra, data_hora_geracao, origem_gatilho, prioridade, estado_atual, resumo_agravamento)
       VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?)
     `).run(id_alerta, idSubmissao, idRegra, agora, origemGatilho, prioridade, resumoAgravamento);
-    return { id_alerta, id_submissao, id_regra, prioridade, estado_atual: 'Pendente', resumo_agravamento };
+        return {
+      id_alerta,
+      id_submissao: idSubmissao,
+      id_regra: idRegra,
+      prioridade,
+      estado_atual: 'Pendente',
+      resumo_agravamento: resumoAgravamento
+    };
   }
 
   static listarAlertas() {
