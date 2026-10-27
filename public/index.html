@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plataforma GBM — Serviço de Neurocirurgia CHSJ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { --primary: #0f4c81; --bg: #f4f7fb; --card: #fff; --danger: #c53030; --ok: #2f855a; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; color: #1a202c; }
+    header { background: var(--primary); color: #fff; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    main { max-width: 1220px; margin: 1.5rem auto; padding: 0 1rem; }
+    .card { background: var(--card); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1rem; }
+    button { background: var(--primary); color: #fff; border: none; padding: 0.6rem 1.1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    input, select { width: 100%; padding: 0.5rem; margin: 0.25rem 0 0.75rem 0; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; }
+    .badge { padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
+    .badge-critica { background: #fed7d7; color: #9b2c2c; }
+    .badge-ok { background: #c6f6d5; color: #22543d; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.55rem; border-bottom: 1px solid #e2e8f0; font-size: 0.88rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong> — Monitorização Longitudinal de Glioblastoma (GBM)</div>
+    <div id="barraUtilizador" class="hidden">
+      <span id="etiquetaUtilizador"></span>
+      <button onclick="location.reload()" style="background:#e53e3e; margin-left:10px;">Terminar Sessão</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="ecraLogin" class="card" style="max-width:460px; margin:2rem auto;">
+      <h2>Autenticação por Perfil (RF01)</h2>
+      <p style="font-size:0.9rem;">Seleciona um dos 4 perfis do modelo ER (Password: <code>123456</code>):</p>
+      <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1rem;">
+        <button type="button" onclick="setCred('medico@chsj.pt')">Médico</button>
+        <button type="button" onclick="setCred('enfermeiro@chsj.pt')">Enfermeiro</button>
+        <button type="button" onclick="setCred('doente@chsj.pt')">Doente</button>
+        <button type="button" onclick="setCred('cuidador@chsj.pt')">Cuidador</button>
+      </div>
+      <label>Email</label>
+      <input id="email" type="email" value="medico@chsj.pt" />
+      <label>Password</label>
+      <input id="password" type="password" value="123456" />
+      <button onclick="fazerLogin()" style="width:100%;">Iniciar Sessão</button>
+      <p id="msgErroLogin" style="color:var(--danger); font-weight:bold;"></p>
+    </section>
+
+    <section id="ecraDashboard" class="hidden">
+      <div id="painelTopoDoente" class="card"></div>
+
+      <!-- ALERTAS E TRIAGEM (ENFERMEIRO / MÉDICO - RF23 a RF28) -->
+      <div id="secAlertas" class="card hidden">
+        <h3>Triagem Clínica e Ciclo de Vida de Alertas (Tabela AlertaClinico / HistoricoAcaoAlerta — RF23 a RF28)</h3>
+        <table id="tabelaAlertas">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Doente</th>
+              <th>Regra / Gatilho</th>
+              <th>Prioridade</th>
+              <th>Estado Atual</th>
+              <th>Resumo Clínico</th>
+              <th>Triagem (RF26/RF27)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Informação Clínica (DiagnosticoGB, Tratamento e AvaliacaoKarnofsky — RF07, RF08, RF22)</h3>
+          <div id="infoDiagnostico"></div>
+          <canvas id="chartKps" height="145"></canvas>
+        </div>
+
+        <!-- GESTÃO CLÍNICA EXCLUSIVA DO MÉDICO -->
+        <div id="secMedico" class="card hidden">
+          <h3>Gestão Médica: KPS, PlanoMonitorizacao e DecisaoAcompanhamento (RF08, RF09, RF30)</h3>
+          <label>Registar Nova Avaliação de Karnofsky (0-100):</label>
+          <input id="inputKps" type="number" min="0" max="100" step="10" value="60" />
+          <button onclick="guardarKps()">Guardar AvaliacaoKarnofsky (RF08)</button>
+          <hr style="margin:0.8rem 0;" />
+          <label>Definir Periodicidade Individualizada (PlanoMonitorizacao — RF09):</label>
+          <input id="inputPeriodicidade" type="number" min="1" max="30" value="3" />
+          <button onclick="guardarPlano()">Atualizar PlanoMonitorizacao (RF09)</button>
+          <hr style="margin:0.8rem 0;" />
+          <label>Registar Decisão de Acompanhamento (DecisaoAcompanhamento — RF29, RF30):</label>
+          <select id="selectDecisao">
+            <option value="Manter seguimento previsto">Manter seguimento previsto</option>
+            <option value="Necessidade de avaliação adicional">Necessidade de avaliação adicional</option>
+            <option value="Proposta de antecipação de consulta">Proposta de antecipação de consulta</option>
+          </select>
+          <input id="inputFundamentacao" type="text" placeholder="Fundamentação clínica baseada no histórico longitudinal..." />
+          <button onclick="guardarDecisao()">Registar DecisaoAcompanhamento (RF30)</button>
+          <button onclick="abrirFhir()" style="background:#2b6cb0; margin-top:0.5rem;">Exportar HL7 FHIR R4 (RNF13)</button>
+        </div>
+      </div>
+
+      <!-- FORMULÁRIO ESTRUTURADO DINÂMICO (Formulario -> PerguntaFormulario -> OpcaoResposta) -->
+      <div class="card">
+        <h3 id="tituloFormulario">Formulário Estruturado de Monitorização (RF10 a RF17)</h3>
+        <label>Data a que os sintomas reportados dizem respeito (RF17):</label>
+        <input id="inputDataRef" type="date" style="max-width:260px;" />
+        <div id="contentorPerguntas" class="grid-2"></div>
+        <p id="msgErroForm" style="color:var(--danger); font-weight:bold;"></p>
+        <button onclick="submeterMonitorizacao()" style="margin-top:0.75rem;">Submeter Respostas Estruturadas (RF10 / RF15)</button>
+      </div>
+
+      <!-- HISTÓRICO LONGITUDINAL -->
+      <div class="card">
+        <h3>Histórico Longitudinal de Submissões e Decisões (RF06, RF20, RF21)</h3>
+        <div id="contentorHistorico"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let token = '';
+    let user = null;
+    let idDoenteAtivo = 'user-doente-001';
+    let formAtivo = null;
+    let grafico = null;
+
+    document.getElementById('inputDataRef').valueAsDate = new Date();
+
+    function setCred(email) {
+      document.getElementById('email').value = email;
+      document.getElementById('password').value = '123456';
+    }
+
+    async function fazerLogin() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('msgErroLogin').textContent = data.erro;
+        return;
+      }
+      token = data.token;
+      user = data.utilizador;
+      document.getElementById('ecraLogin').classList.add('hidden');
+      document.getElementById('ecraDashboard').classList.remove('hidden');
+      document.getElementById('barraUtilizador').classList.remove('hidden');
+      document.getElementById('etiquetaUtilizador').textContent = `${user.nome} (${user.perfil})`;
+
+      await carregarFormulario();
+      await carregarProcesso();
+    }
+
+    async function carregarFormulario() {
+      const res = await fetch('/api/formularios/ativo', { headers: { Authorization: `Bearer ${token}` } });
+      formAtivo = await res.json();
+      document.getElementById('tituloFormulario').textContent = `${formAtivo.nome} (v${formAtivo.versao})`;
+
+      document.getElementById('contentorPerguntas').innerHTML = formAtivo.perguntas.map(p => `
+        <div style="border-bottom:1px solid #edf2f7; padding:0.35rem 0;">
+          <label><strong>[${p.categoria}] ${p.enunciado}</strong> ${p.obrigatoria ? '*' : ''}</label>
+          <select id="resp_${p.id_pergunta}">
+            <option value="">-- Selecione uma opção padronizada (RF15) --</option>
+            ${p.opcoes.map(o => `<option value="${o.id_opcao}">${o.rotulo}</option>`).join('')}
+          </select>
+        </div>
+      `).join('');
+    }
+
+    async function carregarProcesso() {
+      const res = await fetch(`/api/doentes/${idDoenteAtivo}/processo`, { headers: { Authorization: `Bearer ${token}` } });
+      const p = await res.json();
+
+      const badgeKps = p.doente.participacao_cuidador_obrigatoria
+        ? `<span class="badge badge-critica">RF05 Ativo: KPS = ${p.doente.ultimo_kps} (&le; 70) — Participação do Cuidador Obrigatória</span>`
+        : `<span class="badge badge-ok">KPS = ${p.doente.ultimo_kps} (&gt; 70) — Doente Autónomo</span>`;
+
+      document.getElementById('painelTopoDoente').innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+          <div><strong>Doente:</strong> ${p.doente.nome} (Processo: ${p.doente.numero_processo_clinico}) | <strong>Médico:</strong> ${p.doente.nome_medico_responsavel}</div>
+          ${badgeKps}
+        </div>
+        <p style="margin:0.4rem 0 0 0; font-size:0.9rem;">🔔 <strong>${p.lembrete.mensagem}</strong></p>
+      `;
+
+      const d = p.diagnostico || {};
+      document.getElementById('infoDiagnostico').innerHTML = `
+        <p><strong>Tumoral:</strong> ${d.localizacao_tumoral || '-'} (${d.lateralidade || '-'}) | <strong>IDH:</strong> ${d.estatuto_idh || '-'} | <strong>MGMT:</strong> ${d.metilacao_mgmt || '-'}</p>
+        <p><strong>Fase Clínica:</strong> ${d.fase_clinica_atual || '-'} | <strong>Cuidador Autorizado (RF03):</strong> ${p.cuidadores.map(c => `${c.nome} (${c.grau_parentesco})`).join(', ')}</p>
+      `;
+
+      const ctx = document.getElementById('chartKps').getContext('2d');
+      if (grafico) grafico.destroy();
+      grafico = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: p.avaliacoesKps.map(k => k.data_avaliacao),
+          datasets: [{
+            label: 'Evolução Karnofsky Performance Status (KPS)',
+            data: p.avaliacoesKps.map(k => k.score_kps),
+            borderColor: '#0f4c81',
+            backgroundColor: 'rgba(15, 76, 129, 0.15)',
+            fill: true
+          }]
+        },
+        options: { scales: { y: { min: 0, max: 100 } } }
+      });
+
+      if (user.perfil === 'MEDICO') document.getElementById('secMedico').classList.remove('hidden');
+      if (user.perfil === 'ENFERMEIRO' || user.perfil === 'MEDICO') {
+        document.getElementById('secAlertas').classList.remove('hidden');
+        await carregarTabelaAlertas();
+      }
+
+      document.getElementById('contentorHistorico').innerHTML = p.submissoes.slice().reverse().map(s => {
+        const alteradas = s.respostas.filter(r => r.valor_codificado !== 'AUSENTE');
+        return `
+          <div style="border-left:4px solid var(--primary); padding-left:0.75rem; margin-bottom:0.8rem;">
+            <strong>Data Ref. Sintomas (RF17): ${s.data_referencia_sintomas}</strong> (Submetido em ${new Date(s.data_hora_submissao).toLocaleString('pt-PT')})
+            — <em>Responsável (RF06): ${s.nome_autor} [${s.perfil_autor_no_registo}]</em>
+            <div style="font-size:0.86rem; margin-top:0.25rem;">
+              ${alteradas.length === 0 ? 'Todos os sintomas/domínios reportados como Ausentes.' : alteradas.map(a => `<span class="badge badge-critica" style="margin:2px;">${a.enunciado}: ${a.rotulo}</span>`).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function carregarTabelaAlertas() {
+      const res = await fetch('/api/alertas', { headers: { Authorization: `Bearer ${token}` } });
+      const lista = await res.json();
+      document.querySelector('#tabelaAlertas tbody').innerHTML = lista.map(a => `
+        <tr>
+          <td>${new Date(a.data_hora_geracao).toLocaleString('pt-PT')}</td>
+          <td>${a.nome_doente}</td>
+          <td>${a.nome_regra}</td>
+          <td><span class="badge badge-critica">${a.prioridade}</span></td>
+          <td><strong>${a.estado_atual}</strong></td>
+          <td>${a.resumo_agravamento}</td>
+          <td>
+            <select onchange="triar('${a.id_alerta}', this.value)">
+              <option value="">Alterar estado (RF27)...</option>
+              <option value="Em análise">Em análise</option>
+              <option value="Encaminhado">Encaminhar p/ Médico (RF26)</option>
+              <option value="Concluído">Concluído</option>
+            </select>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function triar(idAlerta, estado_novo) {
+      if (!estado_novo) return;
+      await fetch(`/api/alertas/${idAlerta}/triagem`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado_novo, nota_triagem: `Atualizado por ${user.nome}` })
+      });
+      await carregarTabelaAlertas();
+    }
+
+    async function submeterMonitorizacao() {
+      const respostas = formAtivo.perguntas.map(p => ({
+        id_pergunta: p.id_pergunta,
+        id_opcao: document.getElementById(`resp_${p.id_pergunta}`).value
+      })).filter(r => r.id_opcao !== '');
+
+      const res = await fetch(`/api/doentes/${idDoenteAtivo}/submissoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          id_formulario: formAtivo.id_formulario,
+          data_referencia_sintomas: document.getElementById('inputDataRef').value,
+          respostas
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('msgErroForm').textContent = `${data.erro} Em falta: ${(data.camposEmFalta || []).join(', ')}`;
+        return;
+      }
+      document.getElementById('msgErroForm').textContent = '';
+      alert(`Submissão guardada! Alertas gerados: ${data.alertasGerados.length}`);
+      await carregarProcesso();
+    }
+
+    async function guardarKps() {
+      const score_kps = document.getElementById('inputKps').value;
+      await fetch(`/api/doentes/${idDoenteAtivo}/kps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ score_kps })
+      });
+      await carregarProcesso();
+    }
+
+    async function guardarPlano() {
+      const periodicidade_dias = document.getElementById('inputPeriodicidade').value;
+      await fetch(`/api/doentes/${idDoenteAtivo}/planos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ periodicidade_dias })
+      });
+      await carregarProcesso();
+    }
+
+    async function guardarDecisao() {
+      const decisao_medica = document.getElementById('selectDecisao').value;
+      const fundamentacao_clinica = document.getElementById('inputFundamentacao').value || 'Decisão registada após revisão longitudinal';
+      await fetch(`/api/doentes/${idDoenteAtivo}/decisoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ decisao_medica, fundamentacao_clinica })
+      });
+      alert('Decisão registada na tabela DecisaoAcompanhamento (RF30)!');
+      await carregarProcesso();
+    }
+
+    async function abrirFhir() {
+      const res = await fetch(`/api/fhir/Patient/${idDoenteAtivo}/$everything`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const bundle = await res.json();
+      const w = window.open('', '_blank');
+      w.document.write(`<pre>${JSON.stringify(bundle, null, 2)}</pre>`);
+    }
+  </script>
+</body>
+</html>

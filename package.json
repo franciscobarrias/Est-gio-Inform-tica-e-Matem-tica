@@ -1,0 +1,23 @@
+{
+  "name": "plataforma-gbm-chsj",
+  "version": "1.0.0",
+  "description": "Plataforma Digital de Monitorização de Glioblastoma",
+  "main": "src/app.ts",
+  "scripts": {
+    "dev": "npx ts-node src/app.ts",
+    "seed": "npx ts-node src/seed.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.2",
+    "@types/node": "^20.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.2"
+  }
+}
