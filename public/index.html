@@ -659,7 +659,7 @@
       if (user.perfil === 'ENFERMEIRO' && !concluido && a.estado_atual !== 'Encaminhado') {
         const estados = [['Em análise', 'Em análise'], ['Encaminhado', 'Encaminhar ao médico'], ['Concluído', 'Concluir sem encaminhamento']]
           .filter(([v]) => v !== a.estado_atual);
-        triagem = `<details class="triagem"${a.estado_atual === 'Pendente' ? '' : ''}><summary>Registar triagem</summary>
+        triagem = `<details class="triagem"><summary>Registar triagem</summary>
           <div class="linha-campos" style="margin-top:.5rem">
             <div><label for="estado_${id}">Ação</label><select id="estado_${id}">${estados.map(([v, n]) => `<option value="${v}">${n}</option>`).join('')}</select></div>
             <div><label for="prioridade_${id}">Prioridade</label><select id="prioridade_${id}">${['Baixa', 'Média', 'Alta', 'Crítica'].map(pr => `<option ${a.prioridade === pr ? 'selected' : ''}>${pr}</option>`).join('')}</select></div>

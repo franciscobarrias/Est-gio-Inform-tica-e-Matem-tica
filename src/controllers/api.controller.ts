@@ -6,7 +6,7 @@ import { MedicoService } from '../services/medico.service';
 import { AlertaService } from '../services/alerta.service';
 import { FhirService } from '../services/fhir.service';
 
-// Lista clínica com o último KPS e o número de alertas por concluir, para a escolha do doente.
+
 const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, dg.fase_clinica_atual,
     (SELECT k.score_kps FROM AvaliacaoKarnofsky k WHERE k.id_doente = d.id_doente
       ORDER BY k.data_avaliacao DESC, k.rowid DESC LIMIT 1) AS ultimo_kps,
@@ -31,7 +31,7 @@ export class ApiController {
 
   static listarDoentes(req: Request, res: Response) {
     const user = req.user!;
-    if (user.perfil === 'MEDICO') {
+        if (user.perfil === 'MEDICO') {
       res.json(db.prepare(`${SQL_LISTA_CLINICA} WHERE d.id_medico_responsavel = ? ORDER BY u.nome`).all(user.id_utilizador));
       return;
     }
