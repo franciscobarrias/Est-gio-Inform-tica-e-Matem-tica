@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
 
-const dbPath = path.resolve(__dirname, '../../data.db');
+const dbPath = path.resolve(process.env.DATABASE_PATH || path.resolve(__dirname, '../../data.db'));
 export const db = new Database(dbPath);
 
 db.pragma('foreign_keys = ON');
@@ -158,10 +158,15 @@ export function inicializarBaseDados(): void {
       id_opcao TEXT,
       valor_numerico INTEGER NOT NULL DEFAULT 0,
       motivo_nao_avaliavel INTEGER NOT NULL DEFAULT 0,
+      frequencia TEXT,
       FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao),
       FOREIGN KEY (id_pergunta) REFERENCES PerguntaFormulario(id_pergunta),
       FOREIGN KEY (id_opcao) REFERENCES OpcaoResposta(id_opcao)
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_resposta_submissao_pergunta
+      ON RespostaMonitorizacao(id_submissao, id_pergunta);
+    CREATE INDEX IF NOT EXISTS idx_submissao_doente_data
+      ON SubmissaoMonitorizacao(id_doente, data_hora_submissao);
 
     CREATE TABLE IF NOT EXISTS RegraAlerta (
       id_regra TEXT PRIMARY KEY,
@@ -222,6 +227,64 @@ export function inicializarBaseDados(): void {
       FOREIGN KEY (id_utilizador) REFERENCES Utilizador(id_utilizador)
     );
   `);
+  const colunasResposta = db.prepare('PRAGMA table_info(RespostaMonitorizacao)').all() as Array<{ name: string }>;
+  if (!colunasResposta.some(coluna => coluna.name === 'frequencia')) {
+    db.exec('ALTER TABLE RespostaMonitorizacao ADD COLUMN frequencia TEXT');
+  }
+  garantirPerguntasFormularioDemonstracao();
+}
+
+export function garantirPerguntasFormularioDemonstracao(): void {
+  const formulario = db.prepare("SELECT id_formulario FROM Formulario WHERE id_formulario = 'form-gbm-v1' AND estado = 'ATIVO'").get();
+  if (!formulario) return;
+
+  const perguntas = [
+    { id: 'perg-cefaleia', cat: 'SINTOMA_GERAL', texto: 'Cefaleia (dor de cabeça)' },
+    { id: 'perg-astenia', cat: 'SINTOMA_GERAL', texto: 'Astenia (cansaço ou falta de energia)' },
+    { id: 'perg-ansiedade', cat: 'SINTOMA_GERAL', texto: 'Ansiedade' },
+    { id: 'perg-temperatura', cat: 'SINTOMA_GERAL', texto: 'Alterações da temperatura corporal (febre ou arrepios)' },
+    { id: 'perg-sono', cat: 'SINTOMA_GERAL', texto: 'Alterações do sono' },
+    { id: 'perg-nauseas', cat: 'SINTOMA_GERAL', texto: 'Náuseas' },
+    { id: 'perg-vomitos', cat: 'SINTOMA_GERAL', texto: 'Vómitos' },
+    { id: 'perg-outros-sintomas', cat: 'SINTOMA_GERAL', texto: 'Outros sintomas relevantes' },
+    { id: 'perg-marcha', cat: 'ESCALA_NANO', texto: 'Marcha e equilíbrio ao caminhar' },
+    { id: 'perg-forca', cat: 'ESCALA_NANO', texto: 'Força muscular' },
+    { id: 'perg-coordenacao', cat: 'ESCALA_NANO', texto: 'Coordenação dos movimentos' },
+    { id: 'perg-sensibilidade', cat: 'ESCALA_NANO', texto: 'Sensibilidade' },
+    { id: 'perg-visao', cat: 'ESCALA_NANO', texto: 'Visão' },
+    { id: 'perg-linguagem', cat: 'ESCALA_NANO', texto: 'Linguagem e comunicação' },
+    { id: 'perg-consciencia', cat: 'ESCALA_NANO', texto: 'Estado de consciência' },
+    { id: 'perg-comportamento', cat: 'ESCALA_NANO', texto: 'Comportamento' },
+    { id: 'perg-autonomia', cat: 'AUTONOMIA_AVD', texto: 'Autonomia nas atividades da vida diária' }
+  ];
+  const inserirPergunta = db.prepare(`INSERT OR IGNORE INTO PerguntaFormulario
+    (id_pergunta, id_formulario, categoria, enunciado, tipo_resposta, obrigatoria, ordem, ativa)
+    VALUES (?, 'form-gbm-v1', ?, ?, 'SELECAO_UNICA', 0, ?, 1)`);
+  const inserirOpcao = db.prepare(`INSERT OR IGNORE INTO OpcaoResposta
+    (id_opcao, id_pergunta, rotulo, valor_codificado, ordem) VALUES (?, ?, ?, ?, ?)`);
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE PerguntaFormulario SET ativa = 0
+      WHERE id_formulario = 'form-gbm-v1' AND id_pergunta IN ('perg-1', 'perg-2', 'perg-3', 'perg-4')`).run();
+    perguntas.forEach((pergunta, indice) => {
+      inserirPergunta.run(pergunta.id, pergunta.cat, pergunta.texto, indice + 1);
+      const opcoes = pergunta.cat === 'AUTONOMIA_AVD'
+        ? [
+          ['autonomo', 'Independente', 'AUSENTE'],
+          ['parcial', 'Necessita assistência parcial', 'ASSISTENCIA_PARCIAL'],
+          ['total', 'Necessita assistência total', 'ASSISTENCIA_TOTAL']
+        ]
+        : [
+          ['ausente', 'Ausente / sem alteração', 'AUSENTE'],
+          ['ligeira', 'Ligeira', 'LIGEIRA'],
+          ['moderada', 'Moderada', 'MODERADA'],
+          ['grave', 'Grave', 'GRAVE']
+        ];
+      opcoes.forEach(([sufixo, rotulo, codigo], ordem) =>
+        inserirOpcao.run(`op-${pergunta.id}-${sufixo}`, pergunta.id, rotulo, codigo, ordem + 1));
+      inserirOpcao.run(`op-${pergunta.id}-nao-avaliavel`, pergunta.id, 'Não consigo avaliar', 'IMPOSSIVEL_AVALIAR', opcoes.length + 1);
+    });
+  });
+  tx();
 }
 
 export function registarAuditoria(idUtilizador: string, acao: string, detalhes: string): void {

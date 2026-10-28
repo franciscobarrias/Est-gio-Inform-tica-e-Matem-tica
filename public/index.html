@@ -3,333 +3,480 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
   <title>Plataforma GBM — Serviço de Neurocirurgia CHSJ</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    :root { --primary: #0f4c81; --bg: #f4f7fb; --card: #fff; --danger: #c53030; --ok: #2f855a; }
-    body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; color: #1a202c; }
-    header { background: var(--primary); color: #fff; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    main { max-width: 1220px; margin: 1.5rem auto; padding: 0 1rem; }
-    .card { background: var(--card); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1rem; }
-    button { background: var(--primary); color: #fff; border: none; padding: 0.6rem 1.1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
-    input, select { width: 100%; padding: 0.5rem; margin: 0.25rem 0 0.75rem 0; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; }
-    .badge { padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
-    .badge-critica { background: #fed7d7; color: #9b2c2c; }
-    .badge-ok { background: #c6f6d5; color: #22543d; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 0.55rem; border-bottom: 1px solid #e2e8f0; font-size: 0.88rem; }
-    .hidden { display: none; }
+    :root { --primary:#0f4c81; --bg:#f4f7fb; --card:#fff; --danger:#9b2c2c; --ok:#22543d; --border:#cbd5e0; }
+    * { box-sizing:border-box; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); margin:0; color:#1a202c; line-height:1.5; }
+    header { background:var(--primary); color:#fff; padding:1rem max(1rem,calc((100vw - 1220px)/2)); display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+    main { max-width:1220px; margin:1.5rem auto; padding:0 1rem; }
+    .card { background:var(--card); border-radius:8px; padding:1.25rem; margin-bottom:1.25rem; box-shadow:0 2px 5px #0001; }
+    .grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:1rem; }
+    button { background:var(--primary); color:#fff; border:0; padding:.65rem 1rem; border-radius:6px; cursor:pointer; font:inherit; font-weight:650; }
+    button:hover { filter:brightness(.9); }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid #ed8936; outline-offset:2px; }
+    input,select { width:100%; min-height:2.6rem; padding:.55rem; margin:.25rem 0 .75rem; border:1px solid var(--border); border-radius:4px; background:#fff; color:#1a202c; font:inherit; }
+    label { display:block; font-weight:600; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { text-align:left; padding:.6rem; border-bottom:1px solid #e2e8f0; font-size:.9rem; vertical-align:top; }
+    .table-wrap { overflow-x:auto; }
+    .badge { padding:.25rem .6rem; border-radius:12px; font-size:.83rem; font-weight:700; display:inline-block; }
+    .badge-alerta { background:#fed7d7; color:#742a2a; }
+    .badge-ok { background:#c6f6d5; color:#22543d; }
+    .notice { padding:.7rem; border-left:4px solid var(--primary); background:#ebf8ff; }
+    .error { color:var(--danger); font-weight:650; }
+    .success { color:var(--ok); font-weight:650; }
+    .history-item { border-left:4px solid var(--primary); padding-left:.75rem; margin-bottom:1rem; }
+    .hidden { display:none !important; }
+    .chart { width:100%; height:auto; min-height:150px; }
+    .muted { color:#4a5568; }
+    fieldset { border:1px solid #e2e8f0; border-radius:6px; padding:.75rem; margin:.4rem 0; }
+    legend { padding:0 .35rem; }
+    hr { border:0; border-top:1px solid #e2e8f0; margin:1rem 0; }
+    @media (max-width:640px) {
+      header { align-items:flex-start; flex-direction:column; padding:1rem; }
+      main { margin:1rem auto; padding:0 .65rem; }
+      .card { padding:1rem; }
+      th,td { padding:.45rem; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   </style>
 </head>
 <body>
   <header>
-    <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong> — Monitorização Longitudinal de Glioblastoma (GBM)</div>
+    <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong><br />Monitorização longitudinal de glioblastoma</div>
     <div id="barraUtilizador" class="hidden">
       <span id="etiquetaUtilizador"></span>
-      <button onclick="location.reload()" style="background:#e53e3e; margin-left:10px;">Terminar Sessão</button>
+      <button id="terminarSessao" type="button" style="background:#9b2c2c;margin-left:.5rem">Terminar sessão</button>
     </div>
   </header>
-
   <main>
-    <section id="ecraLogin" class="card" style="max-width:460px; margin:2rem auto;">
-      <h2>Autenticação por Perfil (RF01)</h2>
-      <p style="font-size:0.9rem;">Seleciona um dos 4 perfis do modelo ER (Password: <code>123456</code>):</p>
-      <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1rem;">
-        <button type="button" onclick="setCred('medico@chsj.pt')">Médico</button>
-        <button type="button" onclick="setCred('enfermeiro@chsj.pt')">Enfermeiro</button>
-        <button type="button" onclick="setCred('doente@chsj.pt')">Doente</button>
-        <button type="button" onclick="setCred('cuidador@chsj.pt')">Cuidador</button>
+    <section id="ecraLogin" class="card" style="max-width:480px;margin:2rem auto" aria-labelledby="tituloLogin">
+      <h1 id="tituloLogin">Entrar na plataforma</h1>
+      <p>Protótipo com contas e dados fictícios. Palavra-passe de demonstração: <code>123456</code>.</p>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">
+        <button type="button" data-email="medico@chsj.pt">Médico</button>
+        <button type="button" data-email="enfermeiro@chsj.pt">Enfermeiro</button>
+        <button type="button" data-email="doente@chsj.pt">Doente</button>
+        <button type="button" data-email="cuidador@chsj.pt">Cuidador</button>
       </div>
-      <label>Email</label>
-      <input id="email" type="email" value="medico@chsj.pt" />
-      <label>Password</label>
-      <input id="password" type="password" value="123456" />
-      <button onclick="fazerLogin()" style="width:100%;">Iniciar Sessão</button>
-      <p id="msgErroLogin" style="color:var(--danger); font-weight:bold;"></p>
+      <form id="formLogin">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required value="medico@chsj.pt" />
+        <label for="password">Palavra-passe</label>
+        <input id="password" type="password" autocomplete="current-password" required value="123456" />
+        <button type="submit" style="width:100%">Iniciar sessão</button>
+      </form>
+      <p id="msgErroLogin" class="error" role="alert" aria-live="polite"></p>
     </section>
 
-    <section id="ecraDashboard" class="hidden">
-      <div id="painelTopoDoente" class="card"></div>
+    <section id="ecraDashboard" class="hidden" aria-label="Painel de acompanhamento">
+      <section id="selecaoDoente" class="card hidden">
+        <label for="doenteSelecionado">Processo do doente</label>
+        <select id="doenteSelecionado"></select>
+      </section>
+      <p id="msgGeral" role="status" aria-live="polite"></p>
+      <section id="painelTopoDoente" class="card" aria-live="polite"></section>
 
-      <!-- ALERTAS E TRIAGEM (ENFERMEIRO / MÉDICO - RF23 a RF28) -->
-      <div id="secAlertas" class="card hidden">
-        <h3>Triagem Clínica e Ciclo de Vida de Alertas (Tabela AlertaClinico / HistoricoAcaoAlerta — RF23 a RF28)</h3>
-        <table id="tabelaAlertas">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Doente</th>
-              <th>Regra / Gatilho</th>
-              <th>Prioridade</th>
-              <th>Estado Atual</th>
-              <th>Resumo Clínico</th>
-              <th>Triagem (RF26/RF27)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <section id="secAlertas" class="card hidden">
+        <h2>Alertas e triagem</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data/hora</th><th>Doente</th><th>Regra</th><th>Prioridade</th><th>Estado</th><th>Resumo</th><th>Triagem</th></tr></thead>
+            <tbody id="tabelaAlertas"></tbody>
+          </table>
+        </div>
+      </section>
 
       <div class="grid-2">
-        <div class="card">
-          <h3>Informação Clínica (DiagnosticoGB, Tratamento e AvaliacaoKarnofsky — RF07, RF08, RF22)</h3>
+        <section class="card">
+          <h2>Resumo e evolução funcional</h2>
           <div id="infoDiagnostico"></div>
-          <canvas id="chartKps" height="145"></canvas>
-        </div>
-
-        <!-- GESTÃO CLÍNICA EXCLUSIVA DO MÉDICO -->
-        <div id="secMedico" class="card hidden">
-          <h3>Gestão Médica: KPS, PlanoMonitorizacao e DecisaoAcompanhamento (RF08, RF09, RF30)</h3>
-          <label>Registar Nova Avaliação de Karnofsky (0-100):</label>
+          <h3>Histórico Karnofsky (KPS)</h3>
+          <div id="chartKps" role="img" aria-label="Gráfico da evolução das avaliações Karnofsky"></div>
+          <h3>Evolução dos sintomas e alterações funcionais</h3>
+          <label for="perguntaGrafico">Domínio a comparar</label>
+          <select id="perguntaGrafico"></select>
+          <div id="chartSintomas" role="img" aria-live="polite"></div>
+        </section>
+        <section id="secMedico" class="card hidden">
+          <h2>Gestão clínica</h2>
+          <label for="inputKps">Nova avaliação Karnofsky (0 a 100)</label>
           <input id="inputKps" type="number" min="0" max="100" step="10" value="60" />
-          <button onclick="guardarKps()">Guardar AvaliacaoKarnofsky (RF08)</button>
-          <hr style="margin:0.8rem 0;" />
-          <label>Definir Periodicidade Individualizada (PlanoMonitorizacao — RF09):</label>
-          <input id="inputPeriodicidade" type="number" min="1" max="30" value="3" />
-          <button onclick="guardarPlano()">Atualizar PlanoMonitorizacao (RF09)</button>
-          <hr style="margin:0.8rem 0;" />
-          <label>Registar Decisão de Acompanhamento (DecisaoAcompanhamento — RF29, RF30):</label>
+          <button id="guardarKps" type="button">Registar avaliação</button>
+          <hr />
+          <label for="inputPeriodicidade">Periodicidade da monitorização (dias)</label>
+          <input id="inputPeriodicidade" type="number" min="1" max="365" value="3" />
+          <label for="inputFaseClinica">Fase clínica</label>
+          <input id="inputFaseClinica" type="text" maxlength="120" />
+          <button id="guardarPlano" type="button">Atualizar plano</button>
+          <hr />
+          <h3>Diagnóstico</h3>
+          <label for="diagData">Data do diagnóstico</label><input id="diagData" type="date" />
+          <label for="diagLocalizacao">Localização tumoral</label><input id="diagLocalizacao" type="text" maxlength="120" />
+          <label for="diagLateralidade">Lateralidade</label><input id="diagLateralidade" type="text" maxlength="60" />
+          <label for="diagIdh">Estatuto IDH</label><input id="diagIdh" type="text" maxlength="80" />
+          <label for="diagMgmt">Metilação MGMT</label><input id="diagMgmt" type="text" maxlength="80" />
+          <label for="diagFase">Fase clínica atual</label><input id="diagFase" type="text" maxlength="120" />
+          <button id="guardarDiagnostico" type="button">Guardar diagnóstico</button>
+          <hr />
+          <h3>Tratamento</h3>
+          <label for="tratTipo">Tipo</label>
+          <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select>
+          <label for="tratEstado">Estado</label>
+          <select id="tratEstado"><option value="PLANEADO">Planeado</option><option value="EM_CURSO">Em curso</option><option value="CONCLUIDO">Concluído</option><option value="SUSPENSO">Suspenso</option></select>
+          <label for="tratInicio">Data de início</label><input id="tratInicio" type="date" />
+          <label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" />
+          <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
+          <button id="guardarTratamento" type="button">Registar tratamento</button>
+          <hr />
+          <h3>Decisão de acompanhamento</h3>
+          <label for="selectDecisao">Decisão</label>
           <select id="selectDecisao">
-            <option value="Manter seguimento previsto">Manter seguimento previsto</option>
-            <option value="Necessidade de avaliação adicional">Necessidade de avaliação adicional</option>
-            <option value="Proposta de antecipação de consulta">Proposta de antecipação de consulta</option>
+            <option>Manter seguimento previsto</option>
+            <option>Necessidade de avaliação adicional</option>
+            <option>Proposta de antecipação de consulta</option>
           </select>
-          <input id="inputFundamentacao" type="text" placeholder="Fundamentação clínica baseada no histórico longitudinal..." />
-          <button onclick="guardarDecisao()">Registar DecisaoAcompanhamento (RF30)</button>
-          <button onclick="abrirFhir()" style="background:#2b6cb0; margin-top:0.5rem;">Exportar HL7 FHIR R4 (RNF13)</button>
-        </div>
+          <label for="inputFundamentacao">Fundamentação clínica</label>
+          <input id="inputFundamentacao" type="text" maxlength="500" />
+          <button id="guardarDecisao" type="button">Registar decisão</button>
+          <button id="abrirFhir" type="button" style="margin-top:.5rem">Exportar bundle HL7 FHIR</button>
+        </section>
       </div>
 
-      <!-- FORMULÁRIO ESTRUTURADO DINÂMICO (Formulario -> PerguntaFormulario -> OpcaoResposta) -->
-      <div class="card">
-        <h3 id="tituloFormulario">Formulário Estruturado de Monitorização (RF10 a RF17)</h3>
-        <label>Data a que os sintomas reportados dizem respeito (RF17):</label>
-        <input id="inputDataRef" type="date" style="max-width:260px;" />
+      <section id="secAssociacao" class="card hidden">
+        <h2>Associação autorizada de cuidador</h2>
+        <p>O doente ou o médico responsável pode registar a associação. A autorização fica registada com a associação.</p>
+        <label for="emailCuidador">Email da conta de cuidador</label>
+        <input id="emailCuidador" type="email" autocomplete="email" />
+        <label for="grauParentesco">Relação com o doente</label>
+        <input id="grauParentesco" type="text" maxlength="80" />
+        <label id="consentimentoCuidadorLabel" class="hidden"><input id="consentimentoCuidador" type="checkbox" style="width:auto;min-height:auto" /> Confirmo que foi obtida autorização do doente.</label>
+        <button id="associarCuidador" type="button">Associar cuidador</button>
+      </section>
+
+      <section id="secFormulario" class="card hidden">
+        <h2 id="tituloFormulario">Formulário de monitorização</h2>
+        <p>Responda ao que conseguir. As perguntas em branco ficam sem resposta e não são consideradas «Ausente».</p>
+        <label for="inputDataRef">Data a que os sintomas dizem respeito</label>
+        <input id="inputDataRef" type="date" style="max-width:280px" />
         <div id="contentorPerguntas" class="grid-2"></div>
-        <p id="msgErroForm" style="color:var(--danger); font-weight:bold;"></p>
-        <button onclick="submeterMonitorizacao()" style="margin-top:0.75rem;">Submeter Respostas Estruturadas (RF10 / RF15)</button>
-      </div>
+        <p id="msgErroForm" role="alert" aria-live="polite" class="error"></p>
+        <button id="submeterMonitorizacao" type="button">Guardar respostas</button>
+      </section>
 
-      <!-- HISTÓRICO LONGITUDINAL -->
-      <div class="card">
-        <h3>Histórico Longitudinal de Submissões e Decisões (RF06, RF20, RF21)</h3>
+      <section class="card">
+        <h2>Histórico longitudinal</h2>
         <div id="contentorHistorico"></div>
-      </div>
+      </section>
     </section>
   </main>
-
   <script>
     let token = '';
     let user = null;
-    let idDoenteAtivo = 'user-doente-001';
+    let pacientes = [];
+    let idDoenteAtivo = '';
     let formAtivo = null;
-    let grafico = null;
+    let processoAtual = null;
+    const $ = id => document.getElementById(id);
+    const escapar = valor => String(valor ?? '').replace(/[&<>"']/g, caracter => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[caracter]);
+    const perfisClinicos = ['MEDICO', 'ENFERMEIRO'];
 
-    document.getElementById('inputDataRef').valueAsDate = new Date();
-
-    function setCred(email) {
-      document.getElementById('email').value = email;
-      document.getElementById('password').value = '123456';
+    async function pedidoApi(url, opcoes = {}) {
+      const headers = { ...(opcoes.body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(opcoes.headers || {}) };
+      const resposta = await fetch(url, { ...opcoes, headers });
+      const dados = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) throw new Error(dados.erro || `O pedido falhou (${resposta.status}).`);
+      return dados;
+    }
+    function mostrarMensagem(mensagem, tipo = '') {
+      $('msgGeral').textContent = mensagem;
+      $('msgGeral').className = tipo;
+    }
+    function dataHora(valor) {
+      const data = new Date(valor);
+      return Number.isNaN(data.getTime()) ? escapar(valor) : data.toLocaleString('pt-PT');
+    }
+    function habilitarSecoes() {
+      const clinico = perfisClinicos.includes(user.perfil);
+      $('secFormulario').classList.toggle('hidden', clinico);
+      $('secMedico').classList.toggle('hidden', user.perfil !== 'MEDICO');
+      $('secAlertas').classList.toggle('hidden', !clinico);
+      $('secAssociacao').classList.toggle('hidden', !['DOENTE', 'MEDICO'].includes(user.perfil));
+      $('consentimentoCuidadorLabel').classList.toggle('hidden', user.perfil !== 'MEDICO');
     }
 
-    async function fazerLogin() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        document.getElementById('msgErroLogin').textContent = data.erro;
+    async function fazerLogin(evento) {
+      evento.preventDefault();
+      $('msgErroLogin').textContent = '';
+      try {
+        const dados = await pedidoApi('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: $('email').value, password: $('password').value }) });
+        token = dados.token;
+        user = dados.utilizador;
+        pacientes = await pedidoApi('/api/doentes');
+        if (!pacientes.length) throw new Error('Não existem processos de doentes atribuídos a esta conta.');
+        $('ecraLogin').classList.add('hidden');
+        $('ecraDashboard').classList.remove('hidden');
+        $('barraUtilizador').classList.remove('hidden');
+        $('etiquetaUtilizador').textContent = `${user.nome} (${user.perfil})`;
+        $('selecaoDoente').classList.toggle('hidden', pacientes.length < 2);
+        $('doenteSelecionado').innerHTML = pacientes.map(p => `<option value="${escapar(p.id_doente)}">${escapar(p.nome)} — ${escapar(p.numero_processo_clinico || '')}</option>`).join('');
+        $('doenteSelecionado').value = pacientes[0].id_doente;
+        idDoenteAtivo = pacientes[0].id_doente;
+        habilitarSecoes();
+        formAtivo = await pedidoApi('/api/formularios/ativo');
+        renderizarFormulario();
+        $('perguntaGrafico').innerHTML = formAtivo.perguntas.map(pergunta =>
+          `<option value="${escapar(pergunta.id_pergunta)}">${escapar(pergunta.enunciado)}</option>`
+        ).join('');
+        await carregarProcesso();
+        if (user.perfil === 'ENFERMEIRO' || user.perfil === 'MEDICO') await carregarAlertas();
+      } catch (erro) {
+        $('msgErroLogin').textContent = erro.message;
+      }
+    }
+
+    function renderizarFormulario() {
+      $('tituloFormulario').textContent = `${formAtivo.nome} (versão ${formAtivo.versao})`;
+      const categorias = { SINTOMA_GERAL: 'Sintomas gerais', ESCALA_NANO: 'Alterações neurológicas', AUTONOMIA_AVD: 'Autonomia e atividades diárias' };
+      $('contentorPerguntas').innerHTML = formAtivo.perguntas.map(pergunta => `
+        <fieldset>
+          <legend><strong>${escapar(categorias[pergunta.categoria] || pergunta.categoria)}</strong></legend>
+          <label for="resp_${escapar(pergunta.id_pergunta)}">${escapar(pergunta.enunciado)}</label>
+          <select id="resp_${escapar(pergunta.id_pergunta)}" data-opcao="${escapar(pergunta.id_pergunta)}">
+            <option value="">Não respondida</option>
+            ${pergunta.opcoes.map(opcao => `<option value="${escapar(opcao.id_opcao)}">${escapar(opcao.rotulo)}</option>`).join('')}
+          </select>
+          ${pergunta.categoria === 'SINTOMA_GERAL' ? `<label for="freq_${escapar(pergunta.id_pergunta)}">Frequência (opcional)</label>
+            <select id="freq_${escapar(pergunta.id_pergunta)}" data-frequencia="${escapar(pergunta.id_pergunta)}" disabled>
+              <option value="">Não indicada</option><option value="PONTUAL">Pontual</option><option value="INTERMITENTE">Intermitente</option><option value="DIARIA">Diária</option><option value="CONSTANTE">Constante</option>
+            </select>` : ''}
+        </fieldset>`).join('');
+    }
+
+    function desenharKps(avaliacoes) {
+      const contentor = $('chartKps');
+      if (!avaliacoes.length) {
+        contentor.textContent = 'Ainda não existem avaliações funcionais registadas.';
         return;
       }
-      token = data.token;
-      user = data.utilizador;
-      document.getElementById('ecraLogin').classList.add('hidden');
-      document.getElementById('ecraDashboard').classList.remove('hidden');
-      document.getElementById('barraUtilizador').classList.remove('hidden');
-      document.getElementById('etiquetaUtilizador').textContent = `${user.nome} (${user.perfil})`;
-
-      await carregarFormulario();
-      await carregarProcesso();
+      const largura = 600, topo = 18, base = 145, esquerda = 42, direita = 585;
+      const pontos = avaliacoes.map((avaliacao, indice) => {
+        const x = avaliacoes.length === 1 ? (esquerda + direita) / 2 : esquerda + indice * (direita - esquerda) / (avaliacoes.length - 1);
+        const y = base - Number(avaliacao.score_kps) * (base - topo) / 100;
+        return { x, y, score: Number(avaliacao.score_kps), data: avaliacao.data_avaliacao };
+      });
+      contentor.innerHTML = `<svg class="chart" viewBox="0 0 ${largura} 180" role="img" aria-labelledby="kpsSvgTitle kpsSvgDesc">
+        <title id="kpsSvgTitle">Evolução das avaliações Karnofsky</title>
+        <desc id="kpsSvgDesc">${pontos.map(p => `${escapar(p.data)}: ${p.score} pontos`).join('; ')}</desc>
+        <line x1="${esquerda}" y1="${topo}" x2="${esquerda}" y2="${base}" stroke="#718096"/>
+        <line x1="${esquerda}" y1="${base}" x2="${direita}" y2="${base}" stroke="#718096"/>
+        <text x="4" y="${topo + 4}" fill="#1a202c">100</text><text x="15" y="${base + 4}" fill="#1a202c">0</text>
+        ${pontos.length > 1 ? `<polyline points="${pontos.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#0f4c81" stroke-width="3"/>` : ''}
+        ${pontos.map(p => `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#0f4c81"><title>${escapar(p.data)}: ${p.score} pontos</title></circle>`).join('')}
+        ${pontos.map(p => `<text x="${p.x}" y="${base + 20}" text-anchor="middle" font-size="11" fill="#1a202c">${escapar(p.data)}</text>`).join('')}
+      </svg><p class="muted">Os pontos e as datas estão identificados; a avaliação mais recente: ${pontos[pontos.length - 1].score}/100.</p>`;
     }
 
-    async function carregarFormulario() {
-      const res = await fetch('/api/formularios/ativo', { headers: { Authorization: `Bearer ${token}` } });
-      formAtivo = await res.json();
-      document.getElementById('tituloFormulario').textContent = `${formAtivo.nome} (v${formAtivo.versao})`;
+    function desenharSintomas(submissoes) {
+      const idPergunta = $('perguntaGrafico').value;
+      const pontos = submissoes
+        .slice()
+        .sort((a, b) => a.data_referencia_sintomas.localeCompare(b.data_referencia_sintomas))
+        .map(submissao => {
+          const resposta = submissao.respostas.find(item => item.id_pergunta === idPergunta);
+          return resposta && !resposta.motivo_nao_avaliavel
+            ? { data: submissao.data_referencia_sintomas, score: Number(resposta.valor_numerico) }
+            : null;
+        }).filter(Boolean);
+      if (!pontos.length) {
+        $('chartSintomas').textContent = 'Ainda não existem respostas comparáveis para este domínio. Respostas em falta ou não avaliáveis não são representadas como ausência.';
+        return;
+      }
+      const esquerda = 42, direita = 585, topo = 18, base = 125;
+      const coordenadas = pontos.map((ponto, indice) => ({
+        ...ponto,
+        x: pontos.length === 1 ? (esquerda + direita) / 2 : esquerda + indice * (direita - esquerda) / (pontos.length - 1),
+        y: base - ponto.score * (base - topo) / 3
+      }));
+      $('chartSintomas').innerHTML = `<svg class="chart" viewBox="0 0 600 165" role="img" aria-labelledby="sintomasSvgTitle sintomasSvgDesc">
+        <title id="sintomasSvgTitle">Evolução reportada do domínio selecionado</title>
+        <desc id="sintomasSvgDesc">${coordenadas.map(p => `${escapar(p.data)}: intensidade ${p.score}`).join('; ')}</desc>
+        <line x1="${esquerda}" y1="${topo}" x2="${esquerda}" y2="${base}" stroke="#718096"/>
+        <line x1="${esquerda}" y1="${base}" x2="${direita}" y2="${base}" stroke="#718096"/>
+        <text x="12" y="${topo + 4}" fill="#1a202c">Grave</text><text x="12" y="${base + 4}" fill="#1a202c">Ausente</text>
+        ${coordenadas.length > 1 ? `<polyline points="${coordenadas.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#805ad5" stroke-width="3"/>` : ''}
+        ${coordenadas.map(p => `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#553c9a"><title>${escapar(p.data)}: intensidade ${p.score}</title></circle>`).join('')}
+        ${coordenadas.map(p => `<text x="${p.x}" y="${base + 20}" text-anchor="middle" font-size="11" fill="#1a202c">${escapar(p.data)}</text>`).join('')}
+      </svg><p class="muted">Só são comparadas respostas presentes e avaliáveis; cada ponto indica a data da informação.</p>`;
+    }
 
-      document.getElementById('contentorPerguntas').innerHTML = formAtivo.perguntas.map(p => `
-        <div style="border-bottom:1px solid #edf2f7; padding:0.35rem 0;">
-          <label><strong>[${p.categoria}] ${p.enunciado}</strong> ${p.obrigatoria ? '*' : ''}</label>
-          <select id="resp_${p.id_pergunta}">
-            <option value="">-- Selecione uma opção padronizada (RF15) --</option>
-            ${p.opcoes.map(o => `<option value="${o.id_opcao}">${o.rotulo}</option>`).join('')}
-          </select>
-        </div>
-      `).join('');
+    function preencherDiagnostico(diagnostico) {
+      const d = diagnostico || {};
+      $('diagData').value = d.data_diagnostico || '';
+      $('diagLocalizacao').value = d.localizacao_tumoral || '';
+      $('diagLateralidade').value = d.lateralidade || '';
+      $('diagIdh').value = d.estatuto_idh || '';
+      $('diagMgmt').value = d.metilacao_mgmt || '';
+      $('diagFase').value = d.fase_clinica_atual || '';
+      $('inputFaseClinica').value = d.fase_clinica_atual || '';
     }
 
     async function carregarProcesso() {
-      const res = await fetch(`/api/doentes/${idDoenteAtivo}/processo`, { headers: { Authorization: `Bearer ${token}` } });
-      const p = await res.json();
+      try {
+        processoAtual = await pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/processo`);
+        const p = processoAtual;
+        const d = p.diagnostico || {};
+        const cuidadorObrigatorio = Boolean(p.doente.participacao_cuidador_obrigatoria);
+        $('secFormulario').classList.toggle('hidden', perfisClinicos.includes(user.perfil) ||
+          (user.perfil === 'DOENTE' && cuidadorObrigatorio));
+        const kpsBadge = p.doente.participacao_cuidador_obrigatoria
+          ? `<span class="badge badge-alerta">KPS ${escapar(p.doente.ultimo_kps)} — é necessária a participação do cuidador</span>`
+          : `<span class="badge badge-ok">KPS ${escapar(p.doente.ultimo_kps)} — cuidador não obrigatório pelo limiar KPS</span>`;
+        $('painelTopoDoente').innerHTML = `<h2>${escapar(p.doente.nome)}</h2>${kpsBadge}
+          <p class="notice">Lembrete de monitorização: ${escapar(p.lembrete.mensagem)}</p>
+          ${user.perfil === 'DOENTE' && cuidadorObrigatorio ? '<p role="status">A monitorização deve ser preenchida pelo cuidador autorizado, conforme a avaliação funcional mais recente.</p>' : ''}
+          ${p.doente.nome_medico_responsavel ? `<p>Médico responsável: ${escapar(p.doente.nome_medico_responsavel)} · Processo: ${escapar(p.doente.numero_processo_clinico)}</p>` : ''}`;
+        if (perfisClinicos.includes(user.perfil)) {
+          $('infoDiagnostico').innerHTML = `<p><strong>Diagnóstico:</strong> ${escapar(d.localizacao_tumoral || 'Não registado')} (${escapar(d.lateralidade || '—')}) · IDH: ${escapar(d.estatuto_idh || '—')} · MGMT: ${escapar(d.metilacao_mgmt || '—')}</p>
+            <p><strong>Fase clínica:</strong> ${escapar(d.fase_clinica_atual || '—')}</p>
+            <p><strong>Cuidador(es) autorizado(s):</strong> ${p.cuidadores.length ? p.cuidadores.map(c => `${escapar(c.nome)} (${escapar(c.grau_parentesco)})`).join(', ') : 'Nenhum associado'}</p>
+            <h3>Tratamentos</h3>${p.tratamentos.length ? `<ul>${p.tratamentos.map(t => `<li>${escapar(t.tipo)} — ${escapar(t.estado)} (${escapar(t.data_inicio)}${t.data_fim ? ` a ${escapar(t.data_fim)}` : ''}): ${escapar(t.descricao_esquema)}</li>`).join('')}</ul>` : '<p>Sem tratamentos registados.</p>'}`;
+          preencherDiagnostico(d);
+          if (p.planos[0]) $('inputPeriodicidade').value = p.planos[0].periodicidade_dias;
+        } else {
+          $('infoDiagnostico').innerHTML = '<p>Esta área apresenta a evolução funcional autorizada para o seu perfil.</p>';
+        }
+        desenharKps(p.avaliacoesKps);
+        desenharSintomas(p.submissoes);
+        renderizarHistorico(p.submissoes);
+      } catch (erro) { mostrarMensagem(erro.message, 'error'); }
+    }
 
-      const badgeKps = p.doente.participacao_cuidador_obrigatoria
-        ? `<span class="badge badge-critica">RF05 Ativo: KPS = ${p.doente.ultimo_kps} (&le; 70) — Participação do Cuidador Obrigatória</span>`
-        : `<span class="badge badge-ok">KPS = ${p.doente.ultimo_kps} (&gt; 70) — Doente Autónomo</span>`;
-
-      document.getElementById('painelTopoDoente').innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-          <div><strong>Doente:</strong> ${p.doente.nome} (Processo: ${p.doente.numero_processo_clinico}) | <strong>Médico:</strong> ${p.doente.nome_medico_responsavel}</div>
-          ${badgeKps}
-        </div>
-        <p style="margin:0.4rem 0 0 0; font-size:0.9rem;">🔔 <strong>${p.lembrete.mensagem}</strong></p>
-      `;
-
-      const d = p.diagnostico || {};
-      document.getElementById('infoDiagnostico').innerHTML = `
-        <p><strong>Tumoral:</strong> ${d.localizacao_tumoral || '-'} (${d.lateralidade || '-'}) | <strong>IDH:</strong> ${d.estatuto_idh || '-'} | <strong>MGMT:</strong> ${d.metilacao_mgmt || '-'}</p>
-        <p><strong>Fase Clínica:</strong> ${d.fase_clinica_atual || '-'} | <strong>Cuidador Autorizado (RF03):</strong> ${p.cuidadores.map(c => `${c.nome} (${c.grau_parentesco})`).join(', ')}</p>
-      `;
-
-      const ctx = document.getElementById('chartKps').getContext('2d');
-      if (grafico) grafico.destroy();
-      grafico = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: p.avaliacoesKps.map(k => k.data_avaliacao),
-          datasets: [{
-            label: 'Evolução Karnofsky Performance Status (KPS)',
-            data: p.avaliacoesKps.map(k => k.score_kps),
-            borderColor: '#0f4c81',
-            backgroundColor: 'rgba(15, 76, 129, 0.15)',
-            fill: true
-          }]
-        },
-        options: { scales: { y: { min: 0, max: 100 } } }
-      });
-
-      if (user.perfil === 'MEDICO') document.getElementById('secMedico').classList.remove('hidden');
-      if (user.perfil === 'ENFERMEIRO' || user.perfil === 'MEDICO') {
-        document.getElementById('secAlertas').classList.remove('hidden');
-        await carregarTabelaAlertas();
+    function renderizarHistorico(submissoes) {
+      if (!submissoes.length) {
+        $('contentorHistorico').textContent = 'Ainda não existem submissões de monitorização.';
+        return;
       }
-
-      document.getElementById('contentorHistorico').innerHTML = p.submissoes.slice().reverse().map(s => {
-        const alteradas = s.respostas.filter(r => r.valor_codificado !== 'AUSENTE');
-        return `
-          <div style="border-left:4px solid var(--primary); padding-left:0.75rem; margin-bottom:0.8rem;">
-            <strong>Data Ref. Sintomas (RF17): ${s.data_referencia_sintomas}</strong> (Submetido em ${new Date(s.data_hora_submissao).toLocaleString('pt-PT')})
-            — <em>Responsável (RF06): ${s.nome_autor} [${s.perfil_autor_no_registo}]</em>
-            <div style="font-size:0.86rem; margin-top:0.25rem;">
-              ${alteradas.length === 0 ? 'Todos os sintomas/domínios reportados como Ausentes.' : alteradas.map(a => `<span class="badge badge-critica" style="margin:2px;">${a.enunciado}: ${a.rotulo}</span>`).join('')}
-            </div>
-          </div>
-        `;
+      $('contentorHistorico').innerHTML = submissoes.slice().reverse().map(submissao => {
+        const respostas = submissao.respostas.map(resposta =>
+          `          <span class="badge ${resposta.valor_codificado === 'AUSENTE' ? 'badge-ok' : 'badge-alerta'}" style="margin:2px">${escapar(resposta.enunciado)}: ${escapar(resposta.rotulo || 'Não avaliado')}${resposta.frequencia ? ` · frequência ${escapar(resposta.frequencia)}` : ''}</span>`
+        ).join('');
+        return `<article class="history-item"><strong>Data dos sintomas: ${escapar(submissao.data_referencia_sintomas)}</strong>
+          <p>Submetido em ${dataHora(submissao.data_hora_submissao)} · Responsável: ${escapar(submissao.nome_autor)} (${escapar(submissao.perfil_autor_no_registo)})</p>
+          ${respostas || '<p>Esta submissão não contém respostas registadas.</p>'}
+          <p class="muted">Perguntas sem resposta não foram registadas como ausência de sintomas.</p></article>`;
       }).join('');
     }
 
-    async function carregarTabelaAlertas() {
-      const res = await fetch('/api/alertas', { headers: { Authorization: `Bearer ${token}` } });
-      const lista = await res.json();
-      document.querySelector('#tabelaAlertas tbody').innerHTML = lista.map(a => `
-        <tr>
-          <td>${new Date(a.data_hora_geracao).toLocaleString('pt-PT')}</td>
-          <td>${a.nome_doente}</td>
-          <td>${a.nome_regra}</td>
-          <td><span class="badge badge-critica">${a.prioridade}</span></td>
-          <td><strong>${a.estado_atual}</strong></td>
-          <td>${a.resumo_agravamento}</td>
-          <td>
-            <select onchange="triar('${a.id_alerta}', this.value)">
-              <option value="">Alterar estado (RF27)...</option>
-              <option value="Em análise">Em análise</option>
-              <option value="Encaminhado">Encaminhar p/ Médico (RF26)</option>
-              <option value="Concluído">Concluído</option>
-            </select>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    async function triar(idAlerta, estado_novo) {
-      if (!estado_novo) return;
-      await fetch(`/api/alertas/${idAlerta}/triagem`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ estado_novo, nota_triagem: `Atualizado por ${user.nome}` })
-      });
-      await carregarTabelaAlertas();
+    async function carregarAlertas() {
+      try {
+        const alertas = await pedidoApi('/api/alertas');
+        $('tabelaAlertas').innerHTML = alertas.map(alerta => `<tr>
+          <td>${dataHora(alerta.data_hora_geracao)}</td><td>${escapar(alerta.nome_doente)}</td>
+          <td>${escapar(alerta.nome_regra)}<br /><span class="muted">${escapar(alerta.origem_gatilho)}</span></td>
+          <td><span class="badge badge-alerta">${escapar(alerta.prioridade)}</span></td>
+          <td>${escapar(alerta.estado_atual)}</td><td>${escapar(alerta.resumo_agravamento)}</td>
+          <td><label class="hidden" for="estado_${escapar(alerta.id_alerta)}">Novo estado para o alerta</label>
+          <select id="estado_${escapar(alerta.id_alerta)}" data-triar="${escapar(alerta.id_alerta)}" aria-label="Alterar estado do alerta de ${escapar(alerta.nome_doente)}">
+            <option value="">Selecionar ação</option><option value="Em análise">Em análise</option><option value="Encaminhado">Encaminhar ao médico</option><option value="Concluído">Concluído</option>
+          </select><label class="hidden" for="prioridade_${escapar(alerta.id_alerta)}">Prioridade</label>
+          <select id="prioridade_${escapar(alerta.id_alerta)}" data-prioridade="${escapar(alerta.id_alerta)}" aria-label="Prioridade do alerta de ${escapar(alerta.nome_doente)}">
+            ${['Baixa','Média','Alta','Crítica'].map(prioridade => `<option ${alerta.prioridade === prioridade ? 'selected' : ''}>${prioridade}</option>`).join('')}
+          </select></td></tr>`).join('') || '<tr><td colspan="7">Não existem alertas para os processos autorizados.</td></tr>';
+      } catch (erro) { mostrarMensagem(erro.message, 'error'); }
     }
 
     async function submeterMonitorizacao() {
-      const respostas = formAtivo.perguntas.map(p => ({
-        id_pergunta: p.id_pergunta,
-        id_opcao: document.getElementById(`resp_${p.id_pergunta}`).value
-      })).filter(r => r.id_opcao !== '');
+      $('msgErroForm').textContent = '';
+      const respostas = formAtivo.perguntas.map(pergunta => ({
+        id_pergunta: pergunta.id_pergunta,
+        id_opcao: $(`resp_${pergunta.id_pergunta}`).value,
+        frequencia: $(`freq_${pergunta.id_pergunta}`)?.value || undefined
+      })).filter(resposta => resposta.id_opcao);
+      try {
+        const resultado = await pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/submissoes`, {
+          method: 'POST',
+          body: JSON.stringify({ id_formulario: formAtivo.id_formulario, data_referencia_sintomas: $('inputDataRef').value, respostas })
+        });
+        $('msgErroForm').className = 'success';
+        $('msgErroForm').textContent = `Registo guardado. Alertas gerados: ${resultado.alertasGerados.length}.`;
+        formAtivo.perguntas.forEach(pergunta => $(`resp_${pergunta.id_pergunta}`).value = '');
+        await carregarProcesso();
+      } catch (erro) { $('msgErroForm').className = 'error'; $('msgErroForm').textContent = erro.message; }
+    }
 
-      const res = await fetch(`/api/doentes/${idDoenteAtivo}/submissoes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          id_formulario: formAtivo.id_formulario,
-          data_referencia_sintomas: document.getElementById('inputDataRef').value,
-          respostas
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        document.getElementById('msgErroForm').textContent = `${data.erro} Em falta: ${(data.camposEmFalta || []).join(', ')}`;
-        return;
-      }
-      document.getElementById('msgErroForm').textContent = '';
-      alert(`Submissão guardada! Alertas gerados: ${data.alertasGerados.length}`);
+    async function executarAcao(acao, mensagem) {
+      try { await acao(); mostrarMensagem(mensagem, 'success'); await carregarProcesso(); }
+      catch (erro) { mostrarMensagem(erro.message, 'error'); }
+    }
+
+    document.querySelectorAll('[data-email]').forEach(botao => botao.addEventListener('click', () => {
+      $('email').value = botao.dataset.email; $('password').value = '123456';
+    }));
+    $('formLogin').addEventListener('submit', fazerLogin);
+    $('terminarSessao').addEventListener('click', () => location.reload());
+    $('doenteSelecionado').addEventListener('change', async evento => {
+      idDoenteAtivo = evento.target.value;
       await carregarProcesso();
-    }
-
-    async function guardarKps() {
-      const score_kps = document.getElementById('inputKps').value;
-      await fetch(`/api/doentes/${idDoenteAtivo}/kps`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ score_kps })
-      });
-      await carregarProcesso();
-    }
-
-    async function guardarPlano() {
-      const periodicidade_dias = document.getElementById('inputPeriodicidade').value;
-      await fetch(`/api/doentes/${idDoenteAtivo}/planos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ periodicidade_dias })
-      });
-      await carregarProcesso();
-    }
-
-    async function guardarDecisao() {
-      const decisao_medica = document.getElementById('selectDecisao').value;
-      const fundamentacao_clinica = document.getElementById('inputFundamentacao').value || 'Decisão registada após revisão longitudinal';
-      await fetch(`/api/doentes/${idDoenteAtivo}/decisoes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ decisao_medica, fundamentacao_clinica })
-      });
-      alert('Decisão registada na tabela DecisaoAcompanhamento (RF30)!');
-      await carregarProcesso();
-    }
-
-    async function abrirFhir() {
-      const res = await fetch(`/api/fhir/Patient/${idDoenteAtivo}/$everything`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const bundle = await res.json();
-      const w = window.open('', '_blank');
-      w.document.write(`<pre>${JSON.stringify(bundle, null, 2)}</pre>`);
-    }
+    });
+    $('perguntaGrafico').addEventListener('change', () => {
+      if (processoAtual) desenharSintomas(processoAtual.submissoes);
+    });
+    $('submeterMonitorizacao').addEventListener('click', submeterMonitorizacao);
+    $('contentorPerguntas').addEventListener('change', evento => {
+      const idPergunta = evento.target.dataset.opcao;
+      if (!idPergunta || !$(`freq_${idPergunta}`)) return;
+      const opcao = formAtivo.perguntas.find(pergunta => pergunta.id_pergunta === idPergunta)?.opcoes
+        .find(item => item.id_opcao === evento.target.value);
+      const frequencia = $(`freq_${idPergunta}`);
+      const permiteFrequencia = opcao && !['AUSENTE', 'IMPOSSIVEL_AVALIAR'].includes(opcao.valor_codificado);
+      frequencia.disabled = !permiteFrequencia;
+      if (!permiteFrequencia) frequencia.value = '';
+    });
+    $('guardarKps').addEventListener('click', () => executarAcao(async () => pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/kps`, { method:'POST', body:JSON.stringify({ score_kps:$('inputKps').value }) }), 'Avaliação KPS registada.'));
+    $('guardarPlano').addEventListener('click', () => executarAcao(async () => pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/planos`, { method:'POST', body:JSON.stringify({ periodicidade_dias:$('inputPeriodicidade').value, fase_clinica_atual:$('inputFaseClinica').value || undefined }) }), 'Plano de monitorização atualizado.'));
+    $('guardarDiagnostico').addEventListener('click', () => executarAcao(async () => pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/diagnostico`, { method:'PUT', body:JSON.stringify({
+      data_diagnostico:$('diagData').value, localizacao_tumoral:$('diagLocalizacao').value, lateralidade:$('diagLateralidade').value,
+      estatuto_idh:$('diagIdh').value, metilacao_mgmt:$('diagMgmt').value, fase_clinica_atual:$('diagFase').value
+    }) }), 'Diagnóstico atualizado.'));
+    $('guardarTratamento').addEventListener('click', () => executarAcao(async () => pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/tratamentos`, { method:'POST', body:JSON.stringify({
+      tipo:$('tratTipo').value, estado:$('tratEstado').value, data_inicio:$('tratInicio').value, data_fim:$('tratFim').value || undefined, descricao_esquema:$('tratDescricao').value
+    }) }), 'Tratamento registado.'));
+    $('guardarDecisao').addEventListener('click', () => executarAcao(async () => pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/decisoes`, { method:'POST', body:JSON.stringify({
+      decisao_medica:$('selectDecisao').value, fundamentacao_clinica:$('inputFundamentacao').value
+    }) }), 'Decisão de acompanhamento registada.'));
+    $('associarCuidador').addEventListener('click', () => executarAcao(async () => pedidoApi(`/api/doentes/${encodeURIComponent(idDoenteAtivo)}/cuidadores`, { method:'POST', body:JSON.stringify({
+      email_cuidador:$('emailCuidador').value, grau_parentesco:$('grauParentesco').value,
+      consentimento_confirmado:user.perfil === 'DOENTE' || $('consentimentoCuidador').checked
+    }) }), 'Cuidador autorizado associado.'));
+    $('tabelaAlertas').addEventListener('change', async evento => {
+      const idAlerta = evento.target.dataset.triar;
+      if (!idAlerta || !evento.target.value) return;
+      const prioridade = $(`prioridade_${idAlerta}`).value;
+      try {
+        await pedidoApi(`/api/alertas/${encodeURIComponent(idAlerta)}/triagem`, { method:'PUT', body:JSON.stringify({
+          estado_novo:evento.target.value, prioridade, nota_triagem:`Triagem registada por ${user.nome}.`
+        }) });
+        mostrarMensagem('Triagem do alerta registada.', 'success');
+        await carregarAlertas();
+      } catch (erro) { mostrarMensagem(erro.message, 'error'); }
+    });
+    $('abrirFhir').addEventListener('click', async () => {
+      try {
+        const bundle = await pedidoApi(`/api/fhir/Patient/${encodeURIComponent(idDoenteAtivo)}/$everything`);
+        const janela = window.open('', '_blank');
+        if (!janela) throw new Error('O navegador bloqueou a nova janela. Permita a abertura para consultar o bundle.');
+        const pre = janela.document.createElement('pre');
+        pre.textContent = JSON.stringify(bundle, null, 2);
+        janela.document.body.appendChild(pre);
+      } catch (erro) { mostrarMensagem(erro.message, 'error'); }
+    });
+    $('inputDataRef').value = new Date().toISOString().slice(0, 10);
+    $('inputDataRef').max = new Date().toISOString().slice(0, 10);
   </script>
 </body>
 </html>

@@ -9,6 +9,8 @@ router.get('/doentes', autenticarJWT, ApiController.listarDoentes);
 router.get('/doentes/:idDoente/processo', autenticarJWT, ApiController.obterProcessoDoente);
 router.post('/doentes/:idDoente/submissoes', autenticarJWT, ApiController.submeterMonitorizacao);
 router.post('/doentes/:idDoente/kps', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarKps);
+router.put('/doentes/:idDoente/diagnostico', autenticarJWT, exigirPerfis('MEDICO'), ApiController.atualizarDiagnostico);
+router.post('/doentes/:idDoente/cuidadores', autenticarJWT, exigirPerfis('DOENTE', 'MEDICO'), ApiController.associarCuidador);
 router.post('/doentes/:idDoente/planos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.definirPlano);
 router.post('/doentes/:idDoente/tratamentos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarTratamento);
 router.post('/doentes/:idDoente/decisoes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarDecisao);

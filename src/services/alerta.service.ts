@@ -6,7 +6,7 @@ export class AlertaService {
     const alertasCriados: any[] = [];
     const ultimoKpsRow = db.prepare(`
       SELECT score_kps FROM AvaliacaoKarnofsky
-      WHERE id_doente = ? ORDER BY data_avaliacao DESC LIMIT 1
+      WHERE id_doente = ? ORDER BY data_avaliacao DESC, rowid DESC LIMIT 1
     `).get(idDoente) as any;
     const kpsAtual = ultimoKpsRow ? ultimoKpsRow.score_kps : 100;
 
@@ -19,7 +19,8 @@ export class AlertaService {
     `).all(idSubmissao) as any[];
 
     const regraSeveridade = db.prepare(`SELECT * FROM RegraAlerta WHERE tipo_regra = 'SEVERIDADE_IMEDIATA_RF23' AND ativa = 1 LIMIT 1`).get() as any;
-    const itensGraves = respostasAtuais.filter(r => r.valor_numerico >= 3 || (r.categoria === 'ESCALA_NANO' && r.valor_numerico >= 2));
+    const itensGraves = respostasAtuais.filter(r => !r.motivo_nao_avaliavel &&
+      (r.valor_numerico >= 3 || (r.categoria === 'ESCALA_NANO' && r.valor_numerico >= 2)));
 
     if (regraSeveridade && itensGraves.length > 0) {
       const descricao = itensGraves.map(i => `${i.enunciado}: ${i.rotulo}`).join('; ');
@@ -28,18 +29,22 @@ export class AlertaService {
     }
 
     const submissaoAnterior = db.prepare(`
-      SELECT id_submissao FROM SubmissaoMonitorizacao
+      SELECT id_submissao, id_formulario FROM SubmissaoMonitorizacao
       WHERE id_doente = ? AND id_submissao != ?
       ORDER BY data_hora_submissao DESC LIMIT 1
     `).get(idDoente, idSubmissao) as any;
 
     const regraLongitudinal = db.prepare(`SELECT * FROM RegraAlerta WHERE tipo_regra = 'AGRAVAMENTO_LONGITUDINAL_RF24' AND ativa = 1 LIMIT 1`).get() as any;
 
-    if (submissaoAnterior && regraLongitudinal) {
-      const respostasAnteriores = db.prepare(`SELECT id_pergunta, valor_numerico FROM RespostaMonitorizacao WHERE id_submissao = ?`).all(submissaoAnterior.id_submissao) as any[];
+    const formularioAtual = db.prepare('SELECT id_formulario FROM SubmissaoMonitorizacao WHERE id_submissao = ?').get(idSubmissao) as any;
+    if (submissaoAnterior && regraLongitudinal && submissaoAnterior.id_formulario === formularioAtual.id_formulario) {
+      const respostasAnteriores = db.prepare(`SELECT id_pergunta, valor_numerico, motivo_nao_avaliavel
+        FROM RespostaMonitorizacao WHERE id_submissao = ?`).all(submissaoAnterior.id_submissao) as any[];
       const agravamentos = respostasAtuais.filter(atual => {
+        if (atual.motivo_nao_avaliavel) return false;
         const ant = respostasAnteriores.find(a => a.id_pergunta === atual.id_pergunta);
-        return ant && atual.valor_numerico > ant.valor_numerico && atual.valor_numerico >= 2;
+        return ant && !ant.motivo_nao_avaliavel &&
+          atual.valor_numerico > ant.valor_numerico && atual.valor_numerico >= 2;
       });
 
       if (agravamentos.length > 0) {
@@ -61,7 +66,7 @@ export class AlertaService {
       INSERT INTO AlertaClinico (id_alerta, id_submissao, id_regra, data_hora_geracao, origem_gatilho, prioridade, estado_atual, resumo_agravamento)
       VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?)
     `).run(id_alerta, idSubmissao, idRegra, agora, origemGatilho, prioridade, resumoAgravamento);
-        return {
+    return {
       id_alerta,
       id_submissao: idSubmissao,
       id_regra: idRegra,
@@ -87,6 +92,11 @@ export class AlertaService {
   static registarTriagemAlerta(idAlerta: string, idUtilizador: string, novoEstado: string, novaPrioridade: string | undefined, notaTriagem: string) {
     const alerta = db.prepare('SELECT * FROM AlertaClinico WHERE id_alerta = ?').get(idAlerta) as any;
     if (!alerta) throw new Error('AlertaClinico não encontrado.');
+    const estadosValidos = ['Pendente', 'Em análise', 'Encaminhado', 'Concluído'];
+    const prioridadesValidas = ['Baixa', 'Média', 'Alta', 'Crítica'];
+    if (!estadosValidos.includes(novoEstado)) throw new Error('Estado de alerta inválido.');
+    if (novaPrioridade && !prioridadesValidas.includes(novaPrioridade)) throw new Error('Prioridade de alerta inválida.');
+    if (typeof notaTriagem !== 'string' || !notaTriagem.trim()) throw new Error('Registe uma nota de triagem.');
     const prioridadeFinal = novaPrioridade || alerta.prioridade;
     const agora = new Date().toISOString();
     const tipoAcao = novoEstado === 'Encaminhado' ? 'ENCAMINHAMENTO_MEDICO_RF26' : 'TRIAGEM_ENFERMAGEM';

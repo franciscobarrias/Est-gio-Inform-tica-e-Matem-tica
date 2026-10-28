@@ -13,17 +13,21 @@ export class FhirObservationMapper {
   }
 
   static submissaoToFhirQuestionnaireResponse(sub: any) {
+    const totalPerguntasAtivas = sub.total_perguntas_ativas || sub.respostas.length;
     return {
       resourceType: 'QuestionnaireResponse',
       id: sub.id_submissao,
       questionnaire: `Questionnaire/${sub.id_formulario}`,
-      status: 'completed',
+      status: sub.respostas.length < totalPerguntasAtivas ? 'in-progress' : 'completed',
       subject: { reference: `Patient/${sub.id_doente}` },
       authored: sub.data_hora_submissao,
       item: sub.respostas.map((r: any) => ({
         linkId: r.id_pergunta,
         text: `[${r.categoria}] ${r.enunciado}`,
-        answer: [{ valueCoding: { code: r.valor_codificado, display: r.rotulo } }]
+        answer: [{
+          valueCoding: { code: r.valor_codificado, display: r.rotulo },
+          ...(r.frequencia ? { extension: [{ url: 'https://chsj.min-saude.pt/fhir/StructureDefinition/symptom-frequency', valueCode: r.frequencia }] } : {})
+        }]
       }))
     };
   }

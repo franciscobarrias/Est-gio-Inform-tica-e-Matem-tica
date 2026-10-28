@@ -4,8 +4,10 @@
   "description": "Plataforma Digital de Monitorização de Glioblastoma",
   "main": "src/app.ts",
   "scripts": {
-    "dev": "npx ts-node src/app.ts",
-    "seed": "npx ts-node src/seed.ts"
+    "dev": "npx --yes --package=node@22 -c \"node node_modules/ts-node/dist/bin.js src/app.ts\"",
+    "seed": "npx --yes --package=node@22 -c \"node node_modules/ts-node/dist/bin.js src/seed.ts\"",
+    "typecheck": "npx tsc --noEmit",
+    "test": "npx --yes --package=node@22 -c \"node -r ts-node/register --test src/tests/*.test.ts\""
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
