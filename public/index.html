@@ -385,12 +385,12 @@
           <td><span class="badge badge-alerta">${escapar(alerta.prioridade)}</span></td>
           <td>${escapar(alerta.estado_atual)}</td><td>${escapar(alerta.resumo_agravamento)}</td>
           <td><label class="hidden" for="estado_${escapar(alerta.id_alerta)}">Novo estado para o alerta</label>
-          <select id="estado_${escapar(alerta.id_alerta)}" data-triar="${escapar(alerta.id_alerta)}" aria-label="Alterar estado do alerta de ${escapar(alerta.nome_doente)}">
-            <option value="">Selecionar ação</option><option value="Em análise">Em análise</option><option value="Encaminhado">Encaminhar ao médico</option><option value="Concluído">Concluído</option>
+          <select id="estado_${escapar(alerta.id_alerta)}" aria-label="Estado do alerta de ${escapar(alerta.nome_doente)}">
+            ${['Pendente','Em análise','Encaminhado','Concluído'].map(estado => `<option value="${estado}" ${alerta.estado_atual === estado ? 'selected' : ''}>${estado === 'Encaminhado' ? 'Encaminhar ao médico' : estado}</option>`).join('')}
           </select><label class="hidden" for="prioridade_${escapar(alerta.id_alerta)}">Prioridade</label>
           <select id="prioridade_${escapar(alerta.id_alerta)}" data-prioridade="${escapar(alerta.id_alerta)}" aria-label="Prioridade do alerta de ${escapar(alerta.nome_doente)}">
             ${['Baixa','Média','Alta','Crítica'].map(prioridade => `<option ${alerta.prioridade === prioridade ? 'selected' : ''}>${prioridade}</option>`).join('')}
-          </select></td></tr>`).join('') || '<tr><td colspan="7">Não existem alertas para os processos autorizados.</td></tr>';
+          </select><button type="button" data-guardar-triagem="${escapar(alerta.id_alerta)}" aria-label="Guardar triagem do alerta de ${escapar(alerta.nome_doente)}">Guardar triagem</button></td></tr>`).join('') || '<tr><td colspan="7">Não existem alertas para os processos autorizados.</td></tr>';
       } catch (erro) { mostrarMensagem(erro.message, 'error'); }
     }
 
@@ -458,17 +458,22 @@
       email_cuidador:$('emailCuidador').value, grau_parentesco:$('grauParentesco').value,
       consentimento_confirmado:user.perfil === 'DOENTE' || $('consentimentoCuidador').checked
     }) }), 'Cuidador autorizado associado.'));
-    $('tabelaAlertas').addEventListener('change', async evento => {
-      const idAlerta = evento.target.dataset.triar;
-      if (!idAlerta || !evento.target.value) return;
+    $('tabelaAlertas').addEventListener('click', async evento => {
+      const botao = evento.target.closest('[data-guardar-triagem]');
+      const idAlerta = botao?.dataset.guardarTriagem;
+      if (!idAlerta) return;
+      botao.disabled = true;
       const prioridade = $(`prioridade_${idAlerta}`).value;
       try {
         await pedidoApi(`/api/alertas/${encodeURIComponent(idAlerta)}/triagem`, { method:'PUT', body:JSON.stringify({
-          estado_novo:evento.target.value, prioridade, nota_triagem:`Triagem registada por ${user.nome}.`
+          estado_novo:$(`estado_${idAlerta}`).value, prioridade, nota_triagem:`Triagem registada por ${user.nome}.`
         }) });
         mostrarMensagem('Triagem do alerta registada.', 'success');
         await carregarAlertas();
-      } catch (erro) { mostrarMensagem(erro.message, 'error'); }
+      } catch (erro) {
+        botao.disabled = false;
+        mostrarMensagem(erro.message, 'error');
+      }
     });
     $('abrirFhir').addEventListener('click', async () => {
       mostrarMensagem('');
