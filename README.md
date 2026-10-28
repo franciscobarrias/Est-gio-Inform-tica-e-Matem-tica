@@ -44,7 +44,12 @@ npm run dev
 - Formulário estruturado para sintomas gerais, domínios neurológicos e autonomia; permite submissões parciais e regista frequência opcional.
 - Respostas «Ausente», «Não consigo avaliar» e perguntas omitidas são representadas separadamente. Só respostas efetivamente fornecidas são persistidas.
 - Histórico com autor e data/hora, lembretes, gráficos cronológicos de KPS e de respostas comparáveis.
-- Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria.
+- Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria. A prioridade é graduada (limiares demonstrativos):
+  - **Crítica:** alteração neurológica grave ou alteração do estado de consciência moderada ou grave;
+  - **Alta:** alteração neurológica moderada, sintoma geral grave ou dependência total;
+  - **Média:** restantes agravamentos;
+  - um KPS ≤ 70 sobe um nível, sem chegar a Crítica. O motivo fica escrito no resumo do alerta.
+- Interface por separadores (Alertas, Resumo clínico, Evolução, Registos do doente e Gestão clínica), com o doente em consulta sempre identificado.
 - Exportação autenticada de um bundle HL7 FHIR para o processo clínico.
 - Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
 

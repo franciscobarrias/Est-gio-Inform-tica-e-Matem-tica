@@ -19,8 +19,8 @@ export class MedicoService {
     fase_clinica_atual: string;
   }) {
     if (!dados || typeof dados !== 'object') throw new Error('Dados do diagnóstico inválidos.');
-    const camposObrigatorios = Object.entries(dados);
-    if (camposObrigatorios.some(([, valor]) => typeof valor !== 'string' || !valor.trim())) {
+    const camposObrigatorios = ['data_diagnostico', 'localizacao_tumoral', 'lateralidade', 'estatuto_idh', 'metilacao_mgmt', 'fase_clinica_atual'] as const;
+    if (camposObrigatorios.some(campo => typeof dados[campo] !== 'string' || !dados[campo].trim())) {
       throw new Error('Preencha todos os campos do diagnóstico.');
     }
     if (!dataIsoValida(dados.data_diagnostico)) {

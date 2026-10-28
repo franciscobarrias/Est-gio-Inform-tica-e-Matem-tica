@@ -144,3 +144,28 @@ test('valida e guarda o diagnóstico do médico responsável', () => {
   }) as { localizacao_tumoral: string };
   assert.equal(resultado.localizacao_tumoral, 'Frontal');
 });
+test('gradua a prioridade dos alertas pela gravidade e pelo KPS', () => {
+  const item = (id_pergunta: string, categoria: string, valor_numerico: number) => ({ id_pergunta, categoria, valor_numerico });
+  assert.equal(AlertaService.calcularPrioridade([item('perg-marcha', 'ESCALA_NANO', 3)], 90).prioridade, 'Crítica');
+  assert.equal(AlertaService.calcularPrioridade([item('perg-consciencia', 'ESCALA_NANO', 2)], 90).prioridade, 'Crítica');
+  assert.equal(AlertaService.calcularPrioridade([item('perg-forca', 'ESCALA_NANO', 2)], 90).prioridade, 'Alta');
+  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 3)], 90).prioridade, 'Alta');
+  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 2)], 90).prioridade, 'Média');
+  // KPS <= 70 sobe um nível, mas só os critérios neurológicos chegam a Crítica.
+  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 2)], 60).prioridade, 'Alta');
+  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 3)], 60).prioridade, 'Alta');
+  assert.match(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 2)], 60).motivo, /KPS 60/);
+});
+
+test('não permite alterar um alerta já concluído', () => {
+  const formulario = SintomaService.obterFormularioAtivo();
+  const pergunta = formulario.perguntas.find((item: any) => item.id_pergunta === 'perg-forca');
+  const grave = pergunta.opcoes.find((opcao: any) => opcao.valor_codificado === 'GRAVE');
+  const { alertasGerados } = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario,
+    data_referencia_sintomas: new Date().toISOString().slice(0, 10),
+    respostas: [{ id_pergunta: pergunta.id_pergunta, id_opcao: grave.id_opcao }]
+  });
+  AlertaService.registarTriagemAlerta(alertasGerados[0].id_alerta, idMedico, 'Concluído', undefined, 'Resolvido.');
+  assert.throws(() => AlertaService.registarTriagemAlerta(alertasGerados[0].id_alerta, idMedico, 'Em análise', undefined, 'Reabrir.'), /já está concluído/);
+});

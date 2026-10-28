@@ -6,6 +6,15 @@ import { MedicoService } from '../services/medico.service';
 import { AlertaService } from '../services/alerta.service';
 import { FhirService } from '../services/fhir.service';
 
+// Lista clínica com o último KPS e o número de alertas por concluir, para a escolha do doente.
+const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, dg.fase_clinica_atual,
+    (SELECT k.score_kps FROM AvaliacaoKarnofsky k WHERE k.id_doente = d.id_doente
+      ORDER BY k.data_avaliacao DESC, k.rowid DESC LIMIT 1) AS ultimo_kps,
+    (SELECT COUNT(*) FROM AlertaClinico a JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
+      WHERE s.id_doente = d.id_doente AND a.estado_atual != 'Concluído') AS alertas_abertos
+  FROM Doente d JOIN Utilizador u ON d.id_doente = u.id_utilizador
+  LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente`;
+
 export class ApiController {
   static login(req: Request, res: Response) {
     try {
@@ -23,16 +32,11 @@ export class ApiController {
   static listarDoentes(req: Request, res: Response) {
     const user = req.user!;
     if (user.perfil === 'MEDICO') {
-      res.json(db.prepare(`SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, dg.fase_clinica_atual
-        FROM Doente d JOIN Utilizador u ON d.id_doente = u.id_utilizador
-        LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente
-        WHERE d.id_medico_responsavel = ?`).all(user.id_utilizador));
+      res.json(db.prepare(`${SQL_LISTA_CLINICA} WHERE d.id_medico_responsavel = ? ORDER BY u.nome`).all(user.id_utilizador));
       return;
     }
     if (user.perfil === 'ENFERMEIRO') {
-      res.json(db.prepare(`SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, dg.fase_clinica_atual
-        FROM Doente d JOIN Utilizador u ON d.id_doente = u.id_utilizador
-        LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente`).all());
+      res.json(db.prepare(`${SQL_LISTA_CLINICA} ORDER BY u.nome`).all());
       return;
     }
     if (user.perfil === 'DOENTE') {
