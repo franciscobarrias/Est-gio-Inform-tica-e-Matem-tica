@@ -16,4 +16,4 @@ router.post('/doentes/:idDoente/tratamentos', autenticarJWT, exigirPerfis('MEDIC
 router.post('/doentes/:idDoente/decisoes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarDecisao);
 router.get('/alertas', autenticarJWT, exigirPerfis('ENFERMEIRO', 'MEDICO'), ApiController.listarAlertas);
 router.put('/alertas/:idAlerta/triagem', autenticarJWT, exigirPerfis('ENFERMEIRO', 'MEDICO'), ApiController.triarAlerta);
-router.get('/fhir/Patient/:idDoente/$everything', autenticarJWT, exigirPerfis('MEDICO', 'ENFERMEIRO'), ApiController.exportarFhir);
+router.get('/fhir/Patient/:idDoente/\\$everything', autenticarJWT, exigirPerfis('MEDICO', 'ENFERMEIRO'), ApiController.exportarFhir);

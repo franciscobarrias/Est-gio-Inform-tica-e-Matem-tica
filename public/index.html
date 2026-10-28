@@ -142,6 +142,10 @@
           <input id="inputFundamentacao" type="text" maxlength="500" />
           <button id="guardarDecisao" type="button">Registar decisão</button>
           <button id="abrirFhir" type="button" style="margin-top:.5rem">Exportar bundle HL7 FHIR</button>
+          <details id="resultadoFhir" class="hidden" style="margin-top:1rem">
+            <summary>Bundle FHIR exportado</summary>
+            <pre id="conteudoFhir" style="overflow:auto;max-height:28rem;white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+          </details>
         </section>
       </div>
 
@@ -410,6 +414,7 @@
     }
 
     async function executarAcao(acao, mensagem) {
+      mostrarMensagem('');
       try { await acao(); mostrarMensagem(mensagem, 'success'); await carregarProcesso(); }
       catch (erro) { mostrarMensagem(erro.message, 'error'); }
     }
@@ -466,13 +471,13 @@
       } catch (erro) { mostrarMensagem(erro.message, 'error'); }
     });
     $('abrirFhir').addEventListener('click', async () => {
+      mostrarMensagem('');
       try {
         const bundle = await pedidoApi(`/api/fhir/Patient/${encodeURIComponent(idDoenteAtivo)}/$everything`);
-        const janela = window.open('', '_blank');
-        if (!janela) throw new Error('O navegador bloqueou a nova janela. Permita a abertura para consultar o bundle.');
-        const pre = janela.document.createElement('pre');
-        pre.textContent = JSON.stringify(bundle, null, 2);
-        janela.document.body.appendChild(pre);
+        $('conteudoFhir').textContent = JSON.stringify(bundle, null, 2);
+        $('resultadoFhir').classList.remove('hidden');
+        $('resultadoFhir').open = true;
+        mostrarMensagem(`Bundle FHIR exportado (${bundle.total} recursos).`, 'success');
       } catch (erro) { mostrarMensagem(erro.message, 'error'); }
     });
     $('inputDataRef').value = new Date().toISOString().slice(0, 10);
