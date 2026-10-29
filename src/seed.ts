@@ -10,6 +10,7 @@ import { AuthService } from './services/auth.service';
 import { SintomaService } from './services/sintoma.service';
 import { AlertaService } from './services/alerta.service';
 import { MedicoService } from './services/medico.service';
+import { garantirFormularioV2, ID_FORMULARIO_V2 } from './database/formulario-v2';
 
 
 if (process.env.NODE_ENV === 'production') {
@@ -273,20 +274,10 @@ const criarDados = db.transaction(() => {
     );
   }
 
-  // FORMULÁRIO E PERGUNTAS
+  // FORMULÁRIO E PERGUNTAS (formulário v2: ver src/database/formulario-v2.ts)
 
-  const idFormulario = 'form-gbm-v1';
-
-  db.prepare(`
-    INSERT INTO Formulario VALUES (?, ?, ?, ?)
-  `).run(
-    idFormulario,
-    'Questionário estruturado GBM (demonstração)',
-    1,
-    'ATIVO'
-  );
-
-  garantirPerguntasFormularioDemonstracao();
+  const idFormulario = ID_FORMULARIO_V2;
+  garantirFormularioV2(db);
 
   // REGRAS DE ALERTA DEMONSTRATIVAS
 
@@ -329,12 +320,18 @@ const criarDados = db.transaction(() => {
     valor_codificado: string;
   };
 
+  // Perguntas com escala (Blocos B, C e D); os sinais de alarme e os detalhes tratam-se à parte.
   const perguntas = db.prepare(`
     SELECT id_pergunta, categoria
     FROM PerguntaFormulario
-    WHERE id_formulario = ? AND ativa = 1
+    WHERE id_formulario = ? AND ativa = 1 AND id_pergunta_pai IS NULL
+      AND categoria IN ('SINTOMA', 'FUNCAO', 'AUTONOMIA')
     ORDER BY ordem
   `).all(idFormulario) as Pergunta[];
+  const alarmes = db.prepare(`
+    SELECT id_pergunta FROM PerguntaFormulario
+    WHERE id_formulario = ? AND ativa = 1 AND categoria = 'ALARME'
+  `).all(idFormulario) as Array<{ id_pergunta: string }>;
 
   const opcoes = db.prepare(`
     SELECT
@@ -569,8 +566,10 @@ const criarDados = db.transaction(() => {
       // VARIAR AS PERGUNTAS RESPONDIDAS
 
       const fixas = [
-        'perg-cefaleia',
-        'perg-marcha'
+        'v2-b1-cefaleia',
+        'v2-c1-andar',
+        'v2-b3-vomitos',
+        'v2-b4-sonolencia'
       ];
 
       const outras = perguntas
@@ -593,32 +592,19 @@ const criarDados = db.transaction(() => {
             posicao === 1 &&
             indice % 2 === 0;
 
+          // A cefaleia segue sempre a evolução do cenário; a marcha só nalguns cenários.
+          // Nos cenários 4 e 13 aparecem também vómitos e sonolência (combinação de hipertensão intracraniana).
           const intensidade =
-            idPergunta === 'perg-cefaleia' ||
-            (
-              idPergunta === 'perg-marcha' &&
-              [4, 8, 9, 11, 13].includes(c.n)
-            )
-              ? nivel
+            idPergunta === 'v2-b1-cefaleia' ||
+            (idPergunta === 'v2-c1-andar' && [4, 8, 9, 11, 13].includes(c.n)) ||
+            (idPergunta === 'v2-b3-vomitos' && [4, 13].includes(c.n)) ||
+            (idPergunta === 'v2-b4-sonolencia' && [4, 13].includes(c.n) && nivel >= 2)
+              ? Math.min(nivel, 3)
               : 0;
-
-          const autonomia =
-            idPergunta === 'perg-autonomia';
 
           const codigo = naoAvaliavel
             ? 'IMPOSSIVEL_AVALIAR'
-            : autonomia
-              ? intensidade === 0
-                ? 'AUSENTE'
-                : intensidade === 3
-                  ? 'ASSISTENCIA_TOTAL'
-                  : 'ASSISTENCIA_PARCIAL'
-              : [
-                  'AUSENTE',
-                  'LIGEIRA',
-                  'MODERADA',
-                  'GRAVE'
-                ][intensidade];
+            : ['AUSENTE', 'LIGEIRA', 'MODERADA', 'GRAVE'][intensidade];
 
           const pergunta = perguntas.find(
             p => p.id_pergunta === idPergunta
@@ -631,7 +617,7 @@ const criarDados = db.transaction(() => {
               codigo
             ),
             ...(
-              pergunta.categoria === 'SINTOMA_GERAL' &&
+              pergunta.categoria === 'SINTOMA' &&
               intensidade > 0 &&
               !naoAvaliavel
                 ? { frequencia: 'INTERMITENTE' }
@@ -640,6 +626,11 @@ const criarDados = db.transaction(() => {
           };
         }
       );
+
+      // Sinais de alarme: todos respondidos com "Não" nos registos de demonstração.
+      for (const a of alarmes) {
+        respostas.push({ id_pergunta: a.id_pergunta, id_opcao: obterOpcao(a.id_pergunta, 'NAO') });
+      }
 
       // IDENTIFICAR O AUTOR
 

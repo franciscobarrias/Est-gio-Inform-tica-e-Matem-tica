@@ -1,11 +1,16 @@
 import crypto from 'crypto';
 import { db, registarAuditoria } from '../database/dados-locais';
+import { ID_FORMULARIO_V2 } from '../database/formulario-v2';
+import { avaliarSubmissaoV2, resumoDoAlerta, RespostasPorCodigo, TipoRegraV2 } from './motor-alertas-v2';
 
 export type Prioridade = 'Baixa' | 'Média' | 'Alta' | 'Crítica';
 const NIVEIS_PRIORIDADE: Prioridade[] = ['Baixa', 'Média', 'Alta', 'Crítica'];
 
 export class AlertaService {
   static processarRegrasNaSubmissao(idDoente: string, idSubmissao: string, idAutor: string): any[] {
+    const submissao = db.prepare('SELECT id_formulario FROM SubmissaoMonitorizacao WHERE id_submissao = ?').get(idSubmissao) as { id_formulario: string };
+    // O formulário v2 usa o motor em camadas; os registos do formulário antigo mantêm as regras RF23/RF24.
+    if (submissao.id_formulario === ID_FORMULARIO_V2) return this.processarFormularioV2(idDoente, idSubmissao, idAutor);
     const alertasCriados: any[] = [];
     const ultimoKpsRow = db.prepare(`
       SELECT score_kps FROM AvaliacaoKarnofsky
@@ -63,6 +68,35 @@ export class AlertaService {
       registarAuditoria(idAutor, 'GERACAO_ALERTA_RF23_RF24', `Gerados ${alertasCriados.length} alerta(s)`);
     }
     return alertasCriados;
+  }
+
+  // ---------- Formulário v2: motor em camadas (ver motor-alertas-v2.ts) ----------
+  static respostasPorCodigo(idSubmissao: string): RespostasPorCodigo {
+    const linhas = db.prepare(`SELECT p.codigo, r.valor_numerico, r.motivo_nao_avaliavel, r.frequencia
+      FROM RespostaMonitorizacao r JOIN PerguntaFormulario p ON p.id_pergunta = r.id_pergunta
+      WHERE r.id_submissao = ? AND p.codigo IS NOT NULL`).all(idSubmissao) as Array<{ codigo: string; valor_numerico: number; motivo_nao_avaliavel: number; frequencia: string | null }>;
+    const respostas: RespostasPorCodigo = {};
+    for (const l of linhas) respostas[l.codigo] = { valor: l.valor_numerico, naoAvaliavel: Boolean(l.motivo_nao_avaliavel), frequencia: l.frequencia };
+    return respostas;
+  }
+
+  static processarFormularioV2(idDoente: string, idSubmissao: string, idAutor: string): any[] {
+    const ultimoKps = db.prepare(`SELECT score_kps FROM AvaliacaoKarnofsky
+      WHERE id_doente = ? ORDER BY data_avaliacao DESC, rowid DESC LIMIT 1`).get(idDoente) as { score_kps: number } | undefined;
+    const anteriores = (db.prepare(`SELECT id_submissao FROM SubmissaoMonitorizacao
+      WHERE id_doente = ? AND id_formulario = ? AND id_submissao != ? ORDER BY data_hora_submissao ASC`)
+      .all(idDoente, ID_FORMULARIO_V2, idSubmissao) as Array<{ id_submissao: string }>).map(s => this.respostasPorCodigo(s.id_submissao));
+
+    const resultado = avaliarSubmissaoV2({ respostas: this.respostasPorCodigo(idSubmissao), anteriores, kps: ultimoKps ? ultimoKps.score_kps : 100 });
+    if (!resultado.prioridade || !resultado.tipo) return [];
+
+    const regras: Record<TipoRegraV2, string> = { SINAL_ALARME_V2: 'regra-v2-alarme', COMBINACAO_V2: 'regra-v2-combinacao', SCORE_EVOLUCAO_V2: 'regra-v2-score' };
+    const regra = db.prepare('SELECT id_regra, nome FROM RegraAlerta WHERE id_regra = ? AND ativa = 1').get(regras[resultado.tipo]) as { id_regra: string; nome: string } | undefined;
+    if (!regra) return [];
+    const alerta = this.inserirAlertaClinico(idSubmissao, regra.id_regra, `Questionário v2 — ${regra.nome}`, resultado.prioridade, resumoDoAlerta(resultado));
+    registarAuditoria(idAutor, 'GERACAO_ALERTA_V2', `Alerta ${resultado.prioridade} (${resultado.motivos.length} motivo(s))`);
+    // As instruções não ficam guardadas: servem para a aplicação avisar logo quem está a preencher.
+    return [{ ...alerta, instrucoes: resultado.instrucoes, motivos: resultado.motivos.map(m => m.texto) }];
   }
 
   /**
@@ -157,4 +191,4 @@ export class AlertaService {
     tx();
     return db.prepare('SELECT * FROM AlertaClinico WHERE id_alerta = ?').get(idAlerta);
   }
-}
+}

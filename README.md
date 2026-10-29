@@ -41,14 +41,15 @@ npm run dev
 - Autenticação por perfil, hashes scrypt com sal individual, tokens de sessão e autorização por processo.
 - Associação autorizada do cuidador pelo doente ou médico responsável; participação do cuidador exigida quando a última avaliação KPS é ≤ 70.
 - Atualização de diagnóstico, tratamentos, avaliações KPS, plano individual de monitorização e decisões médicas.
-- Formulário estruturado para sintomas gerais, domínios neurológicos e autonomia; permite submissões parciais e regista frequência opcional.
-- Respostas «Ausente», «Não consigo avaliar» e perguntas omitidas são representadas separadamente. Só respostas efetivamente fornecidas são persistidas.
+- Questionário v2 (`form-gbm-v2`) em quatro blocos: **A** sinais de alarme (Sim/Não, últimas 24 horas), **B** sintomas (últimos 7 dias, de «Não tive» a «Grave»), **C** movimento e funções, **D** autonomia. Algumas perguntas têm perguntas de detalhe que só aparecem quando a principal tem resposta (por exemplo, o tipo de dor de cabeça). Nos sintomas pode indicar-se a frequência e se é «novo ou pior do que o habitual». Permite submissões parciais.
+- Respostas «Não tive», «Não consigo avaliar» e perguntas omitidas são representadas separadamente. Só respostas efetivamente fornecidas são persistidas.
 - Histórico com autor e data/hora, lembretes, gráficos cronológicos de KPS e de respostas comparáveis.
-- Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria. A prioridade é graduada (limiares demonstrativos):
-  - **Crítica:** alteração neurológica grave ou alteração do estado de consciência moderada ou grave;
-  - **Alta:** alteração neurológica moderada, sintoma geral grave ou dependência total;
-  - **Média:** restantes agravamentos;
-  - um KPS ≤ 70 sobe um nível, sem chegar a Crítica. O motivo fica escrito no resumo do alerta.
+- Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria. O motor do questionário v2 (`src/services/motor-alertas-v2.ts`) avalia por camadas (limiares demonstrativos, **não validados clinicamente**):
+  1. **Sinais de alarme** (Bloco A, ou sonolência/confusão graves): **Crítica**, com indicação imediata ao doente (ligar 112, contactar já ou contactar hoje);
+  2. **Combinações de sintomas**: hipertensão intracraniana provável (Crítica) ou possível (Alta), toxicidade da temozolomida, declínio neurológico face ao habitual do doente, quedas repetidas (Alta); sintoma grave isolado (Média);
+  3. **Score de evolução** 0–100 ponderado, comparado com a linha de base do doente (mediana dos 3 primeiros registos); uma subida ≥ 15 pontos dá Média;
+  4. **Ajustes**: KPS ≤ 70 e frequência diária ou constante sobem um nível cada, sem passar de Alta.
+  Gera-se no máximo um alerta por registo, com todos os motivos escritos no resumo. Os registos antigos do formulário v1 continuam a usar as regras anteriores.
 - Interface por separadores (Alertas, Resumo clínico, Evolução, Registos do doente e Gestão clínica), com o doente em consulta sempre identificado.
 - Exportação autenticada de um bundle HL7 FHIR para o processo clínico.
 - Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
@@ -66,6 +67,8 @@ A interface está dividida por perfil. Todas as páginas usam os mesmos estilos 
 | `js/comum.js` | Sessão, pedidos à API, mensagens, separadores, barra do doente, gráficos e histórico |
 | `js/clinico.js` | Lista de alertas e resumo clínico, partilhados pelo médico e pela enfermagem |
 | `css/estilos.css` | Estilos comuns |
+
+As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. Ao arrancar, a base de dados existente recebe as colunas novas e o formulário v2 passa a ser o ativo (o v1 fica inativo); para ter os dados de demonstração no v2, corra `npm run seed`.
 
 O token de sessão passa entre páginas no `sessionStorage` e é apagado ao terminar sessão ou ao fechar o separador. Abrir a página de outro perfil leva de volta à página do próprio perfil. Esta divisão serve só a interface: quem decide o que cada perfil pode ver e alterar é sempre o servidor.
 

@@ -166,10 +166,11 @@ export class MedicoService {
     `).all(idDoente) as any[];
 
     for (const sub of submissoes) {
+      // Só contam as perguntas principais: as de detalhe só aparecem quando a principal tem resposta.
       sub.total_perguntas_ativas = (db.prepare(`SELECT COUNT(*) as total FROM PerguntaFormulario
-        WHERE id_formulario = ? AND ativa = 1`).get(sub.id_formulario) as { total: number }).total;
+        WHERE id_formulario = ? AND ativa = 1 AND id_pergunta_pai IS NULL`).get(sub.id_formulario) as { total: number }).total;
       sub.respostas = db.prepare(`
-        SELECT r.*, p.categoria, p.enunciado, o.rotulo, o.valor_codificado
+        SELECT r.*, p.categoria, p.enunciado, p.codigo, p.id_pergunta_pai, o.rotulo, o.valor_codificado
         FROM RespostaMonitorizacao r
         JOIN PerguntaFormulario p ON r.id_pergunta = p.id_pergunta
         LEFT JOIN OpcaoResposta o ON r.id_opcao = o.id_opcao
@@ -187,4 +188,4 @@ export class MedicoService {
       lembrete: SintomaService.calcularLembreteMonitorizacao(idDoente)
     };
   }
-}
+}

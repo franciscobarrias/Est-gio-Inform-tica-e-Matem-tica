@@ -127,3 +127,37 @@ ul.lista li:last-child { border-bottom:0; }
 }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   
+
+/* ---------- Formulário v2 (botões de opção) ---------- */
+.pergunta-v2 { border:0; margin:0; padding:.7rem 0; border-bottom:1px solid var(--line); min-width:0; }
+.pergunta-v2:last-child { border-bottom:0; }
+.pergunta-v2 > legend { font-weight:650; padding:0; margin-bottom:.35rem; }
+.pergunta-v2 .codigo { color:var(--muted); font-weight:500; font-size:.85rem; margin-right:.35rem; }
+.opcoes-radio { display:flex; flex-wrap:wrap; gap:.4rem; }
+.opcoes-radio label { display:flex; align-items:flex-start; gap:.4rem; font-weight:500; border:1px solid var(--border); border-radius:6px; padding:.45rem .7rem; cursor:pointer; background:#fff; max-width:100%; }
+.opcoes-radio label:has(input:checked) { border-color:var(--primary); background:var(--primary-soft); }
+.opcoes-radio label.sem-resposta { color:var(--muted); border-style:dashed; }
+.opcoes-radio input { width:auto; min-height:auto; margin:.2rem 0 0; flex:none; }
+.extras-pergunta { margin:.5rem 0 0 1rem; padding-left:.8rem; border-left:3px solid var(--line); }
+.extras-pergunta .pergunta-v2 { padding:.4rem 0; border-bottom:0; }
+.extras-pergunta label.caixa { display:flex; align-items:center; gap:.4rem; font-weight:500; margin:.3rem 0; }
+.extras-pergunta label.caixa input { width:auto; min-height:auto; margin:0; }
+.extras-pergunta select, .extras-pergunta input[type=text] { max-width:320px; }
+.instrucao { margin:.5rem 0 0; padding:.6rem .8rem; border-radius:0 6px 6px 0; font-weight:650; }
+.instrucao.LIGAR_112 { border-left:5px solid var(--p-critica); background:var(--p-critica-bg); color:var(--p-critica); }
+.instrucao.CONTACTAR_JA { border-left:5px solid var(--p-alta); background:var(--p-alta-bg); color:#7a2e0e; }
+.instrucao.CONTACTAR_HOJE { border-left:5px solid var(--p-media); background:var(--p-media-bg); color:#5c4800; }
+.nota-bloco { margin:-.25rem 0 .5rem; }
+
+/* ---------- Histórico: o que mudou primeiro ---------- */
+.registo-topo { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+.alteracoes { list-style:none; padding:0; margin:.5rem 0; display:grid; gap:.3rem; }
+.alteracao { padding:.35rem .6rem; border-radius:0 6px 6px 0; border-left:4px solid var(--p-media); background:var(--p-media-bg); }
+.alteracao.g2 { border-left-color:var(--p-alta); background:var(--p-alta-bg); }
+.alteracao.g3 { border-left-color:var(--p-critica); background:var(--p-critica-bg); }
+.alteracao .nome { font-weight:650; }
+.alteracao .nome::after { content:': '; }
+.alteracao .nivel { font-weight:700; }
+.alarme-sim { margin:.5rem 0; padding:.45rem .7rem; border-left:4px solid var(--p-critica); background:var(--p-critica-bg); color:var(--p-critica); border-radius:0 6px 6px 0; }
+.alarme-nao { color:var(--ok); margin:.4rem 0; }
+.registo details p { margin:.35rem 0; }

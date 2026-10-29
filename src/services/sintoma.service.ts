@@ -16,7 +16,7 @@ export class SintomaService {
   static submeterMonitorizacao(idDoente: string, idAutor: string, perfilAutor: string, payload: {
     id_formulario: string;
     data_referencia_sintomas: string;
-    respostas: Array<{ id_pergunta: string; id_opcao: string; frequencia?: string }>;
+    respostas: Array<{ id_pergunta: string; id_opcao: string; frequencia?: string; novo_ou_pior?: boolean; texto?: string }>;
   }) {
     if (!payload || typeof payload.id_formulario !== 'string' ||
         typeof payload.data_referencia_sintomas !== 'string' ||
@@ -34,21 +34,46 @@ export class SintomaService {
     const respostasEnviadas = payload.respostas.filter(r => r && r.id_opcao !== '');
     if (respostasEnviadas.length === 0) throw new Error('Registe pelo menos uma resposta antes de submeter.');
     const idsPergunta = new Set<string>();
+    const valores = new Map<string, number>();   // id_pergunta → valor numérico escolhido
+    const detalhes: Array<{ id_pergunta: string; pai: string; minimo: number }> = [];
     for (const resposta of respostasEnviadas) {
       if (typeof resposta.id_pergunta !== 'string' || typeof resposta.id_opcao !== 'string' ||
           idsPergunta.has(resposta.id_pergunta)) {
         throw new Error('As respostas contêm campos inválidos ou perguntas repetidas.');
       }
       idsPergunta.add(resposta.id_pergunta);
-      const opcaoValida = db.prepare(`SELECT p.categoria, o.valor_codificado FROM PerguntaFormulario p
+      const opcaoValida = db.prepare(`SELECT p.categoria, p.tipo_resposta, p.id_pergunta_pai, p.valor_minimo_pai,
+          o.valor_codificado, o.valor_numerico
+        FROM PerguntaFormulario p
         JOIN OpcaoResposta o ON o.id_pergunta = p.id_pergunta
         WHERE p.id_pergunta = ? AND p.id_formulario = ? AND p.ativa = 1 AND o.id_opcao = ?`)
-        .get(resposta.id_pergunta, payload.id_formulario, resposta.id_opcao) as { categoria: string; valor_codificado: string } | undefined;
+        .get(resposta.id_pergunta, payload.id_formulario, resposta.id_opcao) as {
+          categoria: string; tipo_resposta: string; id_pergunta_pai: string | null; valor_minimo_pai: number | null;
+          valor_codificado: string; valor_numerico: number | null } | undefined;
       if (!opcaoValida) throw new Error('Uma resposta não corresponde a uma opção válida do formulário.');
-      if (resposta.frequencia && (opcaoValida.categoria !== 'SINTOMA_GERAL' ||
-          opcaoValida.valor_codificado === 'AUSENTE' || opcaoValida.valor_codificado === 'IMPOSSIVEL_AVALIAR' ||
+      const valor = SintomaService.valorDaOpcao(opcaoValida);
+      const presente = opcaoValida.valor_codificado !== 'IMPOSSIVEL_AVALIAR' && valor > 0;
+      valores.set(resposta.id_pergunta, opcaoValida.valor_codificado === 'IMPOSSIVEL_AVALIAR' ? -1 : valor);
+      if (resposta.frequencia && (!['SINTOMA_GERAL', 'SINTOMA'].includes(opcaoValida.categoria) || !presente ||
           !['PONTUAL', 'INTERMITENTE', 'DIARIA', 'CONSTANTE'].includes(resposta.frequencia))) {
         throw new Error('A frequência só pode ser indicada para um sintoma presente e com uma opção válida.');
+      }
+      if (resposta.novo_ou_pior !== undefined && (typeof resposta.novo_ou_pior !== 'boolean' ||
+          !['SINTOMA', 'FUNCAO'].includes(opcaoValida.categoria) || !presente)) {
+        throw new Error('"É novo ou está pior do que o habitual?" só se responde para um sintoma ou alteração presente.');
+      }
+      if (resposta.texto !== undefined && (typeof resposta.texto !== 'string' || resposta.texto.length > 300 ||
+          opcaoValida.tipo_resposta !== 'SELECAO_UNICA_COM_TEXTO')) {
+        throw new Error('O texto livre só é aceite na pergunta "Outro sintoma" e tem no máximo 300 caracteres.');
+      }
+      if (opcaoValida.id_pergunta_pai) {
+        detalhes.push({ id_pergunta: resposta.id_pergunta, pai: opcaoValida.id_pergunta_pai, minimo: opcaoValida.valor_minimo_pai ?? 1 });
+      }
+    }
+    // Uma pergunta de detalhe só é válida se a pergunta principal tiver a resposta que a faz aparecer (RNF07).
+    for (const d of detalhes) {
+      if ((valores.get(d.pai) ?? -1) < d.minimo) {
+        throw new Error('Há uma pergunta de detalhe respondida sem a pergunta principal correspondente.');
       }
     }
 
@@ -69,18 +94,17 @@ export class SintomaService {
       `).run(id_submissao, idDoente, idAutor, payload.id_formulario, planoAtivo ? planoAtivo.id_plano : null, agora, payload.data_referencia_sintomas, perfilAutor);
 
       const stmtResp = db.prepare(`
-        INSERT INTO RespostaMonitorizacao (id_resposta, id_submissao, id_pergunta, id_opcao, valor_numerico, motivo_nao_avaliavel, frequencia)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO RespostaMonitorizacao (id_resposta, id_submissao, id_pergunta, id_opcao, valor_numerico, motivo_nao_avaliavel, frequencia, novo_ou_pior, texto)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const r of respostasEnviadas) {
         const opcao = db.prepare('SELECT * FROM OpcaoResposta WHERE id_opcao = ?').get(r.id_opcao) as any;
         const naoAvaliavel = opcao?.valor_codificado === 'IMPOSSIVEL_AVALIAR' ? 1 : 0;
-        let valorNum = 0;
-        if (opcao?.valor_codificado === 'LIGEIRA' || opcao?.valor_codificado === 'ASSISTENCIA_PARCIAL') valorNum = 1;
-        if (opcao?.valor_codificado === 'MODERADA') valorNum = 2;
-        if (opcao?.valor_codificado === 'GRAVE' || opcao?.valor_codificado === 'ASSISTENCIA_TOTAL') valorNum = 3;
-        stmtResp.run(crypto.randomUUID(), id_submissao, r.id_pergunta, r.id_opcao, valorNum, naoAvaliavel, r.frequencia || null);
+        const valorNum = naoAvaliavel ? 0 : SintomaService.valorDaOpcao(opcao);
+        const texto = typeof r.texto === 'string' && r.texto.trim() ? r.texto.trim() : null;
+        stmtResp.run(crypto.randomUUID(), id_submissao, r.id_pergunta, r.id_opcao, valorNum, naoAvaliavel, r.frequencia || null,
+          r.novo_ou_pior === undefined ? null : (r.novo_ou_pior ? 1 : 0), texto);
       }
       registarAuditoria(idAutor, 'SUBMISSAO_MONITORIZACAO', `Submissão ${id_submissao}`);
       const alertasGerados = AlertaService.processarRegrasNaSubmissao(idDoente, id_submissao, idAutor);
@@ -88,6 +112,16 @@ export class SintomaService {
     });
     const alertasGerados = tx();
     return { id_submissao, data_hora_submissao: agora, alertasGerados };
+  }
+
+  // Valor numérico de uma opção: o do formulário v2, ou a conversão do código nas opções do formulário antigo.
+  static valorDaOpcao(opcao: { valor_codificado: string; valor_numerico?: number | null } | undefined): number {
+    if (!opcao) return 0;
+    if (opcao.valor_numerico !== null && opcao.valor_numerico !== undefined) return opcao.valor_numerico;
+    if (['LIGEIRA', 'ASSISTENCIA_PARCIAL'].includes(opcao.valor_codificado)) return 1;
+    if (opcao.valor_codificado === 'MODERADA') return 2;
+    if (['GRAVE', 'ASSISTENCIA_TOTAL'].includes(opcao.valor_codificado)) return 3;
+    return 0;
   }
 
   static calcularLembreteMonitorizacao(idDoente: string) {
@@ -106,4 +140,4 @@ export class SintomaService {
       mensagem: atrasado ? `Lembrete Ativo (RF18): Novo registo solicitado.` : `Monitorização regularizada (RF18). Próximo até ${proxData.toLocaleDateString('pt-PT')}.`
     };
   }
-}
+}

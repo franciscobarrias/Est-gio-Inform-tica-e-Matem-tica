@@ -22,7 +22,21 @@ const ehClinico = () => ['MEDICO', 'ENFERMEIRO'].includes(user?.perfil);
 
 // ---------- Textos usados em várias páginas ----------
 const NOMES_PERFIL = { MEDICO: 'Médico', ENFERMEIRO: 'Enfermeiro', DOENTE: 'Doente', CUIDADOR: 'Cuidador' };
-const CATEGORIAS = { SINTOMA_GERAL: 'Sintomas gerais', ESCALA_NANO: 'Alterações neurológicas', AUTONOMIA_AVD: 'Autonomia e atividades diárias' };
+const CATEGORIAS = {
+  ALARME: 'Bloco A — Sinais de alarme (últimas 24 horas)',
+  SINTOMA: 'Bloco B — Sintomas (últimos 7 dias)',
+  FUNCAO: 'Bloco C — Movimento e funções (últimos 7 dias)',
+  AUTONOMIA: 'Bloco D — Autonomia no dia a dia',
+  // Categorias do formulário v1 (registos antigos)
+  SINTOMA_GERAL: 'Sintomas gerais', ESCALA_NANO: 'Alterações neurológicas', AUTONOMIA_AVD: 'Autonomia e atividades diárias'
+};
+// Perguntas com escala de gravidade (as que fazem sentido num gráfico): sem alarmes Sim/Não e sem detalhes.
+const CATEGORIAS_COM_ESCALA = ['SINTOMA', 'FUNCAO', 'AUTONOMIA', 'SINTOMA_GERAL', 'ESCALA_NANO', 'AUTONOMIA_AVD'];
+function perguntasComEscala() {
+  return formAtivo.perguntas.filter(p => !p.id_pergunta_pai && CATEGORIAS_COM_ESCALA.includes(p.categoria));
+}
+// "Ligeira — notei, mas não me impediu…" passa a "Ligeira".
+function rotuloCurto(rotulo) { return String(rotulo || '').split(' — ')[0].replace(' / sem alteração', ''); }
 const TIPOS_TRATAMENTO = { CIRURGIA: 'Cirurgia', QUIMIOTERAPIA: 'Quimioterapia', RADIOTERAPIA: 'Radioterapia', OUTRO: 'Outro' };
 const ESTADOS_TRATAMENTO = { PLANEADO: 'Planeado', EM_CURSO: 'Em curso', CONCLUIDO: 'Concluído', SUSPENSO: 'Suspenso' };
 const PARENTESCO = { CONJUGE: 'Cônjuge' };
@@ -211,15 +225,21 @@ function renderizarIdentidade() {
 }
 
 // ---------- Gráficos de evolução ----------
-function desenharLinha({ pontos, yMax, marcas, limiar, cor, titulo }) {
-  const L = 640, A = 230, esq = 92, dir = 620, topo = 16, base = 186;
+function desenharLinha({ pontos, yMax, marcas, limiar, cor, titulo, degraus = false, mostrarValores = false, zona }) {
+  // A margem esquerda cresce com o texto mais comprido das marcas do eixo (ex.: «Precisa de apoio…»).
+  const L = 640, A = 230, dir = 620, topo = 16, base = 186;
+  const esq = Math.max(48, 16 + 7 * Math.max(0, ...marcas.map(m => String(m.t).length)));
   const x = i => pontos.length === 1 ? (esq + dir) / 2 : esq + i * (dir - esq) / (pontos.length - 1);
   const y = v => base - v * (base - topo) / yMax;
   const passo = Math.max(1, Math.ceil(pontos.length / 8));
   return `<svg class="chart" viewBox="0 0 ${L} ${A}" role="img" aria-label="${escapar(titulo)}: ${pontos.map(p => `${dataCurta(p.data)} ${escapar(p.rotulo)}`).join('; ')}">
     ${marcas.map(m => `<line x1="${esq}" y1="${y(m.v)}" x2="${dir}" y2="${y(m.v)}" stroke="#e2e8f0"/><text x="${esq - 8}" y="${y(m.v) + 4}" text-anchor="end" font-size="12" fill="#4a5568">${escapar(m.t)}</text>`).join('')}
-    ${limiar ? `<line x1="${esq}" y1="${y(limiar.v)}" x2="${dir}" y2="${y(limiar.v)}" stroke="#b54708" stroke-dasharray="6 4" stroke-width="1.5"/><text x="${dir}" y="${y(limiar.v) - 6}" text-anchor="end" font-size="11" fill="#b54708">${escapar(limiar.t)}</text>` : ''}
-    ${pontos.length > 1 ? `<polyline points="${pontos.map((p, i) => `${x(i)},${y(p.v)}`).join(' ')}" fill="none" stroke="${cor}" stroke-width="3"/>` : ''}
+    ${limiar ? `<line x1="${esq}" y1="${y(limiar.v)}" x2="${dir}" y2="${y(limiar.v)}" stroke="#b54708" stroke-dasharray="6 4" stroke-width="1.5"/><text x="${zona ? esq + 6 : dir}" y="${zona ? y(limiar.v) + 15 : y(limiar.v) - 6}" text-anchor="${zona ? 'start' : 'end'}" font-size="11" fill="#b54708">${escapar(limiar.t)}</text>` : ''}
+    ${zona ? `<rect x="${esq}" y="${y(zona.ate)}" width="${dir - esq}" height="${base - y(zona.ate)}" fill="${zona.cor}"/>` : ''}
+    ${pontos.length > 1 ? `<polyline points="${pontos.map((p, i) => degraus && i > 0
+      // Em degraus: o valor mantém-se até à avaliação seguinte (o KPS não muda entre consultas).
+      ? `${x(i)},${y(pontos[i - 1].v)} ${x(i)},${y(p.v)}` : `${x(i)},${y(p.v)}`).join(' ')}" fill="none" stroke="${cor}" stroke-width="3"/>` : ''}
+    ${mostrarValores ? pontos.map((p, i) => `<text x="${i === pontos.length - 1 ? x(i) - 9 : x(i) + 9}" y="${y(p.v) - 9}" text-anchor="${i === pontos.length - 1 ? 'end' : 'start'}" font-size="13" font-weight="700" fill="${cor}">${escapar(p.v)}</text>`).join('') : ''}
     ${pontos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="5.5" fill="${cor}" stroke="#fff" stroke-width="2"><title>${dataCurta(p.data)}: ${escapar(p.rotulo)}</title></circle>`).join('')}
     ${pontos.map((p, i) => i % passo === 0 || i === pontos.length - 1 ? `<text x="${x(i)}" y="${base + 22}" text-anchor="middle" font-size="12" fill="#1a202c">${dataCurta(p.data).slice(0, 5)}</text>` : '').join('')}
   </svg>`;
@@ -229,9 +249,10 @@ function desenharKps(avaliacoes) {
   if (!avaliacoes.length) { $('chartKps').innerHTML = '<p class="muted">Ainda não existem avaliações funcionais registadas.</p>'; return; }
   const pontos = avaliacoes.map(a => ({ data: a.data_avaliacao, v: Number(a.score_kps), rotulo: `${a.score_kps} pontos` }));
   const ultima = pontos[pontos.length - 1];
-  $('chartKps').innerHTML = desenharLinha({ pontos, yMax: 100, cor: '#0f4c81', titulo: 'Evolução do KPS',
-    marcas: [0, 50, 100].map(v => ({ v, t: String(v) })), limiar: { v: 70, t: 'Limiar 70 · cuidador obrigatório' } }) +
-    `<p class="muted pequeno">Avaliação mais recente: <strong>${ultima.v}/100</strong> em ${dataCurta(ultima.data)}.</p>`;
+  $('chartKps').innerHTML = desenharLinha({ pontos, yMax: 100, cor: '#0f4c81', titulo: 'Evolução do KPS', degraus: true, mostrarValores: true,
+    zona: { ate: 70, cor: '#fef0c780' },
+    marcas: [0, 50, 70, 100].map(v => ({ v, t: String(v) })), limiar: { v: 70, t: '≤ 70 · cuidador obrigatório' } }) +
+    `<p class="muted pequeno">O KPS é avaliado pelo médico nas consultas (${pontos.length} avaliação(ões) até agora), por isso o gráfico mostra degraus: o valor mantém-se até à avaliação seguinte. Mais recente: <strong>${ultima.v}/100</strong> em ${dataCurta(ultima.data)}.</p>`;
 }
 function desenharSintomas(submissoes) {
   if (!$('chartSintomas')) return;
@@ -246,51 +267,98 @@ function desenharSintomas(submissoes) {
     $('chartSintomas').innerHTML = '<p class="muted">Ainda não existem respostas comparáveis para este domínio. Respostas em falta ou não avaliáveis não são representadas como ausência.</p>';
     return;
   }
-  const autonomia = idPergunta === 'perg-autonomia';
-  const marcas = autonomia ? [{ v: 0, t: 'Independente' }, { v: 1, t: 'Assist. parcial' }, { v: 3, t: 'Assist. total' }]
-    : [{ v: 0, t: 'Ausente' }, { v: 1, t: 'Ligeira' }, { v: 2, t: 'Moderada' }, { v: 3, t: 'Grave' }];
-  $('chartSintomas').innerHTML = desenharLinha({ pontos, yMax: 3, marcas, cor: '#6b46c1', titulo: 'Evolução do sintoma selecionado' }) +
+  // As marcas do eixo vêm das opções da própria pergunta (ex.: «Normal», «Precisa de apoio…»).
+  const pergunta = formAtivo.perguntas.find(p => p.id_pergunta === idPergunta);
+  const curto = t => t.length > 18 ? `${t.slice(0, 17)}…` : t;
+  const marcas = (pergunta?.opcoes || [])
+    .filter(o => o.valor_codificado !== 'IMPOSSIVEL_AVALIAR' && o.valor_numerico !== null && o.valor_numerico !== undefined)
+    .map(o => ({ v: Number(o.valor_numerico), t: curto(rotuloCurto(o.rotulo)) }));
+  const yMax = Math.max(1, ...marcas.map(m => m.v), ...pontos.map(p => p.v));
+  pontos.forEach(p => { p.rotulo = rotuloCurto(p.rotulo); });
+  $('chartSintomas').innerHTML = desenharLinha({ pontos, yMax, marcas, cor: '#6b46c1', titulo: 'Evolução do sintoma selecionado' }) +
     '<p class="muted pequeno">Só são representadas respostas presentes e avaliáveis; cada ponto corresponde à data dos sintomas.</p>';
 }
 function desenharQuadroComparativo(submissoes) {
   if (!$('quadroComparativo')) return;
   const ultimas = submissoes.slice().sort((a, b) => a.data_referencia_sintomas.localeCompare(b.data_referencia_sintomas)).slice(-6);
   if (!ultimas.length) { $('quadroComparativo').innerHTML = '<p class="muted">Sem registos para comparar.</p>'; return; }
-  const linhas = formAtivo.perguntas.map(p => {
+  // Primeira linha: sinais de alarme assinalados com «Sim» nesse registo.
+  const linhaAlarmes = formAtivo.perguntas.some(p => p.categoria === 'ALARME')
+    ? `<tr><th scope="row">Sinais de alarme</th>${ultimas.map(s => {
+        const alarmes = s.respostas.filter(r => r.categoria === 'ALARME' && !r.id_pergunta_pai);
+        if (!alarmes.length) return '<td class="cel vazio" title="Sem resposta">—</td>';
+        const sim = alarmes.filter(r => Number(r.valor_numerico) === 1);
+        return sim.length ? `<td class="cel v3" title="${escapar(sim.map(r => r.enunciado).join('; '))}">Sim (${sim.map(r => escapar(r.codigo || '')).join(', ')})</td>`
+          : '<td class="cel v0">Nenhum</td>';
+      }).join('')}</tr>` : '';
+  const linhas = linhaAlarmes + perguntasComEscala().map(p => {
     const celulas = ultimas.map(s => {
       const r = s.respostas.find(x => x.id_pergunta === p.id_pergunta);
       if (!r) return '<td class="cel vazio" title="Sem resposta">—</td>';
       if (r.motivo_nao_avaliavel) return '<td class="cel na">Não avaliável</td>';
-      return `<td class="cel v${Number(r.valor_numerico)}">${escapar(r.rotulo.replace(' / sem alteração', ''))}</td>`;
+      const nota = [r.frequencia && (FREQUENCIAS[r.frequencia] || r.frequencia), r.novo_ou_pior ? 'novo/pior' : ''].filter(Boolean).join(' · ');
+      return `<td class="cel v${Math.min(3, Number(r.valor_numerico))}" title="${escapar(r.rotulo)}">${escapar(rotuloCurto(r.rotulo))}${nota ? `<div class="pequeno">${escapar(nota)}</div>` : ''}</td>`;
     }).join('');
-    return `<tr><th scope="row">${escapar(p.enunciado)}</th>${celulas}</tr>`;
+    return `<tr><th scope="row">${p.codigo ? `<span class="muted">${escapar(p.codigo)}</span> ` : ''}${escapar(p.enunciado)}</th>${celulas}</tr>`;
   }).join('');
   $('quadroComparativo').innerHTML = `<table class="quadro"><thead><tr><th>Sintoma / domínio</th>${ultimas.map(s => `<th style="text-align:center">${dataCurta(s.data_referencia_sintomas)}<div class="muted pequeno" style="font-weight:400">${escapar(NOMES_PERFIL[s.perfil_autor_no_registo] || '')}</div></th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
 }
 // Liga o seletor de sintoma do gráfico e preenche-o com as perguntas do formulário ativo.
 function prepararEvolucao() {
-  $('perguntaGrafico').innerHTML = formAtivo.perguntas.map(pergunta =>
+  $('perguntaGrafico').innerHTML = perguntasComEscala().map(pergunta =>
     `<option value="${escapar(pergunta.id_pergunta)}">${escapar(pergunta.enunciado)}</option>`).join('');
   $('perguntaGrafico').addEventListener('change', () => { if (processoAtual) desenharSintomas(processoAtual.submissoes); });
 }
 
 // ---------- Histórico ----------
+// Cada registo mostra primeiro o que mudou; as respostas sem alteração ficam resumidas.
 function renderizarHistorico(submissoes) {
   if (!$('contentorHistorico')) return;
   if (!submissoes.length) { $('contentorHistorico').innerHTML = '<p class="muted">Ainda não existem registos de monitorização.</p>'; return; }
+  const alertasPorSubmissao = {};
+  (processoAtual?.alertas || []).forEach(a => { alertasPorSubmissao[a.id_submissao] = a; });
   $('contentorHistorico').innerHTML = submissoes.slice().reverse().map(s => {
-    const alteradas = s.respostas.filter(r => !r.motivo_nao_avaliavel && Number(r.valor_numerico) > 0);
-    const ausentes = s.respostas.filter(r => !r.motivo_nao_avaliavel && Number(r.valor_numerico) === 0);
-    const naoAval = s.respostas.filter(r => r.motivo_nao_avaliavel);
-    const semResposta = Math.max(0, (s.total_perguntas_ativas || 0) - s.respostas.length);
-    const badge = (r, cls) => `<span class="badge resp ${cls}">${escapar(r.enunciado)}: ${escapar(r.rotulo || 'Não avaliado')}${r.frequencia ? ` · ${escapar(FREQUENCIAS[r.frequencia] || r.frequencia)}` : ''}</span>`;
+    const principais = s.respostas.filter(r => !r.id_pergunta_pai);
+    const detalhesDe = r => s.respostas.filter(d => d.id_pergunta_pai === r.id_pergunta);
+    const alarmes = principais.filter(r => r.categoria === 'ALARME');
+    const alarmesSim = alarmes.filter(r => Number(r.valor_numerico) === 1);
+    const escala = principais.filter(r => r.categoria !== 'ALARME');
+    const alteradas = escala.filter(r => !r.motivo_nao_avaliavel && Number(r.valor_numerico) > 0)
+      .sort((a, b) => Number(b.valor_numerico) - Number(a.valor_numerico));
+    const semAlteracao = escala.filter(r => !r.motivo_nao_avaliavel && Number(r.valor_numerico) === 0);
+    const naoAval = escala.filter(r => r.motivo_nao_avaliavel);
+    const semResposta = Math.max(0, (s.total_perguntas_ativas || 0) - principais.length);
+    const alerta = ehClinico() ? alertasPorSubmissao[s.id_submissao] : null;
+
+    const linhaAlteracao = r => {
+      const extras = [r.frequencia && (FREQUENCIAS[r.frequencia] || r.frequencia), r.novo_ou_pior && 'novo ou pior'].filter(Boolean).join(' · ');
+      const detalhes = detalhesDe(r).filter(d => Number(d.valor_numerico) > 0)
+        .map(d => `${escapar(d.enunciado.replace(/\?$/, ''))}${d.valor_codificado === 'SIM' ? '' : `: ${escapar(rotuloCurto(d.rotulo))}`}`);
+      return `<li class="alteracao g${Math.min(3, Number(r.valor_numerico))}">
+        <span class="nome">${escapar(r.enunciado)}${r.texto ? ` («${escapar(r.texto)}»)` : ''}</span>
+        <span class="nivel">${escapar(rotuloCurto(r.rotulo))}</span>${extras ? `<span class="muted pequeno"> · ${escapar(extras)}</span>` : ''}
+        ${detalhes.length ? `<div class="pequeno muted">${detalhes.join(' · ')}</div>` : ''}</li>`;
+    };
+    const alarmesHtml = !alarmes.length ? ''
+      : alarmesSim.length
+        ? `<p class="alarme-sim"><strong>Sinais de alarme:</strong> ${alarmesSim.map(r => escapar(r.enunciado.replace(/\?$/, ''))).join('; ')}</p>`
+        : `<p class="pequeno alarme-nao">✓ Sem sinais de alarme (${alarmes.length} pergunta(s) respondida(s) com «Não»)</p>`;
+
     return `<article class="registo">
-      <strong>Sintomas de ${dataCurta(s.data_referencia_sintomas)}</strong>
-      <div class="muted pequeno">Registado em ${dataHora(s.data_hora_submissao)} por ${escapar(s.nome_autor)} (${escapar(NOMES_PERFIL[s.perfil_autor_no_registo] || s.perfil_autor_no_registo)})</div>
-      <p class="pequeno">${alteradas.length} com alteração · ${ausentes.length} sem alteração · ${naoAval.length} não avaliável(eis) · ${semResposta} sem resposta</p>
-      <div>${alteradas.length ? alteradas.map(r => badge(r, 'badge-alerta')).join('') : '<span class="muted pequeno">Nenhuma alteração reportada nas respostas dadas.</span>'}</div>
-      ${ausentes.length || naoAval.length ? `<details style="margin-top:.4rem"><summary class="pequeno">Ver as restantes respostas</summary>
-        ${naoAval.map(r => badge(r, 'badge-neutro')).join('')}${ausentes.map(r => badge(r, 'badge-ok')).join('')}</details>` : ''}
+      <div class="registo-topo">
+        <strong>Sintomas de ${dataCurta(s.data_referencia_sintomas)}</strong>
+        ${alerta ? `<span class="prioridade p-${escapar(alerta.prioridade)}">Gerou alerta ${escapar(alerta.prioridade)}</span>` : ''}
+      </div>
+      <div class="muted pequeno">Preenchido por ${escapar(s.nome_autor)} (${escapar(NOMES_PERFIL[s.perfil_autor_no_registo] || s.perfil_autor_no_registo)}) em ${dataHora(s.data_hora_submissao)}</div>
+      ${alarmesHtml}
+      ${alteradas.length ? `<ul class="alteracoes">${alteradas.map(linhaAlteracao).join('')}</ul>`
+        : '<p class="pequeno">Nenhum sintoma ou alteração reportado.</p>'}
+      ${semAlteracao.length || naoAval.length || semResposta ? `<details class="pequeno"><summary>${[
+          semAlteracao.length && `${semAlteracao.length} sem alteração`, naoAval.length && `${naoAval.length} não avaliável(eis)`, semResposta && `${semResposta} sem resposta`
+        ].filter(Boolean).join(' · ')}</summary>
+        ${semAlteracao.length ? `<p><strong>Sem alteração:</strong> ${semAlteracao.map(r => escapar(r.enunciado)).join(', ')}.</p>` : ''}
+        ${naoAval.length ? `<p><strong>Não conseguiu avaliar:</strong> ${naoAval.map(r => escapar(r.enunciado)).join(', ')}.</p>` : ''}
+      </details>` : ''}
     </article>`;
   }).join('');
 }
