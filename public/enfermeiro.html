@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <title>Enfermagem — Plataforma GBM</title>
+  <link rel="stylesheet" href="css/estilos.css" />
+</head>
+<body>
+  <header class="topo">
+    <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong><br />Monitorização longitudinal de glioblastoma</div>
+    <div id="barraUtilizador" class="acoes">
+      <span id="etiquetaUtilizador"></span>
+      <button id="terminarSessao" type="button" class="perigo">Terminar sessão</button>
+    </div>
+  </header>
+
+  <main aria-label="Área da enfermagem">
+    <!-- Doente em consulta: sempre visível fora do separador de alertas -->
+    <section id="barraDoente" class="barra-doente hidden" aria-label="Doente em consulta">
+      <div class="seletor" id="caixaSeletor">
+        <label for="doenteSelecionado">Doente em consulta</label>
+        <select id="doenteSelecionado"></select>
+      </div>
+      <div class="identidade" id="identidadeDoente" aria-live="polite"></div>
+    </section>
+
+    <nav class="tabs" role="tablist" id="separadores" aria-label="Áreas do processo"></nav>
+
+    <!-- ALERTAS -->
+    <section id="painel-alertas" role="tabpanel" aria-labelledby="tab-alertas">
+      <div class="card">
+        <h2>Alertas dos doentes acompanhados</h2>
+        <p class="muted pequeno">Ordenados por prioridade. Analise cada alerta e registe a triagem; encaminhe ao médico quando necessário.</p>
+        <div class="filtros" id="filtrosAlertas" role="group" aria-label="Filtrar alertas por estado"></div>
+        <div id="listaAlertas"></div>
+      </div>
+    </section>
+
+    <!-- RESUMO CLÍNICO -->
+    <section id="painel-resumo" role="tabpanel" class="hidden" aria-labelledby="tab-resumo">
+      <div class="grid-2">
+        <section class="card"><h2>Diagnóstico</h2><div id="resumoDiagnostico"></div></section>
+        <section class="card"><h2>Plano de monitorização</h2><div id="resumoPlano"></div></section>
+        <section class="card"><h2>Alertas deste doente</h2><div id="resumoAlertas"></div></section>
+        <section class="card"><h2>Tratamentos</h2><div id="resumoTratamentos"></div></section>
+        <section class="card"><h2>Decisões de acompanhamento</h2><div id="resumoDecisoes"></div></section>
+        <section class="card"><h2>Cuidadores autorizados</h2><div id="resumoCuidadores"></div></section>
+      </div>
+    </section>
+
+    <!-- EVOLUÇÃO -->
+    <section id="painel-evolucao" role="tabpanel" class="hidden" aria-labelledby="tab-evolucao">
+      <div class="grid-2">
+        <section class="card">
+          <h2>Avaliação funcional (Karnofsky)</h2>
+          <div id="chartKps"></div>
+        </section>
+        <section class="card">
+          <h2>Evolução de um sintoma</h2>
+          <label for="perguntaGrafico">Sintoma ou domínio</label>
+          <select id="perguntaGrafico"></select>
+          <div id="chartSintomas" aria-live="polite"></div>
+        </section>
+      </div>
+      <section class="card" style="margin-top:1rem">
+        <h2>Comparação entre registos</h2>
+        <p class="muted pequeno">Últimos registos lado a lado. «—» significa sem resposta, que não é o mesmo que ausência do sintoma.</p>
+        <div class="table-wrap" id="quadroComparativo"></div>
+      </section>
+    </section>
+
+    <!-- REGISTOS DO DOENTE -->
+    <section id="painel-historico" role="tabpanel" class="hidden" aria-labelledby="tab-historico">
+      <div class="card">
+        <h2>Histórico de registos de monitorização</h2>
+        <div id="contentorHistorico"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="msgGeral" class="hidden" role="status" aria-live="polite"><span id="msgTexto"></span><button type="button" id="fecharMsg" aria-label="Fechar mensagem">×</button></div>
+
+  <script src="js/comum.js"></script>
+  <script src="js/clinico.js"></script>
+  <script src="js/enfermeiro.js"></script>
+</body>
+</html>

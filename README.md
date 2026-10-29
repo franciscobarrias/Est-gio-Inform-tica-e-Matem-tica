@@ -53,6 +53,22 @@ npm run dev
 - Exportação autenticada de um bundle HL7 FHIR para o processo clínico.
 - Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
 
+## Estrutura da interface
+
+A interface está dividida por perfil. Todas as páginas usam os mesmos estilos e o mesmo código comum.
+
+| Ficheiro | Para quê |
+|---|---|
+| `public/index.html` + `js/login.js` | Entrada: autentica e abre a página do perfil |
+| `public/medico.html` + `js/medico.js` | Alertas encaminhados, resumo, evolução, registos e gestão clínica |
+| `public/enfermeiro.html` + `js/enfermeiro.js` | Triagem de alertas e consulta do processo |
+| `public/doente.html` + `js/doente.js` | Doente e cuidador: registo de sintomas, evolução, histórico e associação de cuidador |
+| `js/comum.js` | Sessão, pedidos à API, mensagens, separadores, barra do doente, gráficos e histórico |
+| `js/clinico.js` | Lista de alertas e resumo clínico, partilhados pelo médico e pela enfermagem |
+| `css/estilos.css` | Estilos comuns |
+
+O token de sessão passa entre páginas no `sessionStorage` e é apagado ao terminar sessão ou ao fechar o separador. Abrir a página de outro perfil leva de volta à página do próprio perfil. Esta divisão serve só a interface: quem decide o que cada perfil pode ver e alterar é sempre o servidor.
+
 ## Verificação
 
 ```powershell

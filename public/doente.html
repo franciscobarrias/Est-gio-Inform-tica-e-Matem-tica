@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <title>Monitorização — Plataforma GBM</title>
+  <link rel="stylesheet" href="css/estilos.css" />
+</head>
+<body>
+  <header class="topo">
+    <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong><br />Monitorização longitudinal de glioblastoma</div>
+    <div id="barraUtilizador" class="acoes">
+      <span id="etiquetaUtilizador"></span>
+      <button id="terminarSessao" type="button" class="perigo">Terminar sessão</button>
+    </div>
+  </header>
+
+  <main aria-label="Área do doente e do cuidador">
+    <!-- Doente: o próprio, ou o escolhido pelo cuidador -->
+    <section id="barraDoente" class="barra-doente" aria-label="Doente">
+      <div class="seletor" id="caixaSeletor">
+        <label for="doenteSelecionado">Doente</label>
+        <select id="doenteSelecionado"></select>
+      </div>
+      <div class="identidade" id="identidadeDoente" aria-live="polite"></div>
+    </section>
+
+    <nav class="tabs" role="tablist" id="separadores" aria-label="Áreas"></nav>
+
+    <!-- REGISTAR SINTOMAS -->
+    <section id="painel-registar" role="tabpanel" aria-labelledby="tab-registar">
+      <section class="card" id="secFormulario">
+        <h2 id="tituloFormulario">Formulário de monitorização</h2>
+        <p id="avisoCuidadorObrigatorio" class="aviso hidden">A avaliação funcional mais recente indica que este formulário deve ser preenchido pelo cuidador autorizado.</p>
+        <div id="corpoFormulario">
+          <p>Responda ao que conseguir. As perguntas em branco ficam «sem resposta» e não são consideradas «Ausente».</p>
+          <label for="inputDataRef">Data a que os sintomas dizem respeito</label>
+          <input id="inputDataRef" type="date" style="max-width:280px" />
+          <div id="contentorPerguntas"></div>
+          <p id="msgErroForm" role="alert" aria-live="polite" class="error"></p>
+          <button id="submeterMonitorizacao" type="button">Guardar respostas</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- EVOLUÇÃO -->
+    <section id="painel-evolucao" role="tabpanel" class="hidden" aria-labelledby="tab-evolucao">
+      <div class="grid-2">
+        <section class="card">
+          <h2>Avaliação funcional (Karnofsky)</h2>
+          <div id="chartKps"></div>
+        </section>
+        <section class="card">
+          <h2>Evolução de um sintoma</h2>
+          <label for="perguntaGrafico">Sintoma ou domínio</label>
+          <select id="perguntaGrafico"></select>
+          <div id="chartSintomas" aria-live="polite"></div>
+        </section>
+      </div>
+      <section class="card" style="margin-top:1rem">
+        <h2>Comparação entre registos</h2>
+        <p class="muted pequeno">Últimos registos lado a lado. «—» significa sem resposta, que não é o mesmo que ausência do sintoma.</p>
+        <div class="table-wrap" id="quadroComparativo"></div>
+      </section>
+    </section>
+
+    <!-- HISTÓRICO -->
+    <section id="painel-historico" role="tabpanel" class="hidden" aria-labelledby="tab-historico">
+      <div class="card">
+        <h2>Histórico de registos de monitorização</h2>
+        <div id="contentorHistorico"></div>
+      </div>
+    </section>
+
+    <!-- CUIDADOR (só para o doente) -->
+    <section id="painel-cuidador" role="tabpanel" class="hidden" aria-labelledby="tab-cuidador">
+      <section class="card" style="max-width:640px">
+        <h2>Associar cuidador autorizado</h2>
+        <p class="muted">Ao associar um cuidador, autoriza-o a consultar o seu histórico e a registar sintomas em seu nome.</p>
+        <label for="emailCuidador">Email da conta de cuidador</label>
+        <input id="emailCuidador" type="email" autocomplete="email" />
+        <label for="grauParentesco">Relação consigo</label>
+        <input id="grauParentesco" type="text" maxlength="80" list="listaParentesco" />
+        <datalist id="listaParentesco"><option>Cônjuge</option><option>Filho/a</option><option>Pai/Mãe</option><option>Irmão/Irmã</option><option>Outro familiar</option><option>Cuidador formal</option></datalist>
+        <button id="associarCuidador" type="button">Associar cuidador</button>
+      </section>
+    </section>
+  </main>
+
+  <div id="msgGeral" class="hidden" role="status" aria-live="polite"><span id="msgTexto"></span><button type="button" id="fecharMsg" aria-label="Fechar mensagem">×</button></div>
+
+  <script src="js/comum.js"></script>
+  <script src="js/doente.js"></script>
+</body>
+</html>

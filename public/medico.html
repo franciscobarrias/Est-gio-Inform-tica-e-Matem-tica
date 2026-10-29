@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <title>Médico — Plataforma GBM</title>
+  <link rel="stylesheet" href="css/estilos.css" />
+</head>
+<body>
+  <header class="topo">
+    <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong><br />Monitorização longitudinal de glioblastoma</div>
+    <div id="barraUtilizador" class="acoes">
+      <span id="etiquetaUtilizador"></span>
+      <button id="terminarSessao" type="button" class="perigo">Terminar sessão</button>
+    </div>
+  </header>
+
+  <main aria-label="Área do médico">
+    <!-- Doente em consulta: sempre visível fora do separador de alertas -->
+    <section id="barraDoente" class="barra-doente hidden" aria-label="Doente em consulta">
+      <div class="seletor" id="caixaSeletor">
+        <label for="doenteSelecionado">Doente em consulta</label>
+        <select id="doenteSelecionado"></select>
+      </div>
+      <div class="identidade" id="identidadeDoente" aria-live="polite"></div>
+    </section>
+
+    <nav class="tabs" role="tablist" id="separadores" aria-label="Áreas do processo"></nav>
+
+    <!-- ALERTAS -->
+    <section id="painel-alertas" role="tabpanel" aria-labelledby="tab-alertas">
+      <div class="card">
+        <h2>Alertas dos doentes acompanhados</h2>
+        <p class="muted pequeno">Ordenados por prioridade. Os alertas encaminhados pela enfermagem aguardam a sua decisão.</p>
+        <div class="filtros" id="filtrosAlertas" role="group" aria-label="Filtrar alertas por estado"></div>
+        <div id="listaAlertas"></div>
+      </div>
+    </section>
+
+    <!-- RESUMO CLÍNICO -->
+    <section id="painel-resumo" role="tabpanel" class="hidden" aria-labelledby="tab-resumo">
+      <div class="grid-2">
+        <section class="card"><h2>Diagnóstico</h2><div id="resumoDiagnostico"></div></section>
+        <section class="card"><h2>Plano de monitorização</h2><div id="resumoPlano"></div></section>
+        <section class="card"><h2>Alertas deste doente</h2><div id="resumoAlertas"></div></section>
+        <section class="card"><h2>Tratamentos</h2><div id="resumoTratamentos"></div></section>
+        <section class="card"><h2>Decisões de acompanhamento</h2><div id="resumoDecisoes"></div></section>
+        <section class="card"><h2>Cuidadores autorizados</h2><div id="resumoCuidadores"></div></section>
+      </div>
+    </section>
+
+    <!-- EVOLUÇÃO -->
+    <section id="painel-evolucao" role="tabpanel" class="hidden" aria-labelledby="tab-evolucao">
+      <div class="grid-2">
+        <section class="card">
+          <h2>Avaliação funcional (Karnofsky)</h2>
+          <div id="chartKps"></div>
+        </section>
+        <section class="card">
+          <h2>Evolução de um sintoma</h2>
+          <label for="perguntaGrafico">Sintoma ou domínio</label>
+          <select id="perguntaGrafico"></select>
+          <div id="chartSintomas" aria-live="polite"></div>
+        </section>
+      </div>
+      <section class="card" style="margin-top:1rem">
+        <h2>Comparação entre registos</h2>
+        <p class="muted pequeno">Últimos registos lado a lado. «—» significa sem resposta, que não é o mesmo que ausência do sintoma.</p>
+        <div class="table-wrap" id="quadroComparativo"></div>
+      </section>
+    </section>
+
+    <!-- REGISTOS DO DOENTE -->
+    <section id="painel-historico" role="tabpanel" class="hidden" aria-labelledby="tab-historico">
+      <div class="card">
+        <h2>Histórico de registos de monitorização</h2>
+        <div id="contentorHistorico"></div>
+      </div>
+    </section>
+
+    <!-- GESTÃO CLÍNICA -->
+    <section id="painel-gestao" role="tabpanel" class="hidden" aria-labelledby="tab-gestao">
+      <div class="grid-2">
+        <section class="card" aria-labelledby="tKps">
+          <h2 id="tKps">Avaliação funcional (KPS)</h2>
+          <p class="muted pequeno" id="kpsAtualTexto"></p>
+          <label for="inputKps">Nova classificação</label>
+          <select id="inputKps"></select>
+          <p id="avisoKps" class="aviso pequeno hidden">Com KPS ≤ 70, a participação do cuidador autorizado passa a ser obrigatória no preenchimento.</p>
+          <button id="guardarKps" type="button">Registar avaliação</button>
+        </section>
+
+        <section class="card" aria-labelledby="tPlano">
+          <h2 id="tPlano">Plano de monitorização</h2>
+          <p class="muted pequeno" id="planoAtualTexto"></p>
+          <label for="inputPeriodicidade">Pedir um registo a cada (dias)</label>
+          <input id="inputPeriodicidade" type="number" min="1" max="365" value="7" />
+          <button id="guardarPlano" type="button">Atualizar periodicidade</button>
+        </section>
+
+        <section class="card" aria-labelledby="tDecisao" id="cartaoDecisao">
+          <h2 id="tDecisao">Decisão de acompanhamento</h2>
+          <label for="selectAlertaDecisao">Alerta a que responde</label>
+          <select id="selectAlertaDecisao"></select>
+          <label for="selectDecisao">Decisão</label>
+          <select id="selectDecisao">
+            <option>Manter seguimento previsto</option>
+            <option>Necessidade de avaliação adicional</option>
+            <option>Proposta de antecipação de consulta</option>
+          </select>
+          <label for="inputFundamentacao">Fundamentação clínica</label>
+          <textarea id="inputFundamentacao" maxlength="500"></textarea>
+          <p class="muted pequeno">Se escolher um alerta, este fica «Concluído» com a decisão registada.</p>
+          <button id="guardarDecisao" type="button">Registar decisão</button>
+        </section>
+
+        <section class="card" aria-labelledby="tDiag">
+          <h2 id="tDiag">Diagnóstico</h2>
+          <div class="linha-campos">
+            <div><label for="diagData">Data do diagnóstico</label><input id="diagData" type="date" /></div>
+            <div><label for="diagLocalizacao">Localização tumoral</label><input id="diagLocalizacao" type="text" maxlength="120" list="listaLocalizacoes" /></div>
+            <div><label for="diagLateralidade">Lateralidade</label><select id="diagLateralidade"><option value="">Selecionar</option><option>Esquerda</option><option>Direita</option><option>Bilateral</option><option>Linha média</option></select></div>
+            <div><label for="diagIdh">Estatuto IDH</label><select id="diagIdh"><option value="">Selecionar</option><option>IDH-wildtype</option><option>IDH-mutante</option><option>Não determinado</option></select></div>
+            <div><label for="diagMgmt">Metilação MGMT</label><select id="diagMgmt"><option value="">Selecionar</option><option>MGMT Metilado</option><option>MGMT Não metilado</option><option>Não determinado</option></select></div>
+            <div><label for="diagFase">Fase clínica atual</label><input id="diagFase" type="text" maxlength="120" list="listaFases" /></div>
+          </div>
+          <datalist id="listaLocalizacoes"><option>Lobo Frontal</option><option>Lobo Temporal</option><option>Lobo Parietal</option><option>Lobo Occipital</option><option>Corpo caloso</option><option>Tronco cerebral</option><option>Multifocal</option></datalist>
+          <datalist id="listaFases"><option>Pós-operatório</option><option>Radioterapia</option><option>Quimioterapia Adjuvante</option><option>Seguimento</option><option>Recidiva</option><option>Cuidados paliativos</option></datalist>
+          <button id="guardarDiagnostico" type="button">Guardar diagnóstico</button>
+        </section>
+
+        <section class="card" aria-labelledby="tTrat">
+          <h2 id="tTrat">Registar tratamento</h2>
+          <div class="linha-campos">
+            <div><label for="tratTipo">Tipo</label>
+              <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select></div>
+            <div><label for="tratEstado">Estado</label>
+              <select id="tratEstado"><option value="PLANEADO">Planeado</option><option value="EM_CURSO">Em curso</option><option value="CONCLUIDO">Concluído</option><option value="SUSPENSO">Suspenso</option></select></div>
+            <div><label for="tratInicio">Data de início</label><input id="tratInicio" type="date" /></div>
+            <div><label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" /></div>
+          </div>
+          <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
+          <button id="guardarTratamento" type="button">Registar tratamento</button>
+        </section>
+
+        <section class="card" aria-labelledby="tCuidador">
+          <h2 id="tCuidador">Associar cuidador autorizado</h2>
+          <div id="cuidadoresAtuais"></div>
+          <label for="emailCuidador">Email da conta de cuidador</label>
+          <input id="emailCuidador" type="email" autocomplete="email" />
+          <label for="grauParentesco">Relação com o doente</label>
+          <input id="grauParentesco" type="text" maxlength="80" list="listaParentesco" />
+          <datalist id="listaParentesco"><option>Cônjuge</option><option>Filho/a</option><option>Pai/Mãe</option><option>Irmão/Irmã</option><option>Outro familiar</option><option>Cuidador formal</option></datalist>
+          <label style="font-weight:500;display:flex;align-items:center;margin-bottom:.75rem"><input id="consentimentoCuidador" type="checkbox" style="width:auto;min-height:auto;margin:0 .4rem 0 0" />Confirmo que foi obtida autorização do doente.</label>
+          <button id="associarCuidador" type="button">Associar cuidador</button>
+        </section>
+
+        <section class="card" aria-labelledby="tFhir">
+          <h2 id="tFhir">Exportação HL7 FHIR</h2>
+          <p class="muted pequeno">Gera um bundle com o doente, o diagnóstico, as avaliações KPS e os registos de monitorização.</p>
+          <div class="acoes">
+            <button id="abrirFhir" type="button" class="secundario">Pré-visualizar</button>
+            <button id="descarregarFhir" type="button" class="secundario">Descarregar .json</button>
+          </div>
+          <details id="resultadoFhir" class="hidden" style="margin-top:1rem">
+            <summary>Bundle FHIR</summary>
+            <pre id="conteudoFhir" style="overflow:auto;max-height:24rem;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.8rem"></pre>
+          </details>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="msgGeral" class="hidden" role="status" aria-live="polite"><span id="msgTexto"></span><button type="button" id="fecharMsg" aria-label="Fechar mensagem">×</button></div>
+
+  <script src="js/comum.js"></script>
+  <script src="js/clinico.js"></script>
+  <script src="js/medico.js"></script>
+</body>
+</html>
