@@ -1,7 +1,7 @@
 /*
- * Página do médico: alertas encaminhados, resumo, evolução, registos e gestão clínica
- * (KPS, plano de monitorização, decisão de acompanhamento, diagnóstico, tratamentos,
- * associação de cuidador e exportação FHIR).
+ * Página do médico: alertas encaminhados, resumo, diagnóstico e medicação (com registo de
+ * diagnóstico, tratamentos e medicação), evolução, registos e gestão clínica
+ * (KPS, plano de monitorização, decisão de acompanhamento, associação de cuidador e exportação FHIR).
  */
 
 const KPS = [
@@ -43,6 +43,15 @@ async function aoClicarAlertaDaPagina(evento) {
   $('selectAlertaDecisao').value = decidir.dataset.decidir;
   $('cartaoDecisao').scrollIntoView({ block: 'start' });
   $('inputFundamentacao').focus();
+}
+
+// ---------- Medicação: botões de cada linha ----------
+function acoesMedicacaoDaPagina(m) {
+  const id = escapar(m.id_medicacao);
+  const botao = (estado, texto, classe = 'secundario') => `<button type="button" class="${classe}" data-med="${id}" data-med-estado="${estado}">${texto}</button>`;
+  if (m.estado === 'ATIVA') return botao('SUSPENSA', 'Suspender') + botao('TERMINADA', 'Terminar');
+  if (m.estado === 'SUSPENSA') return botao('ATIVA', 'Retomar') + botao('TERMINADA', 'Terminar');
+  return '';
 }
 
 // ---------- Desenho do processo ----------
@@ -107,6 +116,23 @@ function ligarGestao() {
     $('tratDescricao').value = ''; $('tratInicio').value = ''; $('tratFim').value = '';
   }, 'Tratamento registado.', atualizarTudo));
 
+  $('medInicio').value = new Date().toISOString().slice(0, 10);
+  $('guardarMedicacao').addEventListener('click', () => executarAcao(async () => {
+    await pedidoApi(urlDoente('medicacoes'), { method: 'POST', body: JSON.stringify({
+      nome: $('medNome').value, dose: $('medDose').value, via: $('medVia').value, posologia: $('medPosologia').value,
+      indicacao: $('medIndicacao').value || undefined, data_inicio: $('medInicio').value, observacoes: $('medObs').value || undefined
+    }) });
+    ['medNome', 'medDose', 'medPosologia', 'medIndicacao', 'medObs'].forEach(id => { $(id).value = ''; });
+  }, 'Medicação registada.', atualizarTudo));
+  $('dmMedicacao').addEventListener('click', evento => {
+    const botao = evento.target.closest('[data-med]');
+    if (!botao) return;
+    const textos = { ATIVA: 'Medicação retomada.', SUSPENSA: 'Medicação suspensa.', TERMINADA: 'Medicação terminada.' };
+    executarAcao(() => pedidoApi(urlDoente(`medicacoes/${encodeURIComponent(botao.dataset.med)}`), {
+      method: 'PUT', body: JSON.stringify({ estado: botao.dataset.medEstado })
+    }), textos[botao.dataset.medEstado], atualizarTudo);
+  });
+
   $('guardarDecisao').addEventListener('click', () => executarAcao(async () => {
     await pedidoApi(urlDoente('decisoes'), { method: 'POST', body: JSON.stringify({
       decisao_medica: $('selectDecisao').value, fundamentacao_clinica: $('inputFundamentacao').value,
@@ -148,7 +174,7 @@ function ligarGestao() {
 // ---------- Arranque ----------
 iniciarPagina({
   perfis: ['MEDICO'],
-  separadores: [['alertas', 'Alertas'], ['resumo', 'Resumo clínico'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente'], ['gestao', 'Gestão clínica']],
+  separadores: [['alertas', 'Alertas'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente'], ['gestao', 'Gestão clínica']],
   semBarraDoente: ['alertas'],
   separadorInicial: 'alertas',
   depoisDeCarregar: async () => {

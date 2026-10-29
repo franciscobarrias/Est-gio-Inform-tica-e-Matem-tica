@@ -163,6 +163,20 @@ const cenarios: Cenario[] = [
 
 // CRIAÇÃO DOS DADOS
 
+// NOMES FICTÍCIOS (dados de demonstração; não correspondem a pessoas reais)
+
+const NOMES_DOENTES = [
+  'António Ferreira', 'Maria do Céu Lopes', 'Joaquim Pereira', 'Helena Sousa', 'Manuel Rodrigues',
+  'Rosa Martins', 'José Carvalho', 'Fernanda Almeida', 'Carlos Ribeiro', 'Isabel Gomes',
+  'Luís Teixeira', 'Teresa Moreira', 'Fernando Costa', 'Ana Paula Mendes'
+];
+const NOMES_CUIDADORES = [
+  'Luísa Ferreira', 'Pedro Pereira', 'Graça Rodrigues', 'Miguel Almeida',
+  'Sofia Ribeiro', 'Clara Teixeira', 'Ricardo Moreira', 'Marta Costa'
+];
+const NOMES_MEDICOS = ['Dr. Rui Matos', 'Dra. Inês Carvalho', 'Dr. Tiago Nunes'];
+const NOMES_ENFERMEIROS = ['Enf. Joana Silva', 'Enf. Bruno Faria', 'Enf. Catarina Lima'];
+
 const criarDados = db.transaction(() => {
 
 
@@ -179,6 +193,7 @@ const criarDados = db.transaction(() => {
     DELETE FROM Formulario;
     DELETE FROM PlanoMonitorizacao;
     DELETE FROM AvaliacaoKarnofsky;
+    DELETE FROM Medicacao;
     DELETE FROM Tratamento;
     DELETE FROM DiagnosticoGB;
     DELETE FROM DoenteCuidador;
@@ -227,7 +242,7 @@ const criarDados = db.transaction(() => {
     novoUtilizador(
       'medico',
       n,
-      `Médico de Demonstração ${n}`,
+      NOMES_MEDICOS[n - 1],
       n === 1 ? 'medico@chsj.pt' : `medico${n}@example.invalid`
     );
 
@@ -242,7 +257,7 @@ const criarDados = db.transaction(() => {
     novoUtilizador(
       'enfermeiro',
       n,
-      `Enfermeiro de Demonstração ${n}`,
+      NOMES_ENFERMEIROS[n - 1],
       n === 1 ? 'enfermeiro@chsj.pt' : `enfermeiro${n}@example.invalid`
     );
 
@@ -262,7 +277,7 @@ const criarDados = db.transaction(() => {
     novoUtilizador(
       'cuidador',
       n,
-      `Cuidador de Demonstração ${n}`,
+      NOMES_CUIDADORES[n - 1],
       n === 1 ? 'cuidador@chsj.pt' : `cuidador${n}@example.invalid`
     );
 
@@ -373,6 +388,12 @@ const criarDados = db.transaction(() => {
     VALUES (?, ?, ?, ?, ?)
   `);
 
+  const inserirMedicacao = db.prepare(`
+    INSERT INTO Medicacao (id_medicacao, id_doente, nome, dose, via, posologia, indicacao,
+      data_inicio, data_fim, estado, observacoes, id_medico_registo, data_hora_registo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
   const inserirTratamento = db.prepare(`
     INSERT INTO Tratamento
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -393,7 +414,8 @@ const criarDados = db.transaction(() => {
     novoUtilizador(
       'doente',
       c.n,
-      `Doente Fictício ${String(c.n).padStart(2, '0')} - ${c.descricao}`,
+      // O cenário (c.descricao) fica só no código e no README; o nome é o que se vê na aplicação.
+      NOMES_DOENTES[c.n - 1],
       c.n === 1 ? 'doente@chsj.pt' : `doente${c.n}@example.invalid`
     );
 
@@ -401,8 +423,8 @@ const criarDados = db.transaction(() => {
       INSERT INTO Doente VALUES (?, ?, ?, ?, ?)
     `).run(
       doente,
-      `GBM-FICTICIO-${String(c.n).padStart(3, '0')}`,
-      `${1960 + c.n}-05-15`,
+      `PC-${String(204310 + c.n * 37)}`,
+      `${1950 + ((c.n * 7) % 25)}-${String(1 + (c.n * 5) % 12).padStart(2, '0')}-${String(3 + (c.n * 11) % 25).padStart(2, '0')}`,
       c.n % 2 === 0 ? 'F' : 'M',
       medico
     );
@@ -435,13 +457,13 @@ const criarDados = db.transaction(() => {
       crypto.randomUUID(),
       doente,
       dataAtras(115),
-      c.n % 2 ? 'Lobo frontal' : 'Lobo temporal',
+      c.n % 2 ? 'Lobo Frontal' : 'Lobo Temporal',
       c.n % 2 ? 'Direita' : 'Esquerda',
-      'IDH-wildtype (fictício)',
+      'IDH-wildtype',
       c.n % 3 === 0
-        ? 'MGMT metilado'
-        : 'MGMT não determinado',
-      'Seguimento (fictício)'
+        ? 'MGMT Metilado'
+        : c.n % 3 === 1 ? 'MGMT Não metilado' : 'Não determinado',
+      c.n % 2 === 0 || c.n === 1 ? 'Quimioterapia Adjuvante' : 'Seguimento'
     );
 
     // TRATAMENTOS
@@ -453,7 +475,7 @@ const criarDados = db.transaction(() => {
       'CONCLUIDO',
       dataAtras(105),
       dataAtras(105),
-      'Procedimento fictício para demonstração'
+      c.n % 4 === 0 ? 'Biópsia estereotáxica' : 'Ressecção cirúrgica macroscópica'
     );
 
     if (c.n % 3 !== 0) {
@@ -464,7 +486,7 @@ const criarDados = db.transaction(() => {
         'CONCLUIDO',
         dataAtras(95),
         dataAtras(55),
-        'Tratamento fictício para demonstração'
+        'Radioterapia 60 Gy em 30 frações, com temozolomida concomitante (protocolo de Stupp)'
       );
     }
 
@@ -476,9 +498,30 @@ const criarDados = db.transaction(() => {
         'EM_CURSO',
         dataAtras(40),
         null,
-        'Tratamento fictício para demonstração'
+        'Temozolomida adjuvante, dias 1 a 5 de cada ciclo de 28 dias'
       );
     }
+
+    // MEDICAÇÃO (registada pelo médico responsável)
+
+    const emQuimio = c.n % 2 === 0 || c.n === 1;
+    const medicar = (nome: string, dose: string, via: string, posologia: string, indicacao: string,
+      inicio: number, estado = 'ATIVA', fim: number | null = null) =>
+      inserirMedicacao.run(crypto.randomUUID(), doente, nome, dose, via, posologia, indicacao,
+        dataAtras(inicio), fim === null ? null : dataAtras(fim), estado, null, medico, diasAtras(inicio));
+
+    // Corticoide: ativo nos cenários com agravamento, terminado nos outros.
+    const comCorticoide = [1, 3, 4, 8, 9, 13].includes(c.n);
+    medicar('Dexametasona', comCorticoide ? '4 mg' : '2 mg', 'ORAL', 'Uma vez por dia, de manhã', 'Edema cerebral',
+      110, comCorticoide ? 'ATIVA' : 'TERMINADA', comCorticoide ? null : 60);
+    if (comCorticoide) medicar('Pantoprazol', '20 mg', 'ORAL', 'Uma vez por dia, em jejum', 'Proteção gástrica durante o corticoide', 110);
+    // Antiepilético nos tumores frontais (cenários ímpares).
+    if (c.n % 2 === 1) medicar('Levetiracetam', '500 mg', 'ORAL', 'De 12 em 12 horas', 'Prevenção de convulsões', 105);
+    if (emQuimio) {
+      medicar('Temozolomida', '150 mg/m²', 'ORAL', 'Dias 1 a 5 de cada ciclo de 28 dias, ao deitar', 'Quimioterapia adjuvante', 40);
+      medicar('Ondansetrom', '8 mg', 'ORAL', '30 minutos antes da temozolomida; se necessário até 2 vezes por dia', 'Náuseas e vómitos', 40);
+    }
+    if (c.n === 5) medicar('Paracetamol', '1 g', 'ORAL', 'Até 3 vezes por dia, se dor', 'Dor de cabeça', 30, 'SUSPENSA', 10);
 
     // PRIMEIRA AVALIAÇÃO KPS
 
@@ -797,7 +840,8 @@ const tabelas = [
   'RespostaMonitorizacao',
   'AlertaClinico',
   'HistoricoAcaoAlerta',
-  'DecisaoAcompanhamento'
+  'DecisaoAcompanhamento',
+  'Medicacao'
 ];
 
 for (const tabela of tabelas) {

@@ -36,10 +36,29 @@ npm run dev
 
 **Atenção:** `npm run seed` apaga e recria os registos da base de dados indicada em `DATABASE_PATH` (ou `data.db`, se não for indicada), usando dados sintéticos. Execute-o apenas na primeira configuração ou numa base descartável; não o execute numa base de dados que pretenda conservar.
 
+Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Contas principais: `medico@chsj.pt` (Dr. Rui Matos), `enfermeiro@chsj.pt`, `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os restantes doentes entram com `doenteN@example.invalid`.
+
+| N.º | Doente | Cenário de demonstração |
+|---|---|---|
+| 1 | António Ferreira | Dependência crescente (KPS 80 → 60), preenchido pela cuidadora |
+| 2 | Maria do Céu Lopes | Estável |
+| 3 | Joaquim Pereira | Agravamento progressivo |
+| 4 | Helena Sousa | Agravamento súbito: dor de cabeça, vómitos e sonolência (alerta Crítica) |
+| 5 | Manuel Rodrigues | Melhoria gradual |
+| 6 | Rosa Martins | Respostas muito parciais |
+| 7 | José Carvalho | «Não consigo avaliar» |
+| 8 | Fernanda Almeida | Preenchimento pelo cuidador |
+| 9 | Carlos Ribeiro | Alertas e triagem |
+| 10 | Isabel Gomes | Histórico prolongado |
+| 11 | Luís Teixeira | Autonomia variável |
+| 12 | Teresa Moreira | Tratamentos múltiplos |
+| 13 | Fernando Costa | Agravamento neurológico agudo (alerta Crítica) |
+| 14 | Ana Paula Mendes | Agravamento ligeiro com cuidador |
+
 ## Funcionalidades implementadas
 
 - Autenticação por perfil, hashes scrypt com sal individual, tokens de sessão e autorização por processo.
-- Associação autorizada do cuidador pelo doente ou médico responsável; participação do cuidador exigida quando a última avaliação KPS é ≤ 70.
+- Associação do cuidador feita só pelo médico responsável, que confirma a autorização do doente; participação do cuidador exigida quando a última avaliação KPS é ≤ 70.
 - Atualização de diagnóstico, tratamentos, avaliações KPS, plano individual de monitorização e decisões médicas.
 - Questionário v2 (`form-gbm-v2`) em quatro blocos: **A** sinais de alarme (Sim/Não, últimas 24 horas), **B** sintomas (últimos 7 dias, de «Não tive» a «Grave»), **C** movimento e funções, **D** autonomia. Algumas perguntas têm perguntas de detalhe que só aparecem quando a principal tem resposta (por exemplo, o tipo de dor de cabeça). Nos sintomas pode indicar-se a frequência e se é «novo ou pior do que o habitual». Permite submissões parciais.
 - Respostas «Não tive», «Não consigo avaliar» e perguntas omitidas são representadas separadamente. Só respostas efetivamente fornecidas são persistidas.
@@ -50,7 +69,9 @@ npm run dev
   3. **Score de evolução** 0–100 ponderado, comparado com a linha de base do doente (mediana dos 3 primeiros registos); uma subida ≥ 15 pontos dá Média;
   4. **Ajustes**: KPS ≤ 70 e frequência diária ou constante sobem um nível cada, sem passar de Alta.
   Gera-se no máximo um alerta por registo, com todos os motivos escritos no resumo. Os registos antigos do formulário v1 continuam a usar as regras anteriores.
-- Interface por separadores (Alertas, Resumo clínico, Evolução, Registos do doente e Gestão clínica), com o doente em consulta sempre identificado.
+- Separador **Diagnóstico e medicação**, para todos os perfis: diagnóstico, linha do tempo dos tratamentos e medicação (ativa e anterior). Só o médico regista diagnóstico, tratamentos e medicação, e pode suspender, retomar ou terminar uma medicação; a enfermagem, o doente e o cuidador consultam.
+- Identificação do doente no topo de todas as páginas: nome, n.º de processo, data de nascimento e idade, sexo, médico responsável e cuidador. O cuidador vê «Está a registar por…».
+- Interface por separadores (Alertas, Resumo clínico, Diagnóstico e medicação, Evolução, Registos do doente e Gestão clínica).
 - Exportação autenticada de um bundle HL7 FHIR para o processo clínico.
 - Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
 
@@ -71,6 +92,10 @@ A interface está dividida por perfil. Todas as páginas usam os mesmos estilos 
 As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. Ao arrancar, a base de dados existente recebe as colunas novas e o formulário v2 passa a ser o ativo (o v1 fica inativo); para ter os dados de demonstração no v2, corra `npm run seed`.
 
 O token de sessão passa entre páginas no `sessionStorage` e é apagado ao terminar sessão ou ao fechar o separador. Abrir a página de outro perfil leva de volta à página do próprio perfil. Esta divisão serve só a interface: quem decide o que cada perfil pode ver e alterar é sempre o servidor.
+
+## Diagramas
+
+`docs/modelo-dados-gbm.drawio` tem o modelo de dados completo (abre em [diagrams.net](https://app.diagrams.net) ou na extensão Draw.io do VS Code). A verde está o que foi acrescentado nesta versão: a tabela `Medicacao` e as colunas para o texto do cuidador.
 
 ## Verificação
 

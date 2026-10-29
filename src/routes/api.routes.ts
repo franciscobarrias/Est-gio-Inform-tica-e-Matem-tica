@@ -10,10 +10,12 @@ router.get('/doentes/:idDoente/processo', autenticarJWT, ApiController.obterProc
 router.post('/doentes/:idDoente/submissoes', autenticarJWT, ApiController.submeterMonitorizacao);
 router.post('/doentes/:idDoente/kps', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarKps);
 router.put('/doentes/:idDoente/diagnostico', autenticarJWT, exigirPerfis('MEDICO'), ApiController.atualizarDiagnostico);
-router.post('/doentes/:idDoente/cuidadores', autenticarJWT, exigirPerfis('DOENTE', 'MEDICO'), ApiController.associarCuidador);
+router.post('/doentes/:idDoente/cuidadores', autenticarJWT, exigirPerfis('MEDICO'), ApiController.associarCuidador);
 router.post('/doentes/:idDoente/planos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.definirPlano);
 router.post('/doentes/:idDoente/tratamentos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarTratamento);
+router.post('/doentes/:idDoente/medicacoes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarMedicacao);
+router.put('/doentes/:idDoente/medicacoes/:idMedicacao', autenticarJWT, exigirPerfis('MEDICO'), ApiController.alterarEstadoMedicacao);
 router.post('/doentes/:idDoente/decisoes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarDecisao);
 router.get('/alertas', autenticarJWT, exigirPerfis('ENFERMEIRO', 'MEDICO'), ApiController.listarAlertas);
 router.put('/alertas/:idAlerta/triagem', autenticarJWT, exigirPerfis('ENFERMEIRO', 'MEDICO'), ApiController.triarAlerta);
-router.get('/fhir/Patient/:idDoente/\\$everything', autenticarJWT, exigirPerfis('MEDICO', 'ENFERMEIRO'), ApiController.exportarFhir);
+router.get('/fhir/Patient/:idDoente/\\$everything', autenticarJWT, exigirPerfis('MEDICO', 'ENFERMEIRO'), ApiController.exportarFhir);

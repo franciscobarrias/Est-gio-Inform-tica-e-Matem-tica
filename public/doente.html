@@ -7,7 +7,7 @@
   <title>Monitorização — Plataforma GBM</title>
   <link rel="stylesheet" href="css/estilos.css" />
 </head>
-<body>
+<body class="pagina-doente">
   <header class="topo">
     <div><strong>RISE-HEALTH / Serviço de Neurocirurgia CHSJ</strong><br />Monitorização longitudinal de glioblastoma</div>
     <div id="barraUtilizador" class="acoes">
@@ -38,10 +38,20 @@
           <label for="inputDataRef">Data a que os sintomas dizem respeito</label>
           <input id="inputDataRef" type="date" style="max-width:280px" />
           <div id="contentorPerguntas"></div>
-          <p id="msgErroForm" role="alert" aria-live="polite" class="error"></p>
-          <button id="submeterMonitorizacao" type="button">Guardar respostas</button>
+          <div class="barra-guardar">
+            <span id="contagemRespostas" class="muted" aria-live="polite"></span>
+            <button id="submeterMonitorizacao" type="button">Guardar respostas</button>
+            <p id="msgErroForm" role="alert" aria-live="polite" class="error"></p>
+          </div>
         </div>
       </section>
+    </section>
+
+    <!-- DIAGNÓSTICO E MEDICAÇÃO -->
+    <section id="painel-diagnostico" role="tabpanel" class="hidden" aria-labelledby="tab-diagnostico">
+      <section class="card"><h2>Diagnóstico</h2><div id="dmDiagnostico"></div></section>
+      <section class="card"><h2>Medicação</h2><div id="dmMedicacao"></div></section>
+      <section class="card"><h2>Tratamentos</h2><div id="dmTratamentos"></div></section>
     </section>
 
     <!-- EVOLUÇÃO -->
@@ -73,19 +83,6 @@
       </div>
     </section>
 
-    <!-- CUIDADOR (só para o doente) -->
-    <section id="painel-cuidador" role="tabpanel" class="hidden" aria-labelledby="tab-cuidador">
-      <section class="card" style="max-width:640px">
-        <h2>Associar cuidador autorizado</h2>
-        <p class="muted">Ao associar um cuidador, autoriza-o a consultar o seu histórico e a registar sintomas em seu nome.</p>
-        <label for="emailCuidador">Email da conta de cuidador</label>
-        <input id="emailCuidador" type="email" autocomplete="email" />
-        <label for="grauParentesco">Relação consigo</label>
-        <input id="grauParentesco" type="text" maxlength="80" list="listaParentesco" />
-        <datalist id="listaParentesco"><option>Cônjuge</option><option>Filho/a</option><option>Pai/Mãe</option><option>Irmão/Irmã</option><option>Outro familiar</option><option>Cuidador formal</option></datalist>
-        <button id="associarCuidador" type="button">Associar cuidador</button>
-      </section>
-    </section>
   </main>
 
   <div id="msgGeral" class="hidden" role="status" aria-live="polite"><span id="msgTexto"></span><button type="button" id="fecharMsg" aria-label="Fechar mensagem">×</button></div>

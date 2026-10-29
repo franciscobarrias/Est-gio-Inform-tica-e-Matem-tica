@@ -116,6 +116,57 @@ export class MedicoService {
     return { id_tratamento, ...dados };
   }
 
+  // ---------- Medicação ----------
+  static readonly VIAS_MEDICACAO = ['ORAL', 'ENDOVENOSA', 'SUBCUTANEA', 'INTRAMUSCULAR', 'OUTRA'];
+  static readonly ESTADOS_MEDICACAO = ['ATIVA', 'SUSPENSA', 'TERMINADA'];
+
+  static registarMedicacao(idDoente: string, idMedico: string, dados: {
+    nome: string; dose: string; via: string; posologia: string; indicacao?: string;
+    data_inicio: string; data_fim?: string; estado?: string; observacoes?: string;
+  }) {
+    if (!dados || typeof dados !== 'object') throw new Error('Dados da medicação inválidos.');
+    const texto = (valor: unknown, max: number) => typeof valor === 'string' && valor.trim().length > 0 && valor.trim().length <= max;
+    const estado = dados.estado || 'ATIVA';
+    if (!texto(dados.nome, 120) || !texto(dados.dose, 60) || !texto(dados.posologia, 160)) {
+      throw new Error('Indique o medicamento, a dose e a posologia.');
+    }
+    if (!MedicoService.VIAS_MEDICACAO.includes(dados.via) || !MedicoService.ESTADOS_MEDICACAO.includes(estado)) {
+      throw new Error('Via de administração ou estado da medicação inválidos.');
+    }
+    if (!dataIsoValida(dados.data_inicio) || (dados.data_fim && (!dataIsoValida(dados.data_fim) || dados.data_fim < dados.data_inicio))) {
+      throw new Error('Datas da medicação inválidas. Use AAAA-MM-DD e uma data de fim igual ou posterior ao início.');
+    }
+    if ((dados.indicacao && !texto(dados.indicacao, 160)) || (dados.observacoes && !texto(dados.observacoes, 500))) {
+      throw new Error('A indicação ou as observações são demasiado longas.');
+    }
+    const id_medicacao = crypto.randomUUID();
+    const tx = db.transaction(() => {
+      db.prepare(`INSERT INTO Medicacao (id_medicacao, id_doente, nome, dose, via, posologia, indicacao, data_inicio, data_fim,
+        estado, observacoes, id_medico_registo, data_hora_registo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        id_medicacao, idDoente, dados.nome.trim(), dados.dose.trim(), dados.via, dados.posologia.trim(),
+        dados.indicacao?.trim() || null, dados.data_inicio, dados.data_fim || null, estado,
+        dados.observacoes?.trim() || null, idMedico, new Date().toISOString());
+      registarAuditoria(idMedico, 'REGISTO_MEDICACAO', `Medicação ${dados.nome.trim()} (${estado})`);
+    });
+    tx();
+    return db.prepare('SELECT * FROM Medicacao WHERE id_medicacao = ?').get(id_medicacao);
+  }
+
+  // Suspender ou terminar uma medicação (ou retomá-la). Guarda a data de fim quando deixa de estar ativa.
+  static alterarEstadoMedicacao(idDoente: string, idMedicacao: string, idMedico: string, estado: string, dataFim?: string) {
+    if (!MedicoService.ESTADOS_MEDICACAO.includes(estado)) throw new Error('Estado da medicação inválido.');
+    const atual = db.prepare('SELECT * FROM Medicacao WHERE id_medicacao = ? AND id_doente = ?').get(idMedicacao, idDoente) as any;
+    if (!atual) throw new Error('A medicação indicada não pertence a este processo clínico.');
+    const fim = estado === 'ATIVA' ? null : (dataFim || new Date().toISOString().slice(0, 10));
+    if (fim && (!dataIsoValida(fim) || fim < atual.data_inicio)) throw new Error('A data de fim tem de ser igual ou posterior ao início.');
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE Medicacao SET estado = ?, data_fim = ? WHERE id_medicacao = ?').run(estado, fim, idMedicacao);
+      registarAuditoria(idMedico, 'ALTERACAO_MEDICACAO', `Medicação ${atual.nome}: ${atual.estado} → ${estado}`);
+    });
+    tx();
+    return db.prepare('SELECT * FROM Medicacao WHERE id_medicacao = ?').get(idMedicacao);
+  }
+
   static registarDecisaoAcompanhamento(idDoente: string, idMedico: string, dados: { id_alerta?: string; decisao_medica: string; fundamentacao_clinica: string }) {
     if (!dados || typeof dados !== 'object') throw new Error('Dados da decisão inválidos.');
     const decisoesValidas = ['Manter seguimento previsto', 'Necessidade de avaliação adicional', 'Proposta de antecipação de consulta'];
@@ -151,6 +202,9 @@ export class MedicoService {
 
     const diagnostico = db.prepare('SELECT * FROM DiagnosticoGB WHERE id_doente = ?').get(idDoente);
     const tratamentos = db.prepare('SELECT * FROM Tratamento WHERE id_doente = ? ORDER BY data_inicio DESC').all(idDoente);
+    // Ativas primeiro; dentro de cada estado, as mais recentes primeiro.
+    const medicacoes = db.prepare(`SELECT m.*, u.nome as nome_medico FROM Medicacao m JOIN Utilizador u ON u.id_utilizador = m.id_medico_registo
+      WHERE m.id_doente = ? ORDER BY CASE m.estado WHEN 'ATIVA' THEN 0 WHEN 'SUSPENSA' THEN 1 ELSE 2 END, m.data_inicio DESC`).all(idDoente);
     const avaliacoesKps = db.prepare('SELECT * FROM AvaliacaoKarnofsky WHERE id_doente = ? ORDER BY data_avaliacao ASC, rowid ASC').all(idDoente) as any[];
     const ultimoKps = avaliacoesKps.length > 0 ? avaliacoesKps[avaliacoesKps.length - 1].score_kps : 100;
     const cuidadores = db.prepare(`SELECT dc.*, u.nome, u.email, c.telefone_contacto FROM DoenteCuidador dc JOIN Cuidador c ON dc.id_cuidador = c.id_cuidador JOIN Utilizador u ON c.id_cuidador = u.id_utilizador WHERE dc.id_doente = ? AND dc.ativa = 1 AND dc.autorizacao_validada = 1`).all(idDoente);
@@ -184,7 +238,7 @@ export class MedicoService {
 
     return {
       doente: { ...doente, ultimo_kps: ultimoKps, participacao_cuidador_obrigatoria: ultimoKps <= 70 },
-      diagnostico, tratamentos, avaliacoesKps, cuidadores, planos, submissoes, alertas, decisoes,
+      diagnostico, tratamentos, medicacoes, avaliacoesKps, cuidadores, planos, submissoes, alertas, decisoes,
       lembrete: SintomaService.calcularLembreteMonitorizacao(idDoente)
     };
   }

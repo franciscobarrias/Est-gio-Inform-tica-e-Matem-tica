@@ -128,26 +128,40 @@ ul.lista li:last-child { border-bottom:0; }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; } }
   
 
-/* ---------- Formulário v2 (botões de opção) ---------- */
-.pergunta-v2 { border:0; margin:0; padding:.7rem 0; border-bottom:1px solid var(--line); min-width:0; }
-.pergunta-v2:last-child { border-bottom:0; }
-.pergunta-v2 > legend { font-weight:650; padding:0; margin-bottom:.35rem; }
-.pergunta-v2 .codigo { color:var(--muted); font-weight:500; font-size:.85rem; margin-right:.35rem; }
-.opcoes-radio { display:flex; flex-wrap:wrap; gap:.4rem; }
-.opcoes-radio label { display:flex; align-items:flex-start; gap:.4rem; font-weight:500; border:1px solid var(--border); border-radius:6px; padding:.45rem .7rem; cursor:pointer; background:#fff; max-width:100%; }
-.opcoes-radio label:has(input:checked) { border-color:var(--primary); background:var(--primary-soft); }
-.opcoes-radio label.sem-resposta { color:var(--muted); border-style:dashed; }
-.opcoes-radio input { width:auto; min-height:auto; margin:.2rem 0 0; flex:none; }
-.extras-pergunta { margin:.5rem 0 0 1rem; padding-left:.8rem; border-left:3px solid var(--line); }
-.extras-pergunta .pergunta-v2 { padding:.4rem 0; border-bottom:0; }
-.extras-pergunta label.caixa { display:flex; align-items:center; gap:.4rem; font-weight:500; margin:.3rem 0; }
-.extras-pergunta label.caixa input { width:auto; min-height:auto; margin:0; }
-.extras-pergunta select, .extras-pergunta input[type=text] { max-width:320px; }
-.instrucao { margin:.5rem 0 0; padding:.6rem .8rem; border-radius:0 6px 6px 0; font-weight:650; }
+/* ---------- Formulário v2: uma pergunta por cartão, com espaço ---------- */
+#contentorPerguntas { margin-top:1.25rem; }
+.grupo-perguntas.bloco-v2 { border:0; padding:0; margin:0 0 2.25rem; min-width:0; }
+.grupo-perguntas.bloco-v2 > legend { font-size:1.15rem; font-weight:750; color:var(--primary); padding:0; margin-bottom:.3rem; }
+.nota-bloco { margin:0 0 1rem; max-width:62ch; }
+.pergunta-v2 { border:1px solid var(--line); border-radius:10px; background:#fff; margin:0 0 1rem; padding:1rem 1.1rem 1.1rem; min-width:0; }
+.pergunta-v2.respondida { border-color:#b9cfe6; background:#fbfdff; }
+.pergunta-v2 > legend { float:left; width:100%; font-weight:650; font-size:1.02rem; padding:0; margin:0 0 .75rem; }
+.pergunta-v2 > legend + * { clear:both; }
+.pergunta-v2 .codigo { display:inline-block; min-width:2.3rem; color:var(--muted); font-weight:600; font-size:.8rem; margin-right:.4rem; }
+.opcoes-radio { display:flex; flex-direction:column; gap:.45rem; max-width:620px; }
+.opcoes-radio.curtas { flex-direction:row; flex-wrap:wrap; gap:.6rem; }
+.opcoes-radio label { display:flex; align-items:flex-start; gap:.6rem; font-weight:500; border:1px solid var(--border); border-radius:8px; padding:.6rem .85rem; cursor:pointer; background:#fff; line-height:1.35; }
+.opcoes-radio.curtas label { min-width:6.5rem; }
+.opcoes-radio label:hover { border-color:var(--primary); }
+.opcoes-radio label:has(input:checked) { border-color:var(--primary); background:var(--primary-soft); box-shadow:inset 0 0 0 1px var(--primary); }
+.opcoes-radio label.sem-resposta { color:var(--muted); border-style:dashed; font-size:.9rem; }
+.opcoes-radio input { width:1.05rem; height:1.05rem; min-height:auto; margin:.1rem 0 0; flex:none; accent-color:var(--primary); }
+.extras-pergunta { margin:1rem 0 0; padding:1rem 0 0 1rem; border-top:1px dashed var(--line); border-left:3px solid var(--primary-soft); }
+.extras-pergunta .pergunta-v2 { border:0; background:transparent; padding:0; margin:0 0 1rem; }
+.extras-pergunta .pergunta-v2 > legend { font-size:.95rem; margin-bottom:.5rem; }
+.extras-pergunta > label { margin-top:.25rem; }
+.extras-pergunta label.caixa { display:flex; align-items:center; gap:.5rem; font-weight:500; margin:.5rem 0 0; }
+.extras-pergunta label.caixa input { width:1.05rem; height:1.05rem; min-height:auto; margin:0; }
+.extras-pergunta select, .extras-pergunta input[type=text] { max-width:340px; }
+.instrucao { margin:.75rem 0 0; padding:.7rem .9rem; border-radius:0 8px 8px 0; font-weight:650; }
 .instrucao.LIGAR_112 { border-left:5px solid var(--p-critica); background:var(--p-critica-bg); color:var(--p-critica); }
 .instrucao.CONTACTAR_JA { border-left:5px solid var(--p-alta); background:var(--p-alta-bg); color:#7a2e0e; }
 .instrucao.CONTACTAR_HOJE { border-left:5px solid var(--p-media); background:var(--p-media-bg); color:#5c4800; }
-.nota-bloco { margin:-.25rem 0 .5rem; }
+.preencher-restantes { margin:-.25rem 0 0; }
+.barra-guardar { position:sticky; bottom:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+  background:#fff; border-top:1px solid var(--line); box-shadow:0 -4px 12px #0000000f; margin:1rem -1.25rem -1.25rem; padding:.85rem 1.25rem; border-radius:0 0 10px 10px; }
+.barra-guardar #msgErroForm { margin:0; flex:1 1 100%; }
+.barra-guardar #msgErroForm:empty { display:none; }
 
 /* ---------- Histórico: o que mudou primeiro ---------- */
 .registo-topo { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
@@ -161,3 +175,35 @@ ul.lista li:last-child { border-bottom:0; }
 .alarme-sim { margin:.5rem 0; padding:.45rem .7rem; border-left:4px solid var(--p-critica); background:var(--p-critica-bg); color:var(--p-critica); border-radius:0 6px 6px 0; }
 .alarme-nao { color:var(--ok); margin:.4rem 0; }
 .registo details p { margin:.35rem 0; }
+
+/* ---------- Identificação do doente ---------- */
+.identidade .papel { margin:0; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:650; }
+dl.identificacao { display:flex; flex-wrap:wrap; gap:.35rem 1.5rem; margin:.35rem 0 .6rem; }
+dl.identificacao div { min-width:0; }
+dl.identificacao dt { font-size:.75rem; color:var(--muted); }
+dl.identificacao dd { margin:0; font-weight:600; font-size:.92rem; }
+
+/* ---------- Diagnóstico e medicação ---------- */
+ol.linha-tempo { list-style:none; margin:0; padding:0 0 0 1rem; border-left:3px solid var(--line); }
+ol.linha-tempo li { position:relative; padding:0 0 1rem .75rem; }
+ol.linha-tempo li::before { content:''; position:absolute; left:-1.48rem; top:.35rem; width:.8rem; height:.8rem; border-radius:50%; background:var(--line); border:2px solid #fff; }
+ol.linha-tempo li.atual::before { background:var(--primary); }
+.tabela-medicacao { width:100%; border-collapse:collapse; font-size:.92rem; }
+.tabela-medicacao th, .tabela-medicacao td { text-align:left; padding:.55rem .6rem; border-bottom:1px solid var(--line); vertical-align:top; }
+.tabela-medicacao thead th { font-size:.8rem; color:var(--muted); font-weight:650; }
+.tabela-medicacao tr.inativa { color:var(--muted); }
+.tabela-medicacao td button { padding:.35rem .6rem; font-size:.82rem; margin:0 .25rem .25rem 0; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+/* Na página do doente a barra não acompanha o scroll: o formulário precisa do espaço. */
+.pagina-doente .barra-doente { position:static; }
+/* Diagnóstico numa faixa: os dados lado a lado, a ocupar a largura toda. */
+dl.faixa-dados { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:.75rem 1.5rem; margin:0; }
+dl.faixa-dados dt { font-size:.8rem; color:var(--muted); }
+dl.faixa-dados dd { margin:.1rem 0 0; font-weight:650; }
+#painel-diagnostico > .card { margin-bottom:1rem; }
+details.formulario-medico { margin-top:1rem; border-top:1px solid var(--line); padding-top:.75rem; }
+details.formulario-medico > summary { cursor:pointer; font-weight:650; color:var(--primary); display:inline-block; padding:.35rem 0; }
+details.formulario-medico[open] > summary { margin-bottom:.75rem; }
+details.formulario-medico .linha-campos { max-width:900px; }
+details.formulario-medico > input, details.formulario-medico > label { max-width:900px; }
+.tabela-medicacao td:last-child { white-space:nowrap; }

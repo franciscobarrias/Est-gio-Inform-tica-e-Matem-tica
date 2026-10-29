@@ -39,7 +39,9 @@ function perguntasComEscala() {
 function rotuloCurto(rotulo) { return String(rotulo || '').split(' — ')[0].replace(' / sem alteração', ''); }
 const TIPOS_TRATAMENTO = { CIRURGIA: 'Cirurgia', QUIMIOTERAPIA: 'Quimioterapia', RADIOTERAPIA: 'Radioterapia', OUTRO: 'Outro' };
 const ESTADOS_TRATAMENTO = { PLANEADO: 'Planeado', EM_CURSO: 'Em curso', CONCLUIDO: 'Concluído', SUSPENSO: 'Suspenso' };
-const PARENTESCO = { CONJUGE: 'Cônjuge' };
+const PARENTESCO = { CONJUGE: 'Cônjuge', FAMILIAR: 'Familiar' };
+const VIAS_MEDICACAO = { ORAL: 'Oral', ENDOVENOSA: 'Endovenosa', SUBCUTANEA: 'Subcutânea', INTRAMUSCULAR: 'Intramuscular', OUTRA: 'Outra' };
+const ESTADOS_MEDICACAO = { ATIVA: 'Ativa', SUSPENSA: 'Suspensa', TERMINADA: 'Terminada' };
 const FREQUENCIAS = { PONTUAL: 'pontual', INTERMITENTE: 'intermitente', DIARIA: 'diária', CONSTANTE: 'constante' };
 const PAGINA_DO_PERFIL = { MEDICO: 'medico.html', ENFERMEIRO: 'enfermeiro.html', DOENTE: 'doente.html', CUIDADOR: 'doente.html' };
 
@@ -201,6 +203,7 @@ async function carregarProcesso() {
     desenharSintomas(processoAtual.submissoes);
     desenharQuadroComparativo(processoAtual.submissoes);
     renderizarHistorico(processoAtual.submissoes);
+    renderizarDiagnosticoMedicacao();
     if (typeof aoCarregarProcesso === 'function') aoCarregarProcesso();
   } catch (erro) { mostrarMensagem(erro.message, 'error'); }
 }
@@ -209,19 +212,68 @@ function renderizarIdentidade() {
   const p = processoAtual, doente = p.doente, d = p.diagnostico || {};
   const anos = idade(doente.data_nascimento);
   const sexo = { M: 'Masculino', F: 'Feminino', OUTRO: 'Outro' }[doente.sexo];
-  const meta = [doente.numero_processo_clinico && `Processo ${escapar(doente.numero_processo_clinico)}`,
-    anos !== null && `${anos} anos`, sexo, doente.nome_medico_responsavel && `Médico: ${escapar(doente.nome_medico_responsavel)}`].filter(Boolean).join(' · ');
+  const cuidadores = (p.cuidadores || []).map(c => `${escapar(c.nome)} (${escapar(PARENTESCO[c.grau_parentesco] || c.grau_parentesco)})`).join(', ');
+  // Quem está a ver: deixa claro de quem são os dados e, para o cuidador, por quem está a responder.
+  const papel = user.perfil === 'CUIDADOR' ? 'Está a registar por'
+    : user.perfil === 'DOENTE' ? 'Os seus dados' : '';  // nas páginas clínicas o seletor já diz «Doente em consulta»
+  const campos = [
+    ['N.º de processo', doente.numero_processo_clinico && escapar(doente.numero_processo_clinico)],
+    ['Data de nascimento', doente.data_nascimento && `${dataCurta(doente.data_nascimento)}${anos !== null ? ` (${anos} anos)` : ''}`],
+    ['Sexo', sexo],
+    ['Médico responsável', doente.nome_medico_responsavel && escapar(doente.nome_medico_responsavel)],
+    ['Cuidador', cuidadores || (p.cuidadores ? `Nenhum associado${user.perfil === 'DOENTE' ? ' (o seu médico pode associar um)' : ''}` : null)]
+  ].filter(([, v]) => v);
   const cuidadorObrig = Boolean(doente.participacao_cuidador_obrigatoria);
   const abertos = (p.alertas || []).filter(a => a.estado_atual !== 'Concluído').length;
   $('identidadeDoente').innerHTML = `
+    ${papel ? `<p class="papel">${papel}</p>` : ''}
     <h1>${escapar(doente.nome)}</h1>
-    ${meta ? `<p class="meta">${meta}</p>` : ''}
+    ${campos.length ? `<dl class="identificacao">${campos.map(([t, v]) => `<div><dt>${t}</dt><dd>${v}</dd></div>`).join('')}</dl>` : ''}
     <div class="chips">
       <span class="chip ${cuidadorObrig ? 'chip-alerta' : ''}"><strong>KPS ${escapar(doente.ultimo_kps)}</strong>${cuidadorObrig ? ' · cuidador obrigatório' : ''}</span>
       ${d.fase_clinica_atual ? `<span class="chip">Fase: <strong>${escapar(d.fase_clinica_atual)}</strong></span>` : ''}
       ${ehClinico() ? `<span class="chip ${abertos ? 'chip-alerta' : 'chip-ok'}">${abertos ? `<strong>${abertos}</strong> alerta(s) por concluir` : 'Sem alertas por concluir'}</span>` : ''}
       <span class="chip ${p.lembrete.lembreteAtivo ? 'chip-alerta' : 'chip-ok'}">${escapar(semCodigoRequisito(p.lembrete.mensagem))}</span>
     </div>`;
+}
+
+// ---------- Diagnóstico e medicação ----------
+// Igual para todos os perfis; o médico tem também os formulários de registo (medico.js).
+// Se a página definir acoesMedicacaoDaPagina(m), cada medicação ganha uma coluna de ações.
+function renderizarDiagnosticoMedicacao() {
+  if (!$('dmDiagnostico')) return;
+  const p = processoAtual, d = p.diagnostico;
+  $('dmDiagnostico').innerHTML = d ? `<dl class="faixa-dados">
+      <div><dt>Diagnóstico</dt><dd>Glioblastoma${d.estatuto_idh ? `, ${escapar(d.estatuto_idh)}` : ''}</dd></div>
+      <div><dt>Data do diagnóstico</dt><dd>${dataCurta(d.data_diagnostico)}</dd></div>
+      <div><dt>Localização</dt><dd>${escapar(d.localizacao_tumoral)}${d.lateralidade ? ` (${escapar(d.lateralidade)})` : ''}</dd></div>
+      <div><dt>Metilação MGMT</dt><dd>${escapar(d.metilacao_mgmt || '—')}</dd></div>
+      <div><dt>Fase clínica atual</dt><dd>${escapar(d.fase_clinica_atual || '—')}</dd></div></dl>`
+    : '<p class="muted">O diagnóstico ainda não foi registado.</p>';
+
+  const t = p.tratamentos || [];
+  $('dmTratamentos').innerHTML = t.length ? `<ol class="linha-tempo">${t.map(x => `<li class="${x.estado === 'EM_CURSO' ? 'atual' : ''}">
+      <strong>${escapar(TIPOS_TRATAMENTO[x.tipo] || x.tipo)}</strong>
+      <span class="badge ${x.estado === 'EM_CURSO' ? 'badge-alerta' : 'badge-neutro'}">${escapar(ESTADOS_TRATAMENTO[x.estado] || x.estado)}</span>
+      <div class="muted pequeno">${x.data_fim && x.data_fim !== x.data_inicio ? `${dataCurta(x.data_inicio)} a ${dataCurta(x.data_fim)}` : x.data_fim ? dataCurta(x.data_inicio) : `Desde ${dataCurta(x.data_inicio)}`}</div>
+      <div>${escapar(x.descricao_esquema)}</div></li>`).join('')}</ol>`
+    : '<p class="muted">Sem tratamentos registados.</p>';
+
+  const meds = p.medicacoes || [];
+  const comAcoes = typeof acoesMedicacaoDaPagina === 'function';
+  const tabela = lista => `<div class="table-wrap"><table class="tabela-medicacao">
+    <thead><tr><th>Medicamento</th><th>Dose</th><th>Como tomar</th><th>Para quê</th><th>Datas</th>${comAcoes ? '<th><span class="sr-only">Ações</span></th>' : ''}</tr></thead>
+    <tbody>${lista.map(m => `<tr class="${m.estado !== 'ATIVA' ? 'inativa' : ''}">
+      <th scope="row">${escapar(m.nome)}${m.estado !== 'ATIVA' ? ` <span class="badge badge-neutro">${escapar(ESTADOS_MEDICACAO[m.estado] || m.estado)}</span>` : ''}</th>
+      <td>${escapar(m.dose)}<div class="muted pequeno">${escapar(VIAS_MEDICACAO[m.via] || m.via)}</div></td>
+      <td>${escapar(m.posologia)}${m.observacoes ? `<div class="muted pequeno">${escapar(m.observacoes)}</div>` : ''}</td>
+      <td>${escapar(m.indicacao || '—')}</td>
+      <td class="pequeno">Desde ${dataCurta(m.data_inicio)}${m.data_fim ? `<br>até ${dataCurta(m.data_fim)}` : ''}</td>
+      ${comAcoes ? `<td>${acoesMedicacaoDaPagina(m)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+  const ativas = meds.filter(m => m.estado === 'ATIVA'), outras = meds.filter(m => m.estado !== 'ATIVA');
+  $('dmMedicacao').innerHTML = (ativas.length ? tabela(ativas) : '<p class="muted">Sem medicação ativa registada.</p>')
+    + (outras.length ? `<details class="pequeno" style="margin-top:.75rem"><summary>Medicação anterior ou suspensa (${outras.length})</summary>${tabela(outras)}</details>` : '')
+    + (ehClinico() ? '' : '<p class="muted pequeno">Esta lista é mantida pelo seu médico. Se algo não estiver certo, fale com a equipa na próxima consulta ou contacto.</p>');
 }
 
 // ---------- Gráficos de evolução ----------

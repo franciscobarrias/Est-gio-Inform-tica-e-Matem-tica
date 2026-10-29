@@ -62,13 +62,23 @@ export class ApiController {
       const processo = MedicoService.obterProcessoLongitudinal(idDoente);
       registarAuditoria(req.user!.id_utilizador, 'CONSULTA_PROCESSO_CLINICO', `Consulta do processo ${idDoente}`);
       if (req.user!.perfil === 'DOENTE' || req.user!.perfil === 'CUIDADOR') {
+        // O doente e o cuidador veem a identificação, o diagnóstico, os tratamentos e a medicação,
+        // mas não os alertas, a triagem nem as decisões da equipa.
         res.json({
           doente: {
             id_doente: processo.doente.id_doente,
             nome: processo.doente.nome,
+            numero_processo_clinico: processo.doente.numero_processo_clinico,
+            data_nascimento: processo.doente.data_nascimento,
+            sexo: processo.doente.sexo,
+            nome_medico_responsavel: processo.doente.nome_medico_responsavel,
             ultimo_kps: processo.doente.ultimo_kps,
             participacao_cuidador_obrigatoria: processo.doente.participacao_cuidador_obrigatoria
           },
+          diagnostico: processo.diagnostico,
+          tratamentos: processo.tratamentos,
+          medicacoes: processo.medicacoes,
+          cuidadores: (processo.cuidadores as any[]).map(c => ({ id_cuidador: c.id_cuidador, nome: c.nome, grau_parentesco: c.grau_parentesco })),
           avaliacoesKps: processo.avaliacoesKps,
           submissoes: processo.submissoes,
           lembrete: processo.lembrete
@@ -118,15 +128,14 @@ export class ApiController {
 
   static associarCuidador(req: Request, res: Response) {
     try {
-      if (!['DOENTE', 'MEDICO'].includes(req.user!.perfil) ||
-          !AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
-        res.status(403).json({ erro: 'A associação requer autorização do doente ou do médico responsável.' });
+      // Só o médico responsável associa um cuidador, depois de confirmar a autorização do doente.
+      if (req.user!.perfil !== 'MEDICO' || !AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
+        res.status(403).json({ erro: 'A associação de um cuidador é feita pelo médico responsável, com autorização do doente.' });
         return;
       }
       res.status(201).json(MedicoService.associarCuidador(
         req.params.idDoente, req.body.email_cuidador, req.body.grau_parentesco,
-        req.user!.id_utilizador,
-        req.user!.perfil === 'DOENTE' || req.body.consentimento_confirmado === true
+        req.user!.id_utilizador, req.body.consentimento_confirmado === true
       ));
     } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
@@ -137,6 +146,24 @@ export class ApiController {
       return;
     }
     try { res.status(201).json(MedicoService.definirPlanoMonitorizacao(req.params.idDoente, req.user!.id_utilizador, 'Ad hoc', Number(req.body.periodicidade_dias), req.body.fase_clinica_atual)); } catch (e: any) { res.status(400).json({ erro: e.message }); }
+  }
+
+  static registarMedicacao(req: Request, res: Response) {
+    if (!AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
+      res.status(403).json({ erro: 'Sem autorização para atualizar este processo clínico.' });
+      return;
+    }
+    try { res.status(201).json(MedicoService.registarMedicacao(req.params.idDoente, req.user!.id_utilizador, req.body)); } catch (e: any) { res.status(400).json({ erro: e.message }); }
+  }
+
+  static alterarEstadoMedicacao(req: Request, res: Response) {
+    if (!AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
+      res.status(403).json({ erro: 'Sem autorização para atualizar este processo clínico.' });
+      return;
+    }
+    try {
+      res.json(MedicoService.alterarEstadoMedicacao(req.params.idDoente, req.params.idMedicacao, req.user!.id_utilizador, req.body?.estado, req.body?.data_fim));
+    } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
 
   static registarTratamento(req: Request, res: Response) {
@@ -189,4 +216,4 @@ export class ApiController {
       res.json(FhirService.exportarBundleFhir(req.params.idDoente));
     } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
-}
+}

@@ -206,6 +206,25 @@ export function inicializarBaseDados(): void {
       FOREIGN KEY (id_utilizador) REFERENCES Utilizador(id_utilizador)
     );
 
+    -- Medicação registada pelo médico (o doente e o cuidador só consultam).
+    CREATE TABLE IF NOT EXISTS Medicacao (
+      id_medicacao TEXT PRIMARY KEY,
+      id_doente TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      dose TEXT NOT NULL,
+      via TEXT NOT NULL CHECK(via IN ('ORAL', 'ENDOVENOSA', 'SUBCUTANEA', 'INTRAMUSCULAR', 'OUTRA')),
+      posologia TEXT NOT NULL,
+      indicacao TEXT,
+      data_inicio TEXT NOT NULL,
+      data_fim TEXT,
+      estado TEXT NOT NULL CHECK(estado IN ('ATIVA', 'SUSPENSA', 'TERMINADA')),
+      observacoes TEXT,
+      id_medico_registo TEXT NOT NULL,
+      data_hora_registo TEXT NOT NULL,
+      FOREIGN KEY (id_doente) REFERENCES Doente(id_doente),
+      FOREIGN KEY (id_medico_registo) REFERENCES Medico(id_medico)
+    );
+
     CREATE TABLE IF NOT EXISTS DecisaoAcompanhamento (
       id_decisao TEXT PRIMARY KEY,
       id_doente TEXT NOT NULL,

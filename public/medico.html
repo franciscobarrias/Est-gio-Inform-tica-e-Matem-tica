@@ -50,6 +50,57 @@
       </div>
     </section>
 
+    <!-- DIAGNÓSTICO E MEDICAÇÃO -->
+    <section id="painel-diagnostico" role="tabpanel" class="hidden" aria-labelledby="tab-diagnostico">
+      <section class="card"><h2>Diagnóstico</h2><div id="dmDiagnostico"></div>
+        <details class="formulario-medico">
+          <summary>Editar diagnóstico</summary>
+          <div class="linha-campos">
+            <div><label for="diagData">Data do diagnóstico</label><input id="diagData" type="date" /></div>
+            <div><label for="diagLocalizacao">Localização tumoral</label><input id="diagLocalizacao" type="text" maxlength="120" list="listaLocalizacoes" /></div>
+            <div><label for="diagLateralidade">Lateralidade</label><select id="diagLateralidade"><option value="">Selecionar</option><option>Esquerda</option><option>Direita</option><option>Bilateral</option><option>Linha média</option></select></div>
+            <div><label for="diagIdh">Estatuto IDH</label><select id="diagIdh"><option value="">Selecionar</option><option>IDH-wildtype</option><option>IDH-mutante</option><option>Não determinado</option></select></div>
+            <div><label for="diagMgmt">Metilação MGMT</label><select id="diagMgmt"><option value="">Selecionar</option><option>MGMT Metilado</option><option>MGMT Não metilado</option><option>Não determinado</option></select></div>
+            <div><label for="diagFase">Fase clínica atual</label><input id="diagFase" type="text" maxlength="120" list="listaFases" /></div>
+          </div>
+          <datalist id="listaLocalizacoes"><option>Lobo Frontal</option><option>Lobo Temporal</option><option>Lobo Parietal</option><option>Lobo Occipital</option><option>Corpo caloso</option><option>Tronco cerebral</option><option>Multifocal</option></datalist>
+          <datalist id="listaFases"><option>Pós-operatório</option><option>Radioterapia</option><option>Quimioterapia Adjuvante</option><option>Seguimento</option><option>Recidiva</option><option>Cuidados paliativos</option></datalist>
+          <button id="guardarDiagnostico" type="button">Guardar diagnóstico</button>
+        </details>
+      </section>
+      <section class="card"><h2>Medicação</h2><div id="dmMedicacao"></div>
+        <details class="formulario-medico">
+          <summary>+ Registar medicação</summary>
+          <div class="linha-campos">
+            <div><label for="medNome">Medicamento</label><input id="medNome" type="text" maxlength="120" list="listaMedicamentos" /></div>
+            <div><label for="medDose">Dose</label><input id="medDose" type="text" maxlength="60" placeholder="Ex.: 4 mg" /></div>
+            <div><label for="medVia">Via</label><select id="medVia"><option value="ORAL">Oral</option><option value="ENDOVENOSA">Endovenosa</option><option value="SUBCUTANEA">Subcutânea</option><option value="INTRAMUSCULAR">Intramuscular</option><option value="OUTRA">Outra</option></select></div>
+            <div><label for="medInicio">Data de início</label><input id="medInicio" type="date" /></div>
+          </div>
+          <label for="medPosologia">Como tomar (posologia)</label><input id="medPosologia" type="text" maxlength="160" placeholder="Ex.: uma vez por dia, de manhã" />
+          <label for="medIndicacao">Para quê (indicação)</label><input id="medIndicacao" type="text" maxlength="160" placeholder="Ex.: edema cerebral" />
+          <label for="medObs">Observações (opcional)</label><input id="medObs" type="text" maxlength="500" />
+          <datalist id="listaMedicamentos"><option>Temozolomida</option><option>Dexametasona</option><option>Levetiracetam</option><option>Ondansetrom</option><option>Metoclopramida</option><option>Pantoprazol</option><option>Paracetamol</option><option>Lomustina</option><option>Bevacizumab</option><option>Cotrimoxazol</option></datalist>
+          <button id="guardarMedicacao" type="button">Registar medicação</button>
+        </details>
+      </section>
+      <section class="card"><h2>Tratamentos</h2><div id="dmTratamentos"></div>
+        <details class="formulario-medico">
+          <summary>+ Registar tratamento</summary>
+          <div class="linha-campos">
+            <div><label for="tratTipo">Tipo</label>
+              <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select></div>
+            <div><label for="tratEstado">Estado</label>
+              <select id="tratEstado"><option value="PLANEADO">Planeado</option><option value="EM_CURSO">Em curso</option><option value="CONCLUIDO">Concluído</option><option value="SUSPENSO">Suspenso</option></select></div>
+            <div><label for="tratInicio">Data de início</label><input id="tratInicio" type="date" /></div>
+            <div><label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" /></div>
+          </div>
+          <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
+          <button id="guardarTratamento" type="button">Registar tratamento</button>
+        </details>
+      </section>
+    </section>
+
     <!-- EVOLUÇÃO -->
     <section id="painel-evolucao" role="tabpanel" class="hidden" aria-labelledby="tab-evolucao">
       <div class="grid-2">
@@ -115,34 +166,7 @@
           <button id="guardarDecisao" type="button">Registar decisão</button>
         </section>
 
-        <section class="card" aria-labelledby="tDiag">
-          <h2 id="tDiag">Diagnóstico</h2>
-          <div class="linha-campos">
-            <div><label for="diagData">Data do diagnóstico</label><input id="diagData" type="date" /></div>
-            <div><label for="diagLocalizacao">Localização tumoral</label><input id="diagLocalizacao" type="text" maxlength="120" list="listaLocalizacoes" /></div>
-            <div><label for="diagLateralidade">Lateralidade</label><select id="diagLateralidade"><option value="">Selecionar</option><option>Esquerda</option><option>Direita</option><option>Bilateral</option><option>Linha média</option></select></div>
-            <div><label for="diagIdh">Estatuto IDH</label><select id="diagIdh"><option value="">Selecionar</option><option>IDH-wildtype</option><option>IDH-mutante</option><option>Não determinado</option></select></div>
-            <div><label for="diagMgmt">Metilação MGMT</label><select id="diagMgmt"><option value="">Selecionar</option><option>MGMT Metilado</option><option>MGMT Não metilado</option><option>Não determinado</option></select></div>
-            <div><label for="diagFase">Fase clínica atual</label><input id="diagFase" type="text" maxlength="120" list="listaFases" /></div>
-          </div>
-          <datalist id="listaLocalizacoes"><option>Lobo Frontal</option><option>Lobo Temporal</option><option>Lobo Parietal</option><option>Lobo Occipital</option><option>Corpo caloso</option><option>Tronco cerebral</option><option>Multifocal</option></datalist>
-          <datalist id="listaFases"><option>Pós-operatório</option><option>Radioterapia</option><option>Quimioterapia Adjuvante</option><option>Seguimento</option><option>Recidiva</option><option>Cuidados paliativos</option></datalist>
-          <button id="guardarDiagnostico" type="button">Guardar diagnóstico</button>
-        </section>
 
-        <section class="card" aria-labelledby="tTrat">
-          <h2 id="tTrat">Registar tratamento</h2>
-          <div class="linha-campos">
-            <div><label for="tratTipo">Tipo</label>
-              <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select></div>
-            <div><label for="tratEstado">Estado</label>
-              <select id="tratEstado"><option value="PLANEADO">Planeado</option><option value="EM_CURSO">Em curso</option><option value="CONCLUIDO">Concluído</option><option value="SUSPENSO">Suspenso</option></select></div>
-            <div><label for="tratInicio">Data de início</label><input id="tratInicio" type="date" /></div>
-            <div><label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" /></div>
-          </div>
-          <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
-          <button id="guardarTratamento" type="button">Registar tratamento</button>
-        </section>
 
         <section class="card" aria-labelledby="tCuidador">
           <h2 id="tCuidador">Associar cuidador autorizado</h2>

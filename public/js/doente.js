@@ -1,6 +1,6 @@
 /*
  * Página do doente e do cuidador: registo de sintomas, evolução e histórico.
- * O doente pode também associar um cuidador. O cuidador com vários doentes escolhe-os no seletor.
+ * O cuidador com vários doentes escolhe-os no seletor. A associação de cuidadores é feita pelo médico.
  */
 
 // ---------- Formulário de monitorização ----------
@@ -28,6 +28,14 @@ const respondeCuidador = () => user?.perfil === 'CUIDADOR';
 const textoPergunta = p => (respondeCuidador() && p.enunciado_cuidador) || p.enunciado;
 const rotuloOpcao = o => (respondeCuidador() && o.rotulo_cuidador) || o.rotulo;
 
+// Botão no fim de cada bloco para responder de uma vez às perguntas que ficaram em branco.
+// É uma ação explícita: «sem resposta» continua a ser diferente de «Não tive».
+const PREENCHER_RESTANTES = {
+  ALARME: ['NAO', 'Responder «Não» às que ficaram por responder'],
+  SINTOMA: ['AUSENTE', 'Marcar as que ficaram por responder como «Não tive»'],
+  FUNCAO: ['AUSENTE', 'Marcar as que ficaram por responder como «Normal» / «Nenhuma»']
+};
+
 const filhasDe = idPai => formAtivo.perguntas.filter(p => p.id_pergunta_pai === idPai);
 const perguntaPorId = id => formAtivo.perguntas.find(p => p.id_pergunta === id);
 // Opção escolhida numa pergunta (ou undefined se estiver «Sem resposta»).
@@ -44,6 +52,7 @@ function valorEscolhido(pergunta) {
 
 function htmlPergunta(pergunta) {
   const id = escapar(pergunta.id_pergunta);
+  const curtas = pergunta.opcoes.every(o => rotuloOpcao(o).length <= 14);
   const opcoes = pergunta.opcoes.map(o => `<label><input type="radio" name="resp_${id}" value="${escapar(o.id_opcao)}" />${escapar(rotuloOpcao(o))}</label>`).join('');
   const presente = ['SINTOMA', 'FUNCAO'].includes(pergunta.categoria);
   const extras = [
@@ -57,7 +66,7 @@ function htmlPergunta(pergunta) {
   ].join('');
   return `<fieldset class="pergunta-v2" data-pergunta="${id}">
     <legend>${pergunta.codigo ? `<span class="codigo">${escapar(pergunta.codigo)}</span>` : ''}${escapar(textoPergunta(pergunta))}</legend>
-    <div class="opcoes-radio">${opcoes}<label class="sem-resposta"><input type="radio" name="resp_${id}" value="" checked />Sem resposta</label></div>
+    <div class="opcoes-radio${curtas ? ' curtas' : ''}">${opcoes}<label class="sem-resposta"><input type="radio" name="resp_${id}" value="" checked />Sem resposta</label></div>
     ${extras ? `<div class="extras-pergunta hidden" id="extras_${id}">${extras}</div>` : ''}
     <p class="instrucao hidden" id="instrucao_${id}" role="alert"></p>
   </fieldset>`;
@@ -74,9 +83,10 @@ function renderizarFormulario() {
   formAtivo.perguntas.filter(p => !p.id_pergunta_pai).forEach(p => (grupos[p.categoria] = grupos[p.categoria] || []).push(p));
   const categorias = Object.keys(grupos).sort((a, b) => ORDEM_BLOCOS.indexOf(a) - ORDEM_BLOCOS.indexOf(b));
   $('contentorPerguntas').innerHTML = categorias.map(categoria => `
-    <fieldset class="grupo-perguntas"><legend>${escapar(CATEGORIAS[categoria] || categoria)}</legend>
-      ${notas[categoria] ? `<p class="muted pequeno nota-bloco">${notas[categoria]}</p>` : ''}
+    <fieldset class="grupo-perguntas bloco-v2"><legend>${escapar(CATEGORIAS[categoria] || categoria)}</legend>
+      ${notas[categoria] ? `<p class="muted nota-bloco">${notas[categoria]}</p>` : ''}
       ${grupos[categoria].map(htmlPergunta).join('')}
+      ${PREENCHER_RESTANTES[categoria] ? `<p class="preencher-restantes"><button type="button" class="secundario" data-preencher="${categoria}">${PREENCHER_RESTANTES[categoria][1]}</button></p>` : ''}
     </fieldset>`).join('');
   formAtivo.perguntas.forEach(atualizarPergunta);
 }
@@ -113,12 +123,30 @@ function atualizarPergunta(pergunta) {
       if ($(`texto_${id}`)) $(`texto_${id}`).value = '';
     }
   }
+  document.querySelector(`[data-pergunta="${CSS.escape(id)}"]`)?.classList.toggle('respondida', Boolean(opcaoEscolhida(pergunta)));
+  atualizarContagem();
   const caixa = $(`instrucao_${id}`);
   if (caixa) {
     const instrucao = instrucaoImediata(pergunta, valor);
     caixa.className = `instrucao ${instrucao || 'hidden'}`;
     caixa.textContent = instrucao ? INSTRUCOES[instrucao] : '';
   }
+}
+
+function atualizarContagem() {
+  if (!$('contagemRespostas')) return;
+  const principais = formAtivo.perguntas.filter(p => !p.id_pergunta_pai);
+  const respondidas = principais.filter(p => opcaoEscolhida(p)).length;
+  $('contagemRespostas').textContent = `${respondidas} de ${principais.length} perguntas respondidas`;
+}
+
+function preencherRestantes(categoria) {
+  const codigo = PREENCHER_RESTANTES[categoria][0];
+  formAtivo.perguntas.filter(p => p.categoria === categoria && !p.id_pergunta_pai && !opcaoEscolhida(p)).forEach(p => {
+    const opcao = p.opcoes.find(o => o.valor_codificado === codigo);
+    const entrada = opcao && document.querySelector(`input[name="resp_${CSS.escape(p.id_pergunta)}"][value="${CSS.escape(opcao.id_opcao)}"]`);
+    if (entrada) { entrada.checked = true; atualizarPergunta(p); }
+  });
 }
 
 function instrucaoImediata(pergunta, valor) {
@@ -177,6 +205,10 @@ function ligarFormulario() {
   $('inputDataRef').value = hoje;
   $('inputDataRef').max = hoje;
   $('submeterMonitorizacao').addEventListener('click', submeterMonitorizacao);
+  $('contentorPerguntas').addEventListener('click', evento => {
+    const botao = evento.target.closest('[data-preencher]');
+    if (botao) preencherRestantes(botao.dataset.preencher);
+  });
   $('contentorPerguntas').addEventListener('change', evento => {
     const campo = evento.target.closest('[data-pergunta]');
     if (!campo || evento.target.type !== 'radio') return;
@@ -187,38 +219,30 @@ function ligarFormulario() {
   });
 }
 
-// ---------- Associação de cuidador (só o doente) ----------
-function ligarAssociacao() {
-  $('associarCuidador').addEventListener('click', () => executarAcao(async () => {
-    await pedidoApi(urlDoente('cuidadores'), { method: 'POST', body: JSON.stringify({
-      email_cuidador: $('emailCuidador').value, grau_parentesco: $('grauParentesco').value,
-      consentimento_confirmado: true
-    }) });
-    $('emailCuidador').value = ''; $('grauParentesco').value = '';
-  }, 'Cuidador autorizado associado.'));
-}
-
 // ---------- Desenho do processo ----------
 function aoCarregarProcesso() {
   // Com KPS ≤ 70 o formulário deve ser preenchido pelo cuidador (RF05).
   const bloqueado = user.perfil === 'DOENTE' && Boolean(processoAtual.doente.participacao_cuidador_obrigatoria);
   $('avisoCuidadorObrigatorio').classList.toggle('hidden', !bloqueado);
   $('corpoFormulario').classList.toggle('hidden', bloqueado);
+  const semCuidador = !(processoAtual.cuidadores || []).length;
+  $('avisoCuidadorObrigatorio').textContent = semCuidador
+    ? 'A avaliação funcional mais recente indica que este formulário deve ser preenchido por um cuidador autorizado. Ainda não tem nenhum associado: fale com o seu médico para o associar.'
+    : 'A avaliação funcional mais recente indica que este formulário deve ser preenchido pelo seu cuidador autorizado.';
 }
 
 // ---------- Arranque ----------
 (() => {
   const sessao = lerSessao();
   const ehDoente = sessao?.utilizador?.perfil === 'DOENTE';
-  const separadores = [['registar', 'Registar sintomas'], ['evolucao', ehDoente ? 'A minha evolução' : 'Evolução'], ['historico', 'Histórico']];
-  if (ehDoente) separadores.push(['cuidador', 'O meu cuidador']);
+  const separadores = [['registar', 'Registar sintomas'], ['evolucao', ehDoente ? 'A minha evolução' : 'Evolução'], ['historico', 'Histórico'],
+    ['diagnostico', ehDoente ? 'A minha doença e medicação' : 'Diagnóstico e medicação']];
   iniciarPagina({
     perfis: ['DOENTE', 'CUIDADOR'],
     separadores,
     separadorInicial: 'registar',
     depoisDeCarregar: async () => {
       ligarFormulario();
-      if (ehDoente) ligarAssociacao();
     }
   });
 })();

@@ -273,3 +273,29 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.equal(alertasGerados[0].prioridade, 'Crítica');
   assert.deepEqual(alertasGerados[0].instrucoes, ['LIGAR_112']);
 });
+
+// ---------- Medicação ----------
+
+test('regista, suspende e termina medicação, validando os dados', () => {
+  const hoje = new Date().toISOString().slice(0, 10);
+  assert.throws(() => MedicoService.registarMedicacao(idDoente, idMedico, {
+    nome: '', dose: '4 mg', via: 'ORAL', posologia: 'De manhã', data_inicio: hoje
+  }), /medicamento, a dose e a posologia/);
+  assert.throws(() => MedicoService.registarMedicacao(idDoente, idMedico, {
+    nome: 'Dexametasona', dose: '4 mg', via: 'NASAL', posologia: 'De manhã', data_inicio: hoje
+  }), /Via de administração/);
+  const med = MedicoService.registarMedicacao(idDoente, idMedico, {
+    nome: 'Metoclopramida', dose: '10 mg', via: 'ORAL', posologia: 'Até 3 vezes por dia', indicacao: 'Náuseas', data_inicio: hoje
+  }) as { id_medicacao: string; estado: string };
+  assert.equal(med.estado, 'ATIVA');
+  const suspensa = MedicoService.alterarEstadoMedicacao(idDoente, med.id_medicacao, idMedico, 'SUSPENSA') as { estado: string; data_fim: string };
+  assert.equal(suspensa.estado, 'SUSPENSA');
+  assert.equal(suspensa.data_fim, hoje);
+  const retomada = MedicoService.alterarEstadoMedicacao(idDoente, med.id_medicacao, idMedico, 'ATIVA') as { data_fim: string | null };
+  assert.equal(retomada.data_fim, null);
+  // Não se altera medicação de outro doente.
+  assert.throws(() => MedicoService.alterarEstadoMedicacao('user-doente-002', med.id_medicacao, idMedico, 'TERMINADA'), /não pertence/);
+  const processo = MedicoService.obterProcessoLongitudinal(idDoente) as any;
+  assert.ok(processo.medicacoes.some((m: any) => m.id_medicacao === med.id_medicacao));
+  assert.equal(processo.medicacoes[0].estado, 'ATIVA');
+});
