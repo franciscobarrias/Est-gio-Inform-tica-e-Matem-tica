@@ -69,8 +69,11 @@ function renderizarGestao() {
   const p = processoAtual, d = p.diagnostico || {};
   const ultimaKps = p.avaliacoesKps[p.avaliacoesKps.length - 1];
   $('kpsAtualTexto').textContent = ultimaKps ? `Última avaliação: ${ultimaKps.score_kps} em ${dataCurta(ultimaKps.data_avaliacao)}.` : 'Sem avaliações anteriores.';
-  $('inputKps').value = String(ultimaKps ? ultimaKps.score_kps : 100);
-  $('avisoKps').classList.toggle('hidden', Number($('inputKps').value) > 70);
+  const avaliacaoKpsVigente = ultimaKps &&
+    ultimaKps.data_avaliacao >= new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10) &&
+    ultimaKps.data_avaliacao <= new Date().toISOString().slice(0, 10);
+  $('inputKps').value = avaliacaoKpsVigente ? String(ultimaKps.score_kps) : '';
+  $('avisoKps').classList.toggle('hidden', !$('inputKps').value || Number($('inputKps').value) > 70);
   const plano = p.planos.find(pl => pl.estado === 'ATIVO');
   $('planoAtualTexto').textContent = plano ? `Atualmente: um registo a cada ${plano.periodicidade_dias} dia(s), definido em ${dataCurta(plano.data_definicao)}.` : 'Sem plano definido.';
   if (plano) $('inputPeriodicidade').value = plano.periodicidade_dias;
@@ -90,8 +93,11 @@ function renderizarGestao() {
 
 // ---------- Ações da gestão clínica ----------
 function ligarGestao() {
-  $('inputKps').innerHTML = KPS.map(([v, d]) => `<option value="${v}">${v} — ${d}</option>`).join('');
-  $('inputKps').addEventListener('change', () => $('avisoKps').classList.toggle('hidden', Number($('inputKps').value) > 70));
+  $('inputKps').innerHTML = '<option value="">Não registar avaliação</option>' +
+    KPS.map(([v, d]) => `<option value="${v}">${v} — ${d}</option>`).join('');
+  $('inputKps').addEventListener('change', () => $('avisoKps').classList.toggle(
+    'hidden', !$('inputKps').value || Number($('inputKps').value) > 70
+  ));
 
   $('guardarKps').addEventListener('click', () => executarAcao(
     () => pedidoApi(urlDoente('kps'), { method: 'POST', body: JSON.stringify({ score_kps: $('inputKps').value }) }),

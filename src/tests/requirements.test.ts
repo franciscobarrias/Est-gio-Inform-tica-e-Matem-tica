@@ -3,6 +3,7 @@ import { after, test } from 'node:test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import Database from 'better-sqlite3';
 
 const diretorioTemporario = fs.mkdtempSync(path.join(os.tmpdir(), 'plataforma-gbm-test-'));
 process.env.DATABASE_PATH = path.join(diretorioTemporario, 'teste.db');
@@ -14,8 +15,9 @@ const { AuthService } = require('../services/auth.service') as typeof import('..
 const { SintomaService } = require('../services/sintoma.service') as typeof import('../services/sintoma.service');
 const { MedicoService } = require('../services/medico.service') as typeof import('../services/medico.service');
 const { AlertaService } = require('../services/alerta.service') as typeof import('../services/alerta.service');
-const { avaliarSubmissaoV2, calcularScore } = require('../services/motor-alertas-v2') as typeof import('../services/motor-alertas-v2');
+const { avaliarSubmissaoV2, calcularScore, PESOS } = require('../services/motor-alertas-v2') as typeof import('../services/motor-alertas-v2');
 const { FhirService } = require('../services/fhir.service') as typeof import('../services/fhir.service');
+const { executarMigracoes } = require('../database/migrations') as typeof import('../database/migrations');
 
 const idDoente = 'user-doente-001';
 const idCuidador = 'user-cuidador-001';
@@ -24,6 +26,46 @@ const idMedico = 'user-medico-001';
 after(() => {
   db.close();
   fs.rmSync(diretorioTemporario, { recursive: true, force: true });
+});
+
+test('migração versionada converte «não avaliável» de zero para NULL', () => {
+  const legado = new Database(':memory:');
+  try {
+    legado.exec(`
+      CREATE TABLE SubmissaoMonitorizacao (
+        id_submissao TEXT PRIMARY KEY, id_doente TEXT, id_formulario TEXT,
+        data_referencia_sintomas TEXT, data_hora_submissao TEXT
+      );
+      CREATE TABLE PerguntaFormulario (id_pergunta TEXT PRIMARY KEY);
+      CREATE TABLE OpcaoResposta (id_opcao TEXT PRIMARY KEY);
+      CREATE TABLE RespostaMonitorizacao (
+        id_resposta TEXT PRIMARY KEY, id_submissao TEXT NOT NULL, id_pergunta TEXT NOT NULL, id_opcao TEXT,
+        valor_numerico INTEGER NOT NULL DEFAULT 0, motivo_nao_avaliavel INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao),
+        FOREIGN KEY (id_pergunta) REFERENCES PerguntaFormulario(id_pergunta),
+        FOREIGN KEY (id_opcao) REFERENCES OpcaoResposta(id_opcao)
+      );
+      CREATE TABLE AlertaClinico (id_alerta TEXT PRIMARY KEY);
+      CREATE TABLE HistoricoAcaoAlerta (id_acao TEXT PRIMARY KEY);
+      INSERT INTO SubmissaoMonitorizacao (id_submissao) VALUES ('sub');
+      INSERT INTO PerguntaFormulario VALUES ('pergunta');
+      INSERT INTO OpcaoResposta VALUES ('opcao');
+      INSERT INTO RespostaMonitorizacao VALUES ('resposta', 'sub', 'pergunta', 'opcao', 0, 1);
+    `);
+    executarMigracoes(legado);
+    const resposta = legado.prepare('SELECT valor_numerico, motivo_nao_avaliavel FROM RespostaMonitorizacao')
+      .get() as { valor_numerico: number | null; motivo_nao_avaliavel: number };
+    assert.deepEqual(resposta, { valor_numerico: null, motivo_nao_avaliavel: 1 });
+    const coluna = (legado.prepare('PRAGMA table_info(RespostaMonitorizacao)').all() as Array<{
+      name: string; notnull: number; dflt_value: string | null;
+    }>).find(item => item.name === 'valor_numerico');
+    assert.equal(coluna?.notnull, 0);
+    assert.equal(coluna?.dflt_value, null);
+    const versoes = legado.prepare('SELECT COUNT(*) AS total FROM SchemaMigracao').get() as { total: number };
+    assert.equal(versoes.total, 3);
+  } finally {
+    legado.close();
+  }
 });
 
 test('guarda hashes individuais e migra credenciais antigas após autenticação', () => {
@@ -82,8 +124,18 @@ test('aceita registos parciais e distingue impossível avaliar de ausência e om
 
   const fhir = FhirService.exportarBundleFhir(idDoente);
   const respostaFhir = fhir.entry.find((entrada: any) => entrada.resource.id === submissao.id_submissao);
-  assert.equal(respostaFhir.resource.status, 'in-progress');
+  assert.equal(respostaFhir.resource.status, 'completed');
   assert.equal(respostaFhir.resource.item.length, 1);
+  assert.equal(respostaFhir.resource.item[0].linkId, 'B1');
+  assert.equal(respostaFhir.resource.item[0].answer[0].valueCoding.system,
+    'https://chsj.min-saude.pt/fhir/CodeSystem/resposta-gbm');
+  assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire'));
+  const valorPersistido = db.prepare(`SELECT valor_numerico FROM RespostaMonitorizacao
+    WHERE id_submissao = ?`).get(submissao.id_submissao) as { valor_numerico: number | null };
+  assert.equal(valorPersistido.valor_numerico, null);
+  assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'DetectedIssue'));
+  assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'Observation' &&
+    entrada.resource.code?.coding?.[0]?.code === 'symptom-burden'));
   assert.throws(() => SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
     id_formulario: formulario.id_formulario,
     data_referencia_sintomas: agora,
@@ -119,13 +171,19 @@ test('gera e audita alerta determinístico após resposta grave', () => {
   });
   assert.ok(submissao.alertasGerados.length > 0);
   const alerta = submissao.alertasGerados[0];
-  AlertaService.registarTriagemAlerta(alerta.id_alerta, idMedico, 'Em análise', 'Alta', 'Avaliação registada no teste.');
+  AlertaService.registarTriagemAlerta(alerta.id_alerta, idMedico, 'Em análise', 'Média', 'Avaliação registada no teste.');
   const estado = db.prepare('SELECT estado_atual, prioridade FROM AlertaClinico WHERE id_alerta = ?').get(alerta.id_alerta) as {
     estado_atual: string; prioridade: string;
   };
-  assert.deepEqual(estado, { estado_atual: 'Em análise', prioridade: 'Alta' });
-  const historico = db.prepare('SELECT COUNT(*) as total FROM HistoricoAcaoAlerta WHERE id_alerta = ?').get(alerta.id_alerta) as { total: number };
-  assert.equal(historico.total, 1);
+  assert.deepEqual(estado, { estado_atual: 'Em análise', prioridade: 'Média' });
+  const historico = db.prepare(`SELECT prioridade_anterior, prioridade_nova
+    FROM HistoricoAcaoAlerta WHERE id_alerta = ? ORDER BY data_hora_acao DESC LIMIT 1`).get(alerta.id_alerta) as {
+      prioridade_anterior: string; prioridade_nova: string;
+    };
+  assert.deepEqual(historico, { prioridade_anterior: 'Alta', prioridade_nova: 'Média' });
+  const decisaoOriginal = db.prepare('SELECT prioridade_algoritmo FROM AlertaClinico WHERE id_alerta = ?')
+    .get(alerta.id_alerta) as { prioridade_algoritmo: string };
+  assert.equal(decisaoOriginal.prioridade_algoritmo, alerta.prioridade);
 });
 
 test('exige registo explícito de autorização na associação de cuidador', () => {
@@ -145,24 +203,11 @@ test('valida e guarda o diagnóstico do médico responsável', () => {
   }) as { localizacao_tumoral: string };
   assert.equal(resultado.localizacao_tumoral, 'Frontal');
 });
-test('gradua a prioridade dos alertas pela gravidade e pelo KPS', () => {
-  const item = (id_pergunta: string, categoria: string, valor_numerico: number) => ({ id_pergunta, categoria, valor_numerico });
-  assert.equal(AlertaService.calcularPrioridade([item('perg-marcha', 'ESCALA_NANO', 3)], 90).prioridade, 'Crítica');
-  assert.equal(AlertaService.calcularPrioridade([item('perg-consciencia', 'ESCALA_NANO', 2)], 90).prioridade, 'Crítica');
-  assert.equal(AlertaService.calcularPrioridade([item('perg-forca', 'ESCALA_NANO', 2)], 90).prioridade, 'Alta');
-  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 3)], 90).prioridade, 'Alta');
-  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 2)], 90).prioridade, 'Média');
-  // KPS <= 70 sobe um nível, mas só os critérios neurológicos chegam a Crítica.
-  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 2)], 60).prioridade, 'Alta');
-  assert.equal(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 3)], 60).prioridade, 'Alta');
-  assert.match(AlertaService.calcularPrioridade([item('perg-cefaleia', 'SINTOMA_GERAL', 2)], 60).motivo, /KPS 60/);
-});
-
 test('não permite alterar um alerta já concluído', () => {
   const formulario = SintomaService.obterFormularioAtivo();
   const pergunta = formulario.perguntas.find((item: any) => item.id_pergunta === 'v2-c2-forca');
   const grave = pergunta.opcoes.find((opcao: any) => opcao.valor_codificado === 'GRAVE');
-  const { alertasGerados } = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+  const { id_submissao, alertasGerados } = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
     id_formulario: formulario.id_formulario,
     data_referencia_sintomas: new Date().toISOString().slice(0, 10),
     respostas: [{ id_pergunta: pergunta.id_pergunta, id_opcao: grave.id_opcao }]
@@ -178,7 +223,7 @@ const respostasV2 = (valores: Valores) => Object.fromEntries(Object.entries(valo
   codigo,
   Array.isArray(v) ? { valor: v[0], naoAvaliavel: false, frequencia: v[1] } : { valor: v, naoAvaliavel: false }
 ]));
-const avaliar = (valores: Valores, kps = 90, anteriores: Valores[] = []) =>
+const avaliar = (valores: Valores, kps: number | null = 90, anteriores: Valores[] = []) =>
   avaliarSubmissaoV2({ respostas: respostasV2(valores), anteriores: anteriores.map(respostasV2), kps });
 
 test('v2: o formulário ativo é o v2 e o v1 fica inativo', () => {
@@ -238,18 +283,60 @@ test('v2: sintoma grave isolado dá Média e sobe com KPS ≤ 70 ou frequência 
 
 test('v2: o score só gera alerta com linha de base e cobertura suficientes', () => {
   const todos = (valor: number) => Object.fromEntries(
-    ['B1', 'B2', 'B5', 'B7', 'B10', 'B11', 'B12', 'B13', 'B16', 'B17', 'C1', 'C2', 'C4', 'D1', 'B6', 'B8', 'B9'].map(c => [c, valor])
+    Object.keys(PESOS).map(c => [c, valor])
   );
   const estavel = [todos(0), todos(0), todos(0)];
-  const pior = { ...todos(1), B1: 2, B5: 2, B7: 2 };
+  const pior = { ...todos(0), D1: 2, C4: 2, B7: 2 };
   const r = avaliar(pior, 90, estavel);
-  assert.ok((r.score ?? 0) >= 15);
+  assert.ok((r.score ?? 0) >= 10);
   assert.ok(r.motivos.some(m => m.tipo === 'SCORE_EVOLUCAO_V2'));
   assert.equal(r.prioridade, 'Média');
+  assert.ok(Math.abs((r.score ?? 0) - 11.6) < 0.1);
   // Só com dois registos anteriores ainda não há linha de base.
   assert.equal(avaliar(pior, 90, estavel.slice(0, 2)).linhaDeBase, null);
   // Poucas perguntas respondidas: cobertura abaixo de 60%, sem score.
   assert.ok(calcularScore(respostasV2({ B1: 3 })).cobertura < 0.6);
+});
+
+test('v2: exclui bases parciais antes de selecionar três registos elegíveis', () => {
+  const todos = Object.fromEntries(Object.keys(PESOS).map(c => [c, 0]));
+  const parcial = respostasV2({ B1: 0 });
+  const completos = [respostasV2(todos), respostasV2(todos), respostasV2(todos)];
+  const agravado = { ...todos, D1: 2, C4: 2, B7: 2 };
+  const resultado = avaliarSubmissaoV2({
+    respostas: respostasV2(agravado),
+    anteriores: [parcial, ...completos],
+    kps: null
+  });
+  assert.equal(resultado.linhaDeBase, 0);
+  assert.ok((resultado.limiarScore ?? Infinity) <= 10);
+  assert.ok(resultado.motivos.some(m => m.tipo === 'SCORE_EVOLUCAO_V2'));
+  assert.equal(resultado.prioridade, 'Média');
+});
+
+test('v2: o limiar aumenta com o nível e a variabilidade da linha de base', () => {
+  const todas = (valor: number) => respostasV2(Object.fromEntries(
+    Object.keys(PESOS).map(codigo => [codigo, codigo === 'C3' ? Math.min(valor, 2) : valor])
+  ));
+  const baixo = avaliarSubmissaoV2({ respostas: todas(0), anteriores: [todas(0), todas(0), todas(0)], kps: null });
+  const alto = avaliarSubmissaoV2({ respostas: todas(3), anteriores: [todas(3), todas(3), todas(3)], kps: null });
+  const variavel = avaliarSubmissaoV2({ respostas: todas(1), anteriores: [todas(0), todas(1), todas(3)], kps: null });
+  assert.equal(baixo.limiarScore, 5);
+  assert.equal(alto.limiarScore, 10);
+  assert.ok(alto.limiarScore !== null && variavel.limiarScore !== null && variavel.limiarScore > alto.limiarScore);
+});
+
+test('v2: respostas cognitivas não avaliáveis são sinalizadas e KPS ausente não equivale a 100 nem a 0', () => {
+  const naoAvaliavel = (codigo: string) => [codigo, { valor: 0, naoAvaliavel: true }] as const;
+  const resultado = avaliarSubmissaoV2({
+    respostas: Object.fromEntries([naoAvaliavel('B7'), naoAvaliavel('B8')]),
+    anteriores: [],
+    kps: null
+  });
+  assert.equal(resultado.prioridade, 'Média');
+  assert.equal(resultado.tipo, 'DADOS_INSUFICIENTES_V2');
+  assert.deepEqual(resultado.dadosNaoAvaliaveis, ['B7', 'B8']);
+  assert.equal(avaliar({ B5: 3 }, null).prioridade, 'Média');
 });
 
 test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta principal', () => {
@@ -264,7 +351,7 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
     respostas: [{ id_pergunta: 'v2-b1-manha', id_opcao: opcao('v2-b1-manha', 'SIM') }]
   }));
 
-  const { alertasGerados } = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+  const { id_submissao, alertasGerados } = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
     id_formulario: formulario.id_formulario,
     data_referencia_sintomas: hoje,
     respostas: [{ id_pergunta: 'v2-a2-cefaleia-subita', id_opcao: opcao('v2-a2-cefaleia-subita', 'SIM') }]
@@ -272,6 +359,31 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.equal(alertasGerados.length, 1);
   assert.equal(alertasGerados[0].prioridade, 'Crítica');
   assert.deepEqual(alertasGerados[0].instrucoes, ['LIGAR_112']);
+  const avaliacaoPersistida = db.prepare(`SELECT score, cobertura, linha_de_base, versao_parametros,
+    prioridade_algoritmo, motivos_json
+    FROM AvaliacaoAlgoritmo WHERE id_submissao = ?`).get(id_submissao) as {
+      score: number | null; cobertura: number; linha_de_base: number | null;
+      versao_parametros: string; prioridade_algoritmo: string; motivos_json: string;
+    };
+  assert.equal(avaliacaoPersistida.versao_parametros, '3.0');
+  assert.equal(avaliacaoPersistida.prioridade_algoritmo, 'Crítica');
+  assert.match(JSON.parse(avaliacaoPersistida.motivos_json)[0].texto, /Dor de cabeça súbita/);
+
+  const submissaoRepetida = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario,
+    data_referencia_sintomas: hoje,
+    respostas: [{ id_pergunta: 'v2-a2-cefaleia-subita', id_opcao: opcao('v2-a2-cefaleia-subita', 'SIM') }]
+  });
+  assert.equal(submissaoRepetida.alertasGerados[0].id_alerta, alertasGerados[0].id_alerta);
+  assert.equal(submissaoRepetida.alertasGerados[0].duplicado, true);
+  const ligacoes = db.prepare(`SELECT COUNT(*) AS total FROM AlertaSubmissao WHERE id_alerta = ?`)
+    .get(alertasGerados[0].id_alerta) as { total: number };
+  assert.ok(ligacoes.total >= 2);
+
+  const bundle = FhirService.exportarBundleFhir(idDoente);
+  assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire' &&
+    entrada.resource.id === formulario.id_formulario));
+  assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'DetectedIssue'));
 });
 
 // ---------- Medicação ----------

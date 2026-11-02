@@ -78,7 +78,9 @@ export class SintomaService {
     }
 
     const ultimaAvaliacao = db.prepare(`SELECT score_kps FROM AvaliacaoKarnofsky
-      WHERE id_doente = ? ORDER BY data_avaliacao DESC, rowid DESC LIMIT 1`).get(idDoente) as { score_kps: number } | undefined;
+      WHERE id_doente = ? AND data_avaliacao <= ? AND data_avaliacao >= date(?, '-180 days')
+      ORDER BY data_avaliacao DESC, rowid DESC LIMIT 1`)
+      .get(idDoente, payload.data_referencia_sintomas, payload.data_referencia_sintomas) as { score_kps: number } | undefined;
     if (perfilAutor === 'DOENTE' && ultimaAvaliacao && ultimaAvaliacao.score_kps <= 70) {
       throw new Error('A avaliação funcional atual exige que o cuidador autorizado preencha o formulário (KPS ≤ 70).');
     }
@@ -101,7 +103,7 @@ export class SintomaService {
       for (const r of respostasEnviadas) {
         const opcao = db.prepare('SELECT * FROM OpcaoResposta WHERE id_opcao = ?').get(r.id_opcao) as any;
         const naoAvaliavel = opcao?.valor_codificado === 'IMPOSSIVEL_AVALIAR' ? 1 : 0;
-        const valorNum = naoAvaliavel ? 0 : SintomaService.valorDaOpcao(opcao);
+        const valorNum = naoAvaliavel ? null : SintomaService.valorDaOpcao(opcao);
         const texto = typeof r.texto === 'string' && r.texto.trim() ? r.texto.trim() : null;
         stmtResp.run(crypto.randomUUID(), id_submissao, r.id_pergunta, r.id_opcao, valorNum, naoAvaliavel, r.frequencia || null,
           r.novo_ou_pior === undefined ? null : (r.novo_ou_pior ? 1 : 0), texto);
@@ -127,12 +129,14 @@ export class SintomaService {
   static calcularLembreteMonitorizacao(idDoente: string) {
     const plano = db.prepare(`SELECT * FROM PlanoMonitorizacao WHERE id_doente = ? AND estado = 'ATIVO' ORDER BY data_definicao DESC LIMIT 1`).get(idDoente) as any;
     const periodicidade = plano ? plano.periodicidade_dias : 7;
-    const ultimaSub = db.prepare(`SELECT data_hora_submissao FROM SubmissaoMonitorizacao WHERE id_doente = ? ORDER BY data_hora_submissao DESC LIMIT 1`).get(idDoente) as any;
+    const ultimaSub = db.prepare(`SELECT data_referencia_sintomas FROM SubmissaoMonitorizacao
+      WHERE id_doente = ? ORDER BY data_referencia_sintomas DESC, data_hora_submissao DESC LIMIT 1`).get(idDoente) as any;
 
     if (!ultimaSub) {
       return { periodicidade_dias: periodicidade, lembreteAtivo: true, mensagem: `Lembrete (RF18): Preenchimento pendente (periodicidade: a cada ${periodicidade} dias).` };
     }
-    const proxData = new Date(new Date(ultimaSub.data_hora_submissao).getTime() + periodicidade * 86400000);
+    const proxData = new Date(`${ultimaSub.data_referencia_sintomas}T00:00:00Z`);
+    proxData.setUTCDate(proxData.getUTCDate() + periodicidade);
     const atrasado = new Date() >= proxData;
     return {
       periodicidade_dias: periodicidade,

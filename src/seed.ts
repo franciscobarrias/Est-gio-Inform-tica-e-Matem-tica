@@ -294,34 +294,6 @@ const criarDados = db.transaction(() => {
   const idFormulario = ID_FORMULARIO_V2;
   garantirFormularioV2(db);
 
-  // REGRAS DE ALERTA DEMONSTRATIVAS
-
-  db.prepare(`
-    INSERT INTO RegraAlerta VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    'regra-rf23',
-    'Severidade imediata (demonstração)',
-    'SEVERIDADE_IMEDIATA_RF23',
-    'Limiares provisórios para testes',
-    'NÃO VALIDADO CLINICAMENTE',
-    '1.0',
-    0,
-    1
-  );
-
-  db.prepare(`
-    INSERT INTO RegraAlerta VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    'regra-rf24',
-    'Agravamento longitudinal (demonstração)',
-    'AGRAVAMENTO_LONGITUDINAL_RF24',
-    'Comparação provisória de respostas sucessivas',
-    'NÃO VALIDADO CLINICAMENTE',
-    '1.0',
-    0,
-    1
-  );
-
   // CARREGAR PERGUNTAS E OPÇÕES
 
   type Pergunta = {

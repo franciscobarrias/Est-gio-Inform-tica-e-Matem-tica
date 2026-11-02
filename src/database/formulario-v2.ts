@@ -119,7 +119,8 @@ export const PERGUNTAS_V2: PerguntaV2[] = [
 export const REGRAS_V2 = [
   ['regra-v2-alarme', 'Sinal de alarme', 'SINAL_ALARME_V2', 'Qualquer «sim» no Bloco A; sonolência ou confusão em nível 3'],
   ['regra-v2-combinacao', 'Combinação de sintomas', 'COMBINACAO_V2', 'Hipertensão intracraniana, toxicidade da temozolomida, declínio neurológico, quedas, sintoma isolado grave'],
-  ['regra-v2-score', 'Agravamento face à linha de base', 'SCORE_EVOLUCAO_V2', 'Score ponderado (0–100) sobe 15 pontos ou mais face à mediana dos 3 primeiros registos']
+  ['regra-v2-score', 'Agravamento face à linha de base', 'SCORE_EVOLUCAO_V2', 'Variação ponderada ajustada à linha de base, à variabilidade individual e à cobertura mínima'],
+  ['regra-v2-dados-insuficientes', 'Dados cognitivos não avaliáveis', 'DADOS_INSUFICIENTES_V2', 'Dois ou mais indicadores cognitivos assinalados como não avaliáveis']
 ] as const;
 
 // Cria o formulário v2 (se ainda não existir) e torna-o o único ativo.

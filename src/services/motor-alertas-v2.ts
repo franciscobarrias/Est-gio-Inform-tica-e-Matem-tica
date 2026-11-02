@@ -6,7 +6,7 @@
  * Camadas (ver "Como se calcula o alerta" no documento de validação):
  *   1. Sinais de alarme        → Crítica (convulsão isolada com recuperação → Alta)
  *   2. Combinações de sintomas → Crítica, Alta ou Média
- *   3. Score de evolução       → Média, se subir 15 pontos ou mais face à linha de base
+ *   3. Score de evolução       → Média, se ultrapassar um limiar adaptado à linha de base
  *   4. Ajustes finais          → KPS ≤ 70 ou frequência diária/constante sobem um nível, até Alta
  * Sai no máximo um alerta por submissão, com a prioridade mais alta e todos os motivos.
  *
@@ -14,7 +14,7 @@
  */
 
 export type Prioridade = 'Baixa' | 'Média' | 'Alta' | 'Crítica';
-export type TipoRegraV2 = 'SINAL_ALARME_V2' | 'COMBINACAO_V2' | 'SCORE_EVOLUCAO_V2';
+export type TipoRegraV2 = 'SINAL_ALARME_V2' | 'COMBINACAO_V2' | 'SCORE_EVOLUCAO_V2' | 'DADOS_INSUFICIENTES_V2';
 // O que a aplicação diz logo ao doente ou ao cuidador.
 export type Instrucao = 'LIGAR_112' | 'CONTACTAR_JA' | 'CONTACTAR_HOJE';
 
@@ -42,6 +42,9 @@ export interface ResultadoV2 {
   score: number | null;
   cobertura: number;
   linhaDeBase: number | null;
+  variabilidadeLinhaDeBase: number | null;
+  limiarScore: number | null;
+  dadosNaoAvaliaveis: string[];
 }
 
 export const NIVEIS: Prioridade[] = ['Baixa', 'Média', 'Alta', 'Crítica'];
@@ -60,9 +63,11 @@ export const PESOS: Record<string, number> = {
 export const MAXIMOS: Record<string, number> = { C3: 2 };
 const maximo = (codigo: string) => MAXIMOS[codigo] ?? 3;
 
-export const SUBIDA_SCORE_ALERTA = 15;   // pontos acima da linha de base
+export const SUBIDA_SCORE_MINIMA = 5;    // mínimo demonstrativo; requer validação clínica
 export const COBERTURA_MINIMA = 0.6;     // fração do peso total que tem de estar respondida
 export const REGISTOS_LINHA_DE_BASE = 3; // a linha de base é a mediana dos 3 primeiros registos
+export const JANELA_MINIMA_DIAS = 7;     // evita sobreposição da recordação dos sintomas
+export const VERSAO_PARAMETROS = '3.0';
 
 // Valor de uma resposta, ou null se não foi respondida ou se "não consegue avaliar".
 export function valorDe(respostas: RespostasPorCodigo, codigo: string): number | null {
@@ -96,7 +101,7 @@ export function avaliarSubmissaoV2(entrada: {
   respostas: RespostasPorCodigo;
   // Registos anteriores do mesmo formulário, do mais antigo para o mais recente.
   anteriores: RespostasPorCodigo[];
-  kps: number;
+  kps: number | null;
 }): ResultadoV2 {
   const { respostas, anteriores, kps } = entrada;
   const v = (codigo: string) => valorDe(respostas, codigo);
@@ -150,7 +155,12 @@ export function avaliarSubmissaoV2(entrada: {
   if ((v('B15a') ?? 0) >= 2) motivo('Possível toxicidade da temozolomida: 4 ou mais dejeções a mais por dia (B15)', 'Alta', 'COMBINACAO_V2', ['B15']);
 
   // Declínio neurológico (inspirado no NANO): chega a 3, ou sobe 2 níveis face à linha de base desse item.
+  const historicoElegivel = anteriores.filter(registo => {
+    const resultado = calcularScore(registo);
+    return resultado.score !== null && resultado.cobertura >= COBERTURA_MINIMA;
+  });
   const base = anteriores.slice(0, REGISTOS_LINHA_DE_BASE);
+  const basePontuacao = historicoElegivel.slice(0, REGISTOS_LINHA_DE_BASE);
   for (const codigo of ['C1', 'C2', 'B8', 'B9', 'B18']) {
     const atual = v(codigo);
     if (atual === null) continue;
@@ -168,16 +178,32 @@ export function avaliarSubmissaoV2(entrada: {
     if (graves.length) motivo(`Sintoma grave isolado (${graves.join(', ')})`, 'Média', 'COMBINACAO_V2', graves);
   }
 
+  const dadosNaoAvaliaveis = ['B7', 'B8', 'B9', 'B10', 'B19']
+    .filter(codigo => respostas[codigo]?.naoAvaliavel === true);
+  if (dadosNaoAvaliaveis.length >= 2) {
+    motivo(`Não foi possível avaliar vários indicadores cognitivos (${dadosNaoAvaliaveis.join(', ')})`,
+      'Média', 'DADOS_INSUFICIENTES_V2', dadosNaoAvaliaveis);
+  }
+
   // ----- Passo 3: score de evolução face à linha de base -----
   const { score, cobertura } = calcularScore(respostas);
-  const scoresBase = base.map(calcularScore).filter(s => s.score !== null && s.cobertura >= COBERTURA_MINIMA).map(s => s.score as number);
-  const linhaDeBase = scoresBase.length >= REGISTOS_LINHA_DE_BASE ? mediana(scoresBase) : null;
-  if (score !== null && cobertura >= COBERTURA_MINIMA && linhaDeBase !== null && score - linhaDeBase >= SUBIDA_SCORE_ALERTA) {
-    motivo(`Agravamento global: score ${score} face à linha de base ${linhaDeBase} (+${Math.round((score - linhaDeBase) * 10) / 10})`, 'Média', 'SCORE_EVOLUCAO_V2', []);
+  const scoresBase = basePontuacao.map(registo => calcularScore(registo).score as number);
+  const linhaDeBase = scoresBase.length === REGISTOS_LINHA_DE_BASE ? mediana(scoresBase) : null;
+  const variabilidadeLinhaDeBase = linhaDeBase === null
+    ? null
+    : mediana(scoresBase.map(valor => Math.abs(valor - linhaDeBase)));
+  const limiarScore = linhaDeBase === null || variabilidadeLinhaDeBase === null
+    ? null
+    : Math.max(SUBIDA_SCORE_MINIMA, linhaDeBase * 0.1, variabilidadeLinhaDeBase * 2);
+  if (score !== null && cobertura >= COBERTURA_MINIMA && linhaDeBase !== null && limiarScore !== null &&
+      score - linhaDeBase >= limiarScore) {
+    motivo(`Agravamento global: score ${score} face à linha de base ${linhaDeBase} (+${Math.round((score - linhaDeBase) * 10) / 10}; limiar ${Math.round(limiarScore * 10) / 10})`,
+      'Média', 'SCORE_EVOLUCAO_V2', []);
   }
 
   if (!motivos.length) {
-    return { prioridade: null, tipo: null, motivos, ajustes: [], instrucoes: [], score, cobertura, linhaDeBase };
+    return { prioridade: null, tipo: null, motivos, ajustes: [], instrucoes: [], score, cobertura, linhaDeBase,
+      variabilidadeLinhaDeBase, limiarScore, dadosNaoAvaliaveis };
   }
 
   // ----- Passo 4: ajustes finais (sobem um nível, sem passar de Alta) -----
@@ -187,11 +213,12 @@ export function avaliarSubmissaoV2(entrada: {
   const subir = (razao: string) => {
     if (nivel(prioridade) < nivel('Alta')) { prioridade = NIVEIS[nivel(prioridade) + 1]; ajustes.push(razao); }
   };
-  if (kps <= 70) subir(`KPS ${kps} ≤ 70`);
+  if (kps !== null && kps <= 70) subir(`KPS ${kps} ≤ 70`);
   const frequentes = motivos.flatMap(m => m.codigos).filter(c => ['DIARIA', 'CONSTANTE'].includes(respostas[c]?.frequencia || ''));
   if (frequentes.length) subir(`frequência diária ou constante (${Array.from(new Set(frequentes)).join(', ')})`);
 
-  return { prioridade, tipo: maisGrave.tipo, motivos, ajustes, instrucoes: Array.from(instrucoes), score, cobertura, linhaDeBase };
+  return { prioridade, tipo: maisGrave.tipo, motivos, ajustes, instrucoes: Array.from(instrucoes), score, cobertura,
+    linhaDeBase, variabilidadeLinhaDeBase, limiarScore, dadosNaoAvaliaveis };
 }
 
 // Texto guardado no alerta: os motivos, os ajustes e a prioridade final.

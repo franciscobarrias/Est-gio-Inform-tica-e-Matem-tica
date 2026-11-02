@@ -66,13 +66,13 @@ Os nomes, números de processo e datas são **fictícios** e não correspondem a
 - Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria. O motor do questionário v2 (`src/services/motor-alertas-v2.ts`) avalia por camadas (limiares demonstrativos, **não validados clinicamente**):
   1. **Sinais de alarme** (Bloco A, ou sonolência/confusão graves): **Crítica**, com indicação imediata ao doente (ligar 112, contactar já ou contactar hoje);
   2. **Combinações de sintomas**: hipertensão intracraniana provável (Crítica) ou possível (Alta), toxicidade da temozolomida, declínio neurológico face ao habitual do doente, quedas repetidas (Alta); sintoma grave isolado (Média);
-  3. **Score de evolução** 0–100 ponderado, comparado com a linha de base do doente (mediana dos 3 primeiros registos); uma subida ≥ 15 pontos dá Média;
+  3. **Score de evolução** 0–100 ponderado, comparado com a mediana dos três primeiros registos elegíveis (cobertura ≥ 60%). O limiar demonstrativo é adaptado à linha de base e à variabilidade individual (MAD), com mínimo de 10 pontos;
   4. **Ajustes**: KPS ≤ 70 e frequência diária ou constante sobem um nível cada, sem passar de Alta.
-  Gera-se no máximo um alerta por registo, com todos os motivos escritos no resumo. Os registos antigos do formulário v1 continuam a usar as regras anteriores.
+  Indicadores cognitivos assinalados como «não consigo avaliar» são preservados como sinal de dados insuficientes, não como zero. Os registos com recordação de sete dias só são comparados quando distam pelo menos sete dias; a linha de base reinicia quando muda a fase clínica, há uma nova cirurgia registada ou uma nova avaliação KPS vigente. KPS ausente ou com mais de 180 dias não é tratado como 100 nem ajusta a prioridade. Alertas repetidos do mesmo tipo ficam ligados ao novo registo sem criar novo alerta enquanto o anterior estiver aberto. O formulário v2 é o único motor de alertas; alertas e submissões históricas v1 permanecem disponíveis para consulta.
 - Separador **Diagnóstico e medicação**, para todos os perfis: diagnóstico, linha do tempo dos tratamentos e medicação (ativa e anterior). Só o médico regista diagnóstico, tratamentos e medicação, e pode suspender, retomar ou terminar uma medicação; a enfermagem, o doente e o cuidador consultam.
 - Identificação do doente no topo de todas as páginas: nome, n.º de processo, data de nascimento e idade, sexo, médico responsável e cuidador. O cuidador vê «Está a registar por…».
 - Interface por separadores (Alertas, Resumo clínico, Diagnóstico e medicação, Evolução, Registos do doente e Gestão clínica).
-- Exportação autenticada de um bundle HL7 FHIR para o processo clínico.
+- Exportação autenticada de um bundle HL7 FHIR para o processo clínico, incluindo Questionnaire, QuestionnaireResponse completa mesmo quando parcial, score/linha de base e alertas.
 - Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
 
 ## Estrutura da interface
@@ -89,7 +89,11 @@ A interface está dividida por perfil. Todas as páginas usam os mesmos estilos 
 | `js/clinico.js` | Lista de alertas e resumo clínico, partilhados pelo médico e pela enfermagem |
 | `css/estilos.css` | Estilos comuns |
 
-As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. Ao arrancar, a base de dados existente recebe as colunas novas e o formulário v2 passa a ser o ativo (o v1 fica inativo); para ter os dados de demonstração no v2, corra `npm run seed`.
+As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. As alterações ao esquema são aplicadas por migrações versionadas em `src/database/migrations.ts`; ao arrancar, o formulário v2 passa a ser o ativo (o v1 fica inativo). Para ter os dados de demonstração no v2, corra `npm run seed`.
+
+O score usa os pesos 3/2/1 como importância relativa proposta (função/autonomia, cognição/deglutição e restantes sintomas). A soma é uma aproximação de rastreio sobre respostas ordinais, não uma medida intervalar validada. O limiar adaptativo é `max(5, 10% da linha de base, 2 × MAD)`, pelo que varia com o nível e a variabilidade basais. Sensibilidade no cenário de subida 0→2 em D1, C4 e B7: com pesos 3/2/1 a variação é 11,6 pontos (16/138); com pesos iguais é 7,8 (6/77). O caso dispara com limiares absolutos 8 ou 10, mas não com 15 ou 20; logo a escolha muda a decisão e carece de validação clínica. A cobertura mínima de 60% e a regra de MAD também são parâmetros exploratórios, sem validação clínica.
+
+As bases SQLite e os ficheiros WAL/SHM são locais e ignorados pelo Git. Use `npm run seed` para gerar dados sintéticos; não distribua nem inclua bases de dados locais em ZIPs.
 
 O token de sessão passa entre páginas no `sessionStorage` e é apagado ao terminar sessão ou ao fechar o separador. Abrir a página de outro perfil leva de volta à página do próprio perfil. Esta divisão serve só a interface: quem decide o que cada perfil pode ver e alterar é sempre o servidor.
 
@@ -104,7 +108,7 @@ npm run typecheck
 npm run test
 ```
 
-Os testes usam uma base de dados temporária e não alteram `data.db`.
+Requer Node.js 22, que é também a versão fixada na integração contínua; os testes usam uma base de dados temporária e não alteram `data.db`.
 
 ## Limites de utilização
 

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
 import { garantirFormularioV2 } from './formulario-v2';
+import { executarMigracoes } from './migrations';
 
 const dbPath = path.resolve(process.env.DATABASE_PATH || path.resolve(__dirname, '../../data.db'));
 export const db = new Database(dbPath);
@@ -157,7 +158,7 @@ export function inicializarBaseDados(): void {
       id_submissao TEXT NOT NULL,
       id_pergunta TEXT NOT NULL,
       id_opcao TEXT,
-      valor_numerico INTEGER NOT NULL DEFAULT 0,
+      valor_numerico INTEGER,
       motivo_nao_avaliavel INTEGER NOT NULL DEFAULT 0,
       frequencia TEXT,
       FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao),
@@ -247,27 +248,9 @@ export function inicializarBaseDados(): void {
       FOREIGN KEY (id_utilizador) REFERENCES Utilizador(id_utilizador)
     );
   `);
-  // Colunas acrescentadas depois da primeira versão: criadas em bases de dados antigas sem apagar dados.
-  acrescentarColuna('RespostaMonitorizacao', 'frequencia', 'TEXT');
-  // Formulário v2: código da pergunta (A1, B3, ...) e perguntas de detalhe ligadas a uma pergunta principal.
-  acrescentarColuna('PerguntaFormulario', 'codigo', 'TEXT');
-  acrescentarColuna('PerguntaFormulario', 'id_pergunta_pai', 'TEXT REFERENCES PerguntaFormulario(id_pergunta)');
-  acrescentarColuna('PerguntaFormulario', 'valor_minimo_pai', 'INTEGER');
-  // Valor numérico de cada opção (0 a 3); nas opções antigas fica vazio e usa-se a conversão do código.
-  acrescentarColuna('OpcaoResposta', 'valor_numerico', 'INTEGER');
-  // "É novo ou está pior do que o habitual?" (1 = sim, 0 = não, vazio = não respondido) e texto livre ("Outro sintoma").
-  acrescentarColuna('RespostaMonitorizacao', 'novo_ou_pior', 'INTEGER');
-  acrescentarColuna('RespostaMonitorizacao', 'texto', 'TEXT');
-  // Texto das perguntas e opções quando é o cuidador a responder (na 3.ª pessoa: «O doente teve…»).
-  acrescentarColuna('PerguntaFormulario', 'enunciado_cuidador', 'TEXT');
-  acrescentarColuna('OpcaoResposta', 'rotulo_cuidador', 'TEXT');
+  executarMigracoes(db);
   garantirPerguntasFormularioDemonstracao();
   garantirFormularioV2(db);
-}
-
-function acrescentarColuna(tabela: string, coluna: string, definicao: string): void {
-  const colunas = db.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>;
-  if (!colunas.some(c => c.name === coluna)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${definicao}`);
 }
 
 export function garantirPerguntasFormularioDemonstracao(): void {

@@ -9,6 +9,7 @@ import { FhirService } from '../services/fhir.service';
 
 const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, dg.fase_clinica_atual,
     (SELECT k.score_kps FROM AvaliacaoKarnofsky k WHERE k.id_doente = d.id_doente
+      AND k.data_avaliacao <= date('now') AND k.data_avaliacao >= date('now', '-180 days')
       ORDER BY k.data_avaliacao DESC, k.rowid DESC LIMIT 1) AS ultimo_kps,
     (SELECT COUNT(*) FROM AlertaClinico a JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
       WHERE s.id_doente = d.id_doente AND a.estado_atual != 'Concluído') AS alertas_abertos

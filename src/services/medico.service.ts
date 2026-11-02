@@ -206,7 +206,13 @@ export class MedicoService {
     const medicacoes = db.prepare(`SELECT m.*, u.nome as nome_medico FROM Medicacao m JOIN Utilizador u ON u.id_utilizador = m.id_medico_registo
       WHERE m.id_doente = ? ORDER BY CASE m.estado WHEN 'ATIVA' THEN 0 WHEN 'SUSPENSA' THEN 1 ELSE 2 END, m.data_inicio DESC`).all(idDoente);
     const avaliacoesKps = db.prepare('SELECT * FROM AvaliacaoKarnofsky WHERE id_doente = ? ORDER BY data_avaliacao ASC, rowid ASC').all(idDoente) as any[];
-    const ultimoKps = avaliacoesKps.length > 0 ? avaliacoesKps[avaliacoesKps.length - 1].score_kps : 100;
+    const kpsMaisRecente = avaliacoesKps.length > 0 ? avaliacoesKps[avaliacoesKps.length - 1] : null;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const ultimoKps = kpsMaisRecente &&
+      kpsMaisRecente.data_avaliacao <= hoje &&
+      kpsMaisRecente.data_avaliacao >= new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10)
+      ? kpsMaisRecente.score_kps
+      : null;
     const cuidadores = db.prepare(`SELECT dc.*, u.nome, u.email, c.telefone_contacto FROM DoenteCuidador dc JOIN Cuidador c ON dc.id_cuidador = c.id_cuidador JOIN Utilizador u ON c.id_cuidador = u.id_utilizador WHERE dc.id_doente = ? AND dc.ativa = 1 AND dc.autorizacao_validada = 1`).all(idDoente);
     const planos = db.prepare('SELECT * FROM PlanoMonitorizacao WHERE id_doente = ? ORDER BY data_definicao DESC').all(idDoente);
 
@@ -233,13 +239,23 @@ export class MedicoService {
       `).all(sub.id_submissao);
     }
 
-    const alertas = db.prepare(`SELECT a.*, r.nome as nome_regra FROM AlertaClinico a JOIN SubmissaoMonitorizacao s ON a.id_submissao = s.id_submissao JOIN RegraAlerta r ON a.id_regra = r.id_regra WHERE s.id_doente = ? ORDER BY a.data_hora_geracao DESC`).all(idDoente);
+    const alertas = db.prepare(`SELECT a.*, r.nome as nome_regra, r.tipo_regra FROM AlertaClinico a
+      JOIN SubmissaoMonitorizacao s ON a.id_submissao = s.id_submissao
+      JOIN RegraAlerta r ON a.id_regra = r.id_regra
+      WHERE s.id_doente = ? ORDER BY a.data_hora_geracao DESC`).all(idDoente);
+    const avaliacoesAlgoritmo = db.prepare(`SELECT a.*, s.data_referencia_sintomas FROM AvaliacaoAlgoritmo a
+      JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
+      WHERE s.id_doente = ? ORDER BY s.data_referencia_sintomas ASC, s.data_hora_submissao ASC`).all(idDoente);
     const decisoes = db.prepare(`SELECT dec.*, u.nome as nome_medico FROM DecisaoAcompanhamento dec JOIN Utilizador u ON dec.id_medico = u.id_utilizador WHERE dec.id_doente = ? ORDER BY dec.data_hora_decisao DESC`).all(idDoente);
 
     return {
-      doente: { ...doente, ultimo_kps: ultimoKps, participacao_cuidador_obrigatoria: ultimoKps <= 70 },
+      doente: {
+        ...doente,
+        ultimo_kps: ultimoKps,
+        participacao_cuidador_obrigatoria: ultimoKps !== null && ultimoKps <= 70
+      },
       diagnostico, tratamentos, medicacoes, avaliacoesKps, cuidadores, planos, submissoes, alertas, decisoes,
-      lembrete: SintomaService.calcularLembreteMonitorizacao(idDoente)
+      avaliacoesAlgoritmo, lembrete: SintomaService.calcularLembreteMonitorizacao(idDoente)
     };
   }
 }
