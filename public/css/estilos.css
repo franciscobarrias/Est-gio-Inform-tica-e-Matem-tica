@@ -207,3 +207,23 @@ details.formulario-medico[open] > summary { margin-bottom:.75rem; }
 details.formulario-medico .linha-campos { max-width:900px; }
 details.formulario-medico > input, details.formulario-medico > label { max-width:900px; }
 .tabela-medicacao td:last-child { white-space:nowrap; }
+
+/* ---------- Recomendação fixa no topo do formulário ---------- */
+.aviso-fixo { position:sticky; top:.5rem; z-index:20; display:flex; flex-direction:column; gap:.2rem; margin:0 0 1rem;
+  padding:.8rem 1rem; border-radius:10px; border-left:6px solid; box-shadow:0 6px 18px #0000001f; }
+.aviso-fixo strong { font-size:1.1rem; }
+.aviso-fixo .motivo { font-size:.88rem; }
+.aviso-fixo a { color:inherit; font-weight:600; }
+.aviso-fixo.LIGAR_112 { background:var(--p-critica-bg); border-color:var(--p-critica); color:var(--p-critica); }
+.aviso-fixo.CONTACTAR_JA { background:var(--p-alta-bg); border-color:var(--p-alta); color:#7a2e0e; }
+.aviso-fixo.CONTACTAR_HOJE { background:var(--p-media-bg); border-color:var(--p-media); color:#5c4800; }
+
+/* ---------- Lista de doentes (médico e enfermagem) ---------- */
+.tabela-doentes { width:100%; border-collapse:collapse; margin-top:.5rem; }
+.tabela-doentes th, .tabela-doentes td { text-align:left; padding:.7rem .6rem; border-bottom:1px solid var(--line); vertical-align:middle; }
+.tabela-doentes thead th { font-size:.8rem; color:var(--muted); font-weight:650; }
+.tabela-doentes tbody tr { cursor:pointer; }
+.tabela-doentes tbody tr:hover, .tabela-doentes tbody tr:focus-visible { background:var(--primary-soft); }
+.tabela-doentes tbody tr.ativo { box-shadow:inset 4px 0 0 var(--primary); background:#f7faff; }
+.tabela-doentes th .nome { display:block; font-weight:650; }
+.tabela-doentes td button { padding:.4rem .8rem; }

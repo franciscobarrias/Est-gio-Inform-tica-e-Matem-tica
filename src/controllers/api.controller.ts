@@ -12,9 +12,16 @@ const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, 
       AND k.data_avaliacao <= date('now') AND k.data_avaliacao >= date('now', '-180 days')
       ORDER BY k.data_avaliacao DESC, k.rowid DESC LIMIT 1) AS ultimo_kps,
     (SELECT COUNT(*) FROM AlertaClinico a JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
-      WHERE s.id_doente = d.id_doente AND a.estado_atual != 'Concluído') AS alertas_abertos
+      WHERE s.id_doente = d.id_doente AND a.estado_atual != 'Concluído') AS alertas_abertos,
+    (SELECT MAX(s.data_hora_submissao) FROM SubmissaoMonitorizacao s WHERE s.id_doente = d.id_doente) AS ultimo_registo
   FROM Doente d JOIN Utilizador u ON d.id_doente = u.id_utilizador
   LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente`;
+
+// Lista de doentes da equipa clínica: acrescenta se o registo de sintomas está em atraso.
+const comLembrete = (doentes: any[]) => doentes.map(d => {
+  const lembrete = SintomaService.calcularLembreteMonitorizacao(d.id_doente);
+  return { ...d, registo_em_atraso: lembrete.lembreteAtivo, periodicidade_dias: lembrete.periodicidade_dias };
+});
 
 export class ApiController {
   static login(req: Request, res: Response) {
@@ -33,11 +40,11 @@ export class ApiController {
   static listarDoentes(req: Request, res: Response) {
     const user = req.user!;
         if (user.perfil === 'MEDICO') {
-      res.json(db.prepare(`${SQL_LISTA_CLINICA} WHERE d.id_medico_responsavel = ? ORDER BY u.nome`).all(user.id_utilizador));
+      res.json(comLembrete(db.prepare(`${SQL_LISTA_CLINICA} WHERE d.id_medico_responsavel = ? ORDER BY u.nome`).all(user.id_utilizador)));
       return;
     }
     if (user.perfil === 'ENFERMEIRO') {
-      res.json(db.prepare(`${SQL_LISTA_CLINICA} ORDER BY u.nome`).all());
+      res.json(comLembrete(db.prepare(`${SQL_LISTA_CLINICA} ORDER BY u.nome`).all()));
       return;
     }
     if (user.perfil === 'DOENTE') {

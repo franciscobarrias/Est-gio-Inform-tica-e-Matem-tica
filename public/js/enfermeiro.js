@@ -59,11 +59,12 @@ function aoCarregarProcesso() {
 // ---------- Arranque ----------
 iniciarPagina({
   perfis: ['ENFERMEIRO'],
-  separadores: [['alertas', 'Alertas'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente']],
-  semBarraDoente: ['alertas'],
+  separadores: [['alertas', 'Alertas'], ['doentes', 'Doentes'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente']],
+  semBarraDoente: ['alertas', 'doentes'],
   separadorInicial: 'alertas',
   depoisDeCarregar: async () => {
     ligarAlertas();
+    ligarListaDoentes();
     await carregarAlertas();
   }
 });

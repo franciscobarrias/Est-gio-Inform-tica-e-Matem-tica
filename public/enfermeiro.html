@@ -38,6 +38,17 @@
       </div>
     </section>
 
+    <!-- LISTA DE DOENTES -->
+    <section id="painel-doentes" role="tabpanel" class="hidden" aria-labelledby="tab-doentes">
+      <div class="card">
+        <h2>Doentes</h2>
+        <p class="muted pequeno">Escolha um doente para ver o resumo, o diagnóstico e a medicação, a evolução e os registos. Os doentes com alertas por concluir ou registos em atraso aparecem primeiro.</p>
+        <label for="pesquisaDoentes">Procurar por nome ou n.º de processo</label>
+        <input id="pesquisaDoentes" type="search" autocomplete="off" style="max-width:420px" />
+        <div id="listaDoentes" class="table-wrap"></div>
+      </div>
+    </section>
+
     <!-- RESUMO CLÍNICO -->
     <section id="painel-resumo" role="tabpanel" class="hidden" aria-labelledby="tab-resumo">
       <div class="grid-2">

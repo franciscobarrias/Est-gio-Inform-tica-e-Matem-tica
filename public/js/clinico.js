@@ -58,6 +58,7 @@ function ligarAlertas() {
     const abrir = evento.target.closest('[data-abrir-doente]');
     if (abrir) {
       await selecionarDoente(abrir.dataset.abrirDoente);
+      renderizarListaDoentes();
       abrirSeparador('resumo');
       window.scrollTo({ top: 0 });
       return;
@@ -71,6 +72,53 @@ async function atualizarTudo() {
   await carregarAlertas();
   pacientes = await pedidoApi('/api/doentes');
   preencherSeletorDoentes();
+  renderizarListaDoentes();
+}
+
+// ---------- Lista de doentes ----------
+// Primeiro passo nas páginas clínicas: escolher o doente. Os que têm alertas por concluir ou registos em atraso aparecem primeiro.
+function renderizarListaDoentes() {
+  if (!$('listaDoentes')) return;
+  const termo = ($('pesquisaDoentes').value || '').trim().toLowerCase();
+  const lista = pacientes
+    .filter(p => !termo || `${p.nome} ${p.numero_processo_clinico || ''}`.toLowerCase().includes(termo))
+    .sort((a, b) => (b.alertas_abertos || 0) - (a.alertas_abertos || 0)
+      || Number(b.registo_em_atraso || 0) - Number(a.registo_em_atraso || 0)
+      || a.nome.localeCompare(b.nome, 'pt'));
+  if (!lista.length) { $('listaDoentes').innerHTML = '<p class="muted">Nenhum doente encontrado.</p>'; return; }
+  const sexo = { M: 'M', F: 'F', OUTRO: 'Outro' };
+  $('listaDoentes').innerHTML = `<table class="tabela-doentes">
+    <thead><tr><th>Doente</th><th>KPS</th><th>Fase clínica</th><th>Alertas por concluir</th><th>Último registo</th><th><span class="sr-only">Ação</span></th></tr></thead>
+    <tbody>${lista.map(p => {
+      const anos = idade(p.data_nascimento);
+      return `<tr data-escolher-doente="${escapar(p.id_doente)}" class="${p.id_doente === idDoenteAtivo ? 'ativo' : ''}" tabindex="0">
+        <th scope="row"><span class="nome">${escapar(p.nome)}</span>
+          <span class="muted pequeno">${escapar(p.numero_processo_clinico || '')}${anos !== null ? ` · ${anos} anos` : ''}${p.sexo ? ` · ${sexo[p.sexo] || ''}` : ''}</span></th>
+        <td>${p.ultimo_kps ?? '—'}${p.ultimo_kps !== null && p.ultimo_kps <= 70 ? ' <span class="badge badge-neutro">cuidador</span>' : ''}</td>
+        <td>${escapar(p.fase_clinica_atual || '—')}</td>
+        <td>${p.alertas_abertos ? `<span class="badge badge-alerta">${p.alertas_abertos}</span>` : '<span class="muted">0</span>'}</td>
+        <td>${p.ultimo_registo ? dataCurta(p.ultimo_registo) : '—'}${p.registo_em_atraso ? ' <span class="badge badge-alerta">em atraso</span>' : ''}</td>
+        <td><button type="button" class="secundario">Abrir</button></td></tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function ligarListaDoentes() {
+  $('pesquisaDoentes').addEventListener('input', renderizarListaDoentes);
+  const abrir = async linha => {
+    await selecionarDoente(linha.dataset.escolherDoente);
+    renderizarListaDoentes();
+    abrirSeparador('resumo');
+    window.scrollTo({ top: 0 });
+  };
+  $('listaDoentes').addEventListener('click', evento => {
+    const linha = evento.target.closest('[data-escolher-doente]');
+    if (linha) abrir(linha);
+  });
+  $('listaDoentes').addEventListener('keydown', evento => {
+    const linha = evento.target.closest('[data-escolher-doente]');
+    if (linha && (evento.key === 'Enter' || evento.key === ' ')) { evento.preventDefault(); abrir(linha); }
+  });
+  renderizarListaDoentes();
 }
 
 // ---------- Resumo clínico ----------

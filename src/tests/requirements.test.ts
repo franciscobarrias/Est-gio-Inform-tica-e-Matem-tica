@@ -242,11 +242,24 @@ test('v2: sinal de alarme dá Crítica e a instrução de ligar 112', () => {
 });
 
 test('v2: convulsão isolada com recuperação dá Alta; sem detalhes assume o pior', () => {
-  const isolada = avaliar({ A1: 1, A1a: 0, A1b: 0 });
+  // A1a: durou 5 min ou mais; A1b: mais do que uma; A1c: não recuperou.
+  const isolada = avaliar({ A1: 1, A1a: 0, A1b: 0, A1c: 0 });
   assert.equal(isolada.prioridade, 'Alta');
   assert.deepEqual(isolada.instrucoes, ['CONTACTAR_HOJE']);
-  assert.equal(avaliar({ A1: 1 }).prioridade, 'Crítica');
-  assert.equal(avaliar({ A1: 1, A1a: 1, A1b: 0 }).prioridade, 'Crítica');
+  assert.deepEqual(avaliar({ A1: 1 }).instrucoes, ['LIGAR_112']);
+  assert.deepEqual(avaliar({ A1: 1, A1a: 1, A1b: 0, A1c: 0 }).instrucoes, ['LIGAR_112']);
+  assert.deepEqual(avaliar({ A1: 1, A1a: 0, A1b: 1, A1c: 1 }).instrucoes, ['LIGAR_112']);
+  // Uma só convulsão curta mas sem recuperação: 112.
+  assert.deepEqual(avaliar({ A1: 1, A1a: 0, A1b: 0, A1c: 1 }).instrucoes, ['LIGAR_112']);
+  // Várias curtas com recuperação: contactar já (a validar com o médico).
+  const varias = avaliar({ A1: 1, A1a: 0, A1b: 1, A1c: 0 });
+  assert.equal(varias.prioridade, 'Crítica');
+  assert.deepEqual(varias.instrucoes, ['CONTACTAR_JA']);
+});
+
+test('v2: confusão grave (B19 = 3) já não é sinal de alarme, conta como sintoma isolado', () => {
+  assert.equal(avaliar({ B19: 3 }).prioridade, 'Média');
+  assert.equal(avaliar({ B4: 3 }).prioridade, 'Crítica');
 });
 
 test('v2: cefaleia + vómitos + sonolência = hipertensão intracraniana provável (Crítica)', () => {

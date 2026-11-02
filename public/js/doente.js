@@ -125,6 +125,7 @@ function atualizarPergunta(pergunta) {
   }
   document.querySelector(`[data-pergunta="${CSS.escape(id)}"]`)?.classList.toggle('respondida', Boolean(opcaoEscolhida(pergunta)));
   atualizarContagem();
+  atualizarAvisoFixo();
   const caixa = $(`instrucao_${id}`);
   if (caixa) {
     const instrucao = instrucaoImediata(pergunta, valor);
@@ -152,14 +153,33 @@ function preencherRestantes(categoria) {
 function instrucaoImediata(pergunta, valor) {
   if (pergunta.categoria === 'ALARME' && !pergunta.id_pergunta_pai && valor === 1) {
     if (pergunta.codigo === 'A1') {
-      // Convulsão: se não durou mais de 5 minutos e não foram várias seguidas, contactar hoje.
-      const [a, b] = filhasDe(pergunta.id_pergunta).map(valorEscolhido);
-      if (a === 0 && b === 0) return 'CONTACTAR_HOJE';
+      // Convulsão (igual ao motor do servidor): uma só, com menos de 5 minutos e recuperação → contactar hoje;
+      // várias curtas com recuperação → contactar já; tudo o resto (ou detalhes em falta) → 112.
+      const detalhe = codigo => { const p = formAtivo.perguntas.find(x => x.codigo === codigo); return p ? valorEscolhido(p) : null; };
+      const curta = detalhe('A1a') === 0, recuperou = detalhe('A1c') === 0;
+      if (curta && recuperou && detalhe('A1b') === 0) return 'CONTACTAR_HOJE';
+      if (curta && recuperou && detalhe('A1b') === 1) return 'CONTACTAR_JA';
     }
     return INSTRUCAO_ALARME[pergunta.codigo] || 'CONTACTAR_JA';
   }
-  if (['B4', 'B19'].includes(pergunta.codigo) && valor === 3) return 'CONTACTAR_JA';
+  if (pergunta.codigo === 'B4' && valor === 3) return 'CONTACTAR_JA';
   return null;
+}
+
+// Aviso fixo no topo: mostra a recomendação mais urgente enquanto o doente continua a responder,
+// mesmo depois de descer na página. Lista também as respostas que a originaram.
+function atualizarAvisoFixo() {
+  const aviso = $('avisoRecomendacao');
+  if (!aviso) return;
+  const ativas = formAtivo.perguntas.filter(p => !p.id_pergunta_pai)
+    .map(p => ({ pergunta: p, instrucao: instrucaoImediata(p, valorEscolhido(p)) }))
+    .filter(x => x.instrucao);
+  if (!ativas.length) { aviso.className = 'aviso-fixo hidden'; aviso.innerHTML = ''; return; }
+  const maisUrgente = ORDEM_INSTRUCOES.find(i => ativas.some(x => x.instrucao === i));
+  aviso.className = `aviso-fixo ${maisUrgente}`;
+  aviso.innerHTML = `<strong>${escapar(INSTRUCOES[maisUrgente])}</strong>
+    <span class="motivo">Por causa de: ${ativas.map(x => `<a href="#" data-ir-pergunta="${escapar(x.pergunta.id_pergunta)}">${escapar(textoPergunta(x.pergunta).replace(/\?$/, ''))}</a>`).join('; ')}.</span>
+    <span class="motivo">Pode continuar a responder; a equipa é avisada quando guardar o registo.</span>`;
 }
 
 function recolherRespostas() {
@@ -195,6 +215,13 @@ async function submeterMonitorizacao() {
         : 'Registo guardado. Obrigado.';
     formAtivo.perguntas.forEach(limparPergunta);
     formAtivo.perguntas.forEach(atualizarPergunta);
+    // Depois de guardar, a recomendação confirmada pelo servidor fica no topo até o doente voltar a responder.
+    if (maisUrgente) {
+      $('avisoRecomendacao').className = `aviso-fixo ${maisUrgente}`;
+      $('avisoRecomendacao').innerHTML = `<strong>${escapar(INSTRUCOES[maisUrgente])}</strong>
+        <span class="motivo">O registo foi guardado e a equipa foi notificada.</span>`;
+      $('avisoRecomendacao').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     await carregarProcesso();
   } catch (erro) { $('msgErroForm').className = 'error'; $('msgErroForm').textContent = erro.message; }
 }
@@ -205,6 +232,14 @@ function ligarFormulario() {
   $('inputDataRef').value = hoje;
   $('inputDataRef').max = hoje;
   $('submeterMonitorizacao').addEventListener('click', submeterMonitorizacao);
+  $('avisoRecomendacao').addEventListener('click', evento => {
+    const ligacao = evento.target.closest('[data-ir-pergunta]');
+    if (!ligacao) return;
+    evento.preventDefault();
+    const campo = document.querySelector(`[data-pergunta="${CSS.escape(ligacao.dataset.irPergunta)}"]`);
+    campo?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    campo?.querySelector('input')?.focus({ preventScroll: true });
+  });
   $('contentorPerguntas').addEventListener('click', evento => {
     const botao = evento.target.closest('[data-preencher]');
     if (botao) preencherRestantes(botao.dataset.preencher);

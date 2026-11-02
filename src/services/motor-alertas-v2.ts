@@ -112,16 +112,24 @@ export function avaliarSubmissaoV2(entrada: {
     motivos.push({ texto, prioridade, tipo, codigos });
 
   // ----- Passo 1: sinais de alarme (Bloco A) -----
+  // Convulsão: A1a = durou 5 minutos ou mais, A1b = mais do que uma, A1c = não recuperou.
+  // Detalhes por responder ou «não consigo avaliar» contam como o pior caso.
   if (sim('A1')) {
-    const prolongada = sim('A1a'), emSerie = sim('A1b');
-    const recuperou = v('A1a') === 0 && v('A1b') === 0;
-    if (recuperou) {
-      motivo('Convulsão isolada, com recuperação (A1)', 'Alta', 'SINAL_ALARME_V2', ['A1']);
+    const curta = v('A1a') === 0, uma = v('A1b') === 0, recuperou = v('A1c') === 0;
+    if (curta && uma && recuperou) {
+      motivo('Convulsão única, com menos de 5 minutos e recuperação (A1)', 'Alta', 'SINAL_ALARME_V2', ['A1']);
       instrucoes.add('CONTACTAR_HOJE');
+    } else if (curta && v('A1b') === 1 && recuperou) {
+      // Várias convulsões curtas com recuperação entre elas: não é estado de mal, mas não pode esperar (a validar).
+      motivo('Várias convulsões curtas, com recuperação entre elas (A1)', 'Crítica', 'SINAL_ALARME_V2', ['A1']);
+      instrucoes.add('CONTACTAR_JA');
     } else {
-      // Sem os detalhes respondidos, assume-se o pior: não se sabe se foi prolongada.
-      const detalhe = prolongada ? 'durou mais de 5 minutos' : emSerie ? 'várias seguidas sem recuperação' : 'duração não indicada';
-      motivo(`Convulsão: ${detalhe} (A1)`, 'Crítica', 'SINAL_ALARME_V2', ['A1']);
+      const detalhes = [
+        v('A1a') === 1 ? 'durou 5 minutos ou mais' : v('A1a') === null ? 'duração não indicada' : '',
+        v('A1b') === 1 && v('A1c') === 1 ? 'várias sem recuperar entre elas' : '',
+        v('A1c') === 1 && v('A1b') !== 1 ? 'sem recuperação' : v('A1c') === null ? 'recuperação não indicada' : ''
+      ].filter(Boolean).join('; ');
+      motivo(`Convulsão: ${detalhes || 'detalhes não indicados'} (A1)`, 'Crítica', 'SINAL_ALARME_V2', ['A1']);
       instrucoes.add('LIGAR_112');
     }
   }
@@ -129,9 +137,9 @@ export function avaliarSubmissaoV2(entrada: {
     ['A2', 'Dor de cabeça súbita, a pior da vida', 'LIGAR_112'],
     ['A3', 'Sonolência ou confusão súbita, ou dificuldade em acordar', 'LIGAR_112'],
     ['A4', 'Défice neurológico súbito (fraqueza de um lado, boca ao lado ou sem falar)', 'LIGAR_112'],
-    ['A5', 'Temperatura ≥ 37,5 °C ou < 36 °C', 'CONTACTAR_JA'],
-    ['A6', 'Falta de ar nova ou dor no peito', 'LIGAR_112'],
-    ['A7', 'Perna inchada, quente ou dolorosa de um só lado', 'CONTACTAR_HOJE'],
+    ['A5', 'Temperatura ≥ 38 °C ou < 36 °C', 'CONTACTAR_JA'],
+    ['A6', 'Falta de ar de novo ou dor no peito', 'LIGAR_112'],
+    ['A7', 'Perna inchada, quente ou dolorosa', 'CONTACTAR_HOJE'],
     ['A8', 'Sangramento ou nódoas negras sem razão', 'CONTACTAR_HOJE'],
     ['A9', 'Vómitos que não param com os antieméticos', 'CONTACTAR_JA']
   ];
@@ -139,7 +147,6 @@ export function avaliarSubmissaoV2(entrada: {
     if (sim(codigo)) { motivo(`${texto} (${codigo})`, 'Crítica', 'SINAL_ALARME_V2', [codigo]); instrucoes.add(instrucao); }
   }
   if (v('B4') === 3) { motivo('Sonolência em nível grave (B4)', 'Crítica', 'SINAL_ALARME_V2', ['B4']); instrucoes.add('CONTACTAR_JA'); }
-  if (v('B19') === 3) { motivo('Confusão em nível grave (B19)', 'Crítica', 'SINAL_ALARME_V2', ['B19']); instrucoes.add('CONTACTAR_JA'); }
 
   // ----- Passo 2: combinações de sintomas -----
   const cefaleia = v('B1') ?? 0, vomitos = v('B3') ?? 0;

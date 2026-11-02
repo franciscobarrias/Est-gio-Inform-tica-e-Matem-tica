@@ -147,7 +147,7 @@ function construirSeparadores(separadores, semBarraDoente = []) {
     if (tab) abrirSeparador(tab.dataset.tab);
   });
   $('separadores').addEventListener('keydown', evento => {
-    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const tabs = [...document.querySelectorAll('[role="tab"]:not(.hidden)')];
     const i = tabs.findIndex(t => t.dataset.tab === separadorAtivo);
     let novo = null;
     if (evento.key === 'ArrowRight') novo = tabs[(i + 1) % tabs.length];
@@ -157,7 +157,17 @@ function construirSeparadores(separadores, semBarraDoente = []) {
     if (novo) { evento.preventDefault(); abrirSeparador(novo.dataset.tab, true); }
   });
 }
+// Nas páginas clínicas, os separadores do processo (Resumo, Evolução, ...) só aparecem depois de escolher um doente.
+function atualizarSeparadoresVisiveis() {
+  const semDoente = ehClinico() && !idDoenteAtivo;
+  document.querySelectorAll('[role="tab"]').forEach(tab =>
+    tab.classList.toggle('hidden', semDoente && !separadoresSemBarra.includes(tab.dataset.tab)));
+}
 function abrirSeparador(id, focar = false) {
+  // Nas páginas clínicas, os separadores do processo só abrem depois de escolher um doente.
+  if (ehClinico() && !idDoenteAtivo && !separadoresSemBarra.includes(id) && $('painel-doentes')) {
+    id = 'doentes';
+  }
   separadorAtivo = id;
   document.querySelectorAll('[role="tab"]').forEach(tab => {
     const ativo = tab.dataset.tab === id;
@@ -173,23 +183,27 @@ function abrirSeparador(id, focar = false) {
 async function carregarDoentes() {
   pacientes = await pedidoApi('/api/doentes');
   if (!pacientes.length) throw new Error('Não existem processos de doentes atribuídos a esta conta.');
-  if (!pacientes.some(p => p.id_doente === idDoenteAtivo)) idDoenteAtivo = pacientes[0].id_doente;
+  // O médico e o enfermeiro começam sem doente escolhido: escolhem-no na lista de doentes.
+  if (!pacientes.some(p => p.id_doente === idDoenteAtivo)) idDoenteAtivo = ehClinico() ? null : pacientes[0].id_doente;
   preencherSeletorDoentes();
 }
 function preencherSeletorDoentes() {
   const mostrarSeletor = ehClinico() || pacientes.length > 1;
   $('caixaSeletor').classList.toggle('hidden', !mostrarSeletor);
   $('barraDoente').style.gridTemplateColumns = mostrarSeletor ? '' : '1fr';
-  $('doenteSelecionado').innerHTML = pacientes.map(p => {
+  $('doenteSelecionado').innerHTML = (idDoenteAtivo ? '' : '<option value="">— Escolha um doente —</option>') + pacientes.map(p => {
     const extra = ehClinico()
       ? ` · KPS ${p.ultimo_kps ?? '—'}${p.alertas_abertos ? ` · ${p.alertas_abertos} alerta(s)` : ''}`
       : '';
     return `<option value="${escapar(p.id_doente)}">${escapar(p.nome)} · ${escapar(p.numero_processo_clinico || '')}${extra}</option>`;
   }).join('');
-  $('doenteSelecionado').value = idDoenteAtivo;
+  $('doenteSelecionado').value = idDoenteAtivo || '';
 }
 async function selecionarDoente(idDoente) {
+  if (!idDoente) return;
+  const primeiraEscolha = !idDoenteAtivo;
   idDoenteAtivo = idDoente;
+  if (primeiraEscolha) { preencherSeletorDoentes(); atualizarSeparadoresVisiveis(); }
   $('doenteSelecionado').value = idDoente;
   await carregarProcesso();
 }
@@ -420,13 +434,14 @@ function renderizarHistorico(submissoes) {
 async function iniciarPagina({ perfis, separadores, semBarraDoente = [], separadorInicial, depoisDeCarregar }) {
   if (!exigirSessao(perfis)) return;
   construirSeparadores(separadores, semBarraDoente);
+  atualizarSeparadoresVisiveis();
   try {
     await carregarDoentes();
     formAtivo = await pedidoApi('/api/formularios/ativo');
     if ($('perguntaGrafico')) prepararEvolucao();
     $('doenteSelecionado').addEventListener('change', evento => selecionarDoente(evento.target.value));
     if (depoisDeCarregar) await depoisDeCarregar();
-    await carregarProcesso();
+    if (idDoenteAtivo) await carregarProcesso();
     abrirSeparador(separadorInicial);
   } catch (erro) { mostrarMensagem(erro.message, 'error'); }
 }
