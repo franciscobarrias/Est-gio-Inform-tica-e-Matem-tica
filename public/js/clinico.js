@@ -85,9 +85,12 @@ function renderizarListaDoentes() {
     .sort((a, b) => (b.alertas_abertos || 0) - (a.alertas_abertos || 0)
       || Number(b.registo_em_atraso || 0) - Number(a.registo_em_atraso || 0)
       || a.nome.localeCompare(b.nome, 'pt'));
-  if (!lista.length) { $('listaDoentes').innerHTML = '<p class="muted">Nenhum doente encontrado.</p>'; return; }
+  const atual = pacientes.find(p => p.id_doente === idDoenteAtivo);
+  const voltar = atual ? `<div class="voltar-processo"><span>Em consulta: <strong>${escapar(atual.nome)}</strong></span>
+    <button type="button" data-escolher-doente="${escapar(atual.id_doente)}">Voltar ao processo</button></div>` : '';
+  if (!lista.length) { $('listaDoentes').innerHTML = voltar + '<p class="muted">Nenhum doente encontrado.</p>'; return; }
   const sexo = { M: 'M', F: 'F', OUTRO: 'Outro' };
-  $('listaDoentes').innerHTML = `<table class="tabela-doentes">
+  $('listaDoentes').innerHTML = voltar + `<table class="tabela-doentes">
     <thead><tr><th>Doente</th><th>KPS</th><th>Fase clínica</th><th>Alertas por concluir</th><th>Último registo</th><th><span class="sr-only">Ação</span></th></tr></thead>
     <tbody>${lista.map(p => {
       const anos = idade(p.data_nascimento);

@@ -14,12 +14,16 @@
       <img src="img/arvore-sao-joao-branca.png" alt="" class="marca-arvore" />
       <div class="marca-texto"><span class="marca-nome">São João</span><span class="marca-sub">Neurocirurgia · Monitorização de glioblastoma (RISE-Health)</span></div>
     </div>
-    <div id="barraUtilizador" class="acoes">
-      <span id="etiquetaUtilizador"></span>
-      <button id="terminarSessao" type="button" class="perigo">Terminar sessão</button>
+    <div id="barraUtilizador" class="utilizador">
+      <span id="etiquetaUtilizador" class="etiqueta-utilizador"></span>
+      <button id="terminarSessao" type="button" class="sair">Terminar sessão</button>
     </div>
   </header>
 
+  <div class="app-layout">
+    <aside class="menu-lateral">
+      <nav id="separadores" role="tablist" aria-orientation="vertical" aria-label="Menu da enfermagem"></nav>
+    </aside>
   <main aria-label="Área da enfermagem">
     <!-- Doente em consulta: sempre visível fora do separador de alertas -->
     <section id="barraDoente" class="barra-doente hidden" aria-label="Doente em consulta">
@@ -30,7 +34,6 @@
       <div class="identidade" id="identidadeDoente" aria-live="polite"></div>
     </section>
 
-    <nav class="tabs" role="tablist" id="separadores" aria-label="Áreas do processo"></nav>
 
     <!-- ALERTAS -->
     <section id="painel-alertas" role="tabpanel" aria-labelledby="tab-alertas">
@@ -102,8 +105,11 @@
     </section>
 
   </main>
+  </div>
 
   <div id="msgGeral" class="hidden" role="status" aria-live="polite"><span id="msgTexto"></span><button type="button" id="fecharMsg" aria-label="Fechar mensagem">×</button></div>
+
+  <footer class="rodape">Protótipo académico com dados fictícios · Serviço de Neurocirurgia, ULS São João · Projeto RISE-Health</footer>
 
   <script src="js/comum.js"></script>
   <script src="js/clinico.js"></script>

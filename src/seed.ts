@@ -174,8 +174,9 @@ const NOMES_CUIDADORES = [
   'Luísa Ferreira', 'Pedro Pereira', 'Graça Rodrigues', 'Miguel Almeida',
   'Sofia Ribeiro', 'Clara Teixeira', 'Ricardo Moreira', 'Marta Costa'
 ];
-const NOMES_MEDICOS = ['Dr. Rui Matos', 'Dra. Inês Carvalho', 'Dr. Tiago Nunes'];
-const NOMES_ENFERMEIROS = ['Enf. Joana Silva', 'Enf. Bruno Faria', 'Enf. Catarina Lima'];
+// Profissionais sem nomes próprios, para não coincidirem com profissionais reais do hospital.
+const NOMES_MEDICOS = ['Médico 1', 'Médico 2', 'Médico 3'];
+const NOMES_ENFERMEIROS = ['Enfermeiro 1', 'Enfermeiro 2', 'Enfermeiro 3'];
 
 const criarDados = db.transaction(() => {
 
@@ -243,7 +244,7 @@ const criarDados = db.transaction(() => {
       'medico',
       n,
       NOMES_MEDICOS[n - 1],
-      n === 1 ? 'medico@chsj.pt' : `medico${n}@example.invalid`
+      `medico${n}@chsj.min-saude.pt`
     );
 
     db.prepare(`
@@ -258,7 +259,7 @@ const criarDados = db.transaction(() => {
       'enfermeiro',
       n,
       NOMES_ENFERMEIROS[n - 1],
-      n === 1 ? 'enfermeiro@chsj.pt' : `enfermeiro${n}@example.invalid`
+      `enfermeiro${n}@chsj.min-saude.pt`
     );
 
     db.prepare(`

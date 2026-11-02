@@ -18,8 +18,8 @@ Contas fictícias de demonstração (palavra-passe `123456`):
 
 | Perfil | Email |
 |---|---|
-| Médico | `medico@chsj.pt` |
-| Enfermeiro | `enfermeiro@chsj.pt` |
+| Médico | `medico1@chsj.min-saude.pt` (também `medico2`, `medico3`) |
+| Enfermeiro | `enfermeiro1@chsj.min-saude.pt` (também `enfermeiro2`, `enfermeiro3`) |
 | Doente | `doente@chsj.pt` |
 | Cuidador | `cuidador@chsj.pt` |
 
@@ -36,7 +36,7 @@ npm run dev
 
 **Atenção:** `npm run seed` apaga e recria os registos da base de dados indicada em `DATABASE_PATH` (ou `data.db`, se não for indicada), usando dados sintéticos. Execute-o apenas na primeira configuração ou numa base descartável; não o execute numa base de dados que pretenda conservar.
 
-Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Contas principais: `medico@chsj.pt` (Dr. Rui Matos), `enfermeiro@chsj.pt`, `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os restantes doentes entram com `doenteN@example.invalid`.
+Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Os profissionais aparecem como «Médico 1», «Enfermeiro 1», etc., para não coincidirem com profissionais reais. Contas principais: `medico1@chsj.min-saude.pt` (Médico 1), `enfermeiro1@chsj.min-saude.pt`, `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os restantes doentes entram com `doenteN@example.invalid`.
 
 | N.º | Doente | Cenário de demonstração |
 |---|---|---|

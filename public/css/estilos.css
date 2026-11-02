@@ -117,7 +117,6 @@ ul.lista li:last-child { border-bottom:0; }
 #msgGeral.error { border-left:5px solid var(--danger); }
 #msgGeral button { padding:.2rem .55rem; background:transparent; color:var(--muted); border:1px solid var(--border); }
 
-@media (min-width:900px) { .barra-doente { position:sticky; top:.5rem; z-index:10; } }
 @media (max-width:720px) {
   header.topo { align-items:flex-start; flex-direction:column; padding:.8rem 1rem; }
   main { margin:1rem auto; padding:0 .65rem; }
@@ -251,3 +250,92 @@ h2 { color:var(--primary-escuro); }
 .login-marca .servico { margin:.6rem 0 0; color:var(--muted); font-size:.95rem; }
 #ecraLogin h1 { text-align:center; font-size:1.5rem; color:var(--text); }
 @media (max-width:600px) { .marca-sub { display:none; } .marca-nome { font-size:1.1rem; } }
+
+/* ================= Aspeto profissional: cabeçalho, navegação e cartão do doente ================= */
+body { font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif; font-size:15px; display:flex; flex-direction:column; min-height:100vh; }
+main { flex:1; width:100%; margin-top:1.5rem; }
+
+/* Cabeçalho: marca | navegação principal | utilizador */
+header.topo { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:1.5rem; min-height:68px; padding-top:.6rem; padding-bottom:.6rem; position:sticky; top:0; z-index:30; }
+.nav-principal { display:flex; gap:.35rem; align-items:center; overflow-x:auto; scrollbar-width:none; }
+.nav-principal button[role="tab"] { background:transparent; color:#fff; opacity:.85; font-weight:600; padding:.55rem 1rem; border-radius:8px; border:0; white-space:nowrap; display:inline-flex; align-items:center; gap:.4rem; }
+.nav-principal button[role="tab"]:hover { opacity:1; background:#ffffff1f; filter:none; }
+.nav-principal button[role="tab"][aria-selected="true"] { opacity:1; background:#ffffff2e; box-shadow:inset 0 -3px 0 #fff; }
+.nav-principal .contador { background:#fff; color:var(--p-critica); margin-left:0; }
+:focus-visible { outline-color:#1d4ed8; }
+header.topo :focus-visible { outline-color:#fff; }
+
+.utilizador { display:flex; align-items:center; gap:1rem; color:#fff; }
+.etiqueta-utilizador { display:flex; align-items:center; gap:.6rem; }
+.avatar { width:36px; height:36px; border-radius:50%; background:#ffffff33; border:1px solid #ffffff66; display:grid; place-items:center; font-weight:700; font-size:.85rem; letter-spacing:.03em; }
+.quem { display:flex; flex-direction:column; line-height:1.2; }
+.quem strong { font-size:.92rem; }
+.quem span { font-size:.78rem; opacity:.9; }
+button.sair { background:transparent; color:#fff; border:1px solid #ffffffa6; padding:.45rem .9rem; border-radius:8px; font-weight:600; }
+button.sair:hover { background:#ffffff1f; filter:none; }
+
+/* Cartão do doente: identificação, mudança de doente e os separadores do processo, tudo alinhado */
+.barra-doente { display:grid; grid-template-columns:1fr minmax(220px,320px); gap:.5rem 2rem; align-items:start; padding:1.25rem 1.5rem 0; margin-bottom:1.25rem; position:static; border-top:4px solid var(--laranja); overflow:hidden; }
+.barra-doente .identidade { grid-column:1; grid-row:1; }
+.barra-doente .seletor { grid-column:2; grid-row:1; }
+.barra-doente .seletor label { font-size:.72rem; }
+.identidade h1 { font-size:1.45rem; letter-spacing:-.01em; }
+.nav-doente { grid-column:1 / -1; display:flex; gap:0; margin:.9rem -1.5rem 0; padding:0 1.5rem; border-top:1px solid var(--line); border-bottom:0; background:#fdfaf7; overflow-x:auto; }
+.nav-doente button[role="tab"] { background:transparent; color:var(--muted); font-weight:600; padding:.85rem 1.1rem; border:0; border-radius:0; border-bottom:3px solid transparent; margin:0; white-space:nowrap; }
+.nav-doente button[role="tab"]:hover { color:var(--text); background:transparent; filter:none; }
+.nav-doente button[role="tab"][aria-selected="true"] { color:var(--primary-escuro); border-bottom-color:var(--laranja); background:transparent; }
+
+/* Conteúdo */
+.card { padding:1.4rem 1.5rem; }
+h2 { font-size:1.12rem; font-weight:700; letter-spacing:-.005em; }
+table th { font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; }
+tbody th { text-transform:none; letter-spacing:0; font-size:.9rem; }
+button { border-radius:8px; }
+input, select, textarea { border-radius:8px; }
+input:focus, select:focus, textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px #e0700033; }
+.voltar-processo { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin:0 0 1rem; padding:.7rem 1rem; border-radius:10px; background:var(--primary-soft); }
+
+.rodape { text-align:center; color:var(--muted); font-size:.8rem; padding:1.25rem 1rem 1.75rem; }
+
+@media (max-width:860px) {
+  header.topo { grid-template-columns:1fr auto; gap:.5rem 1rem; }
+  .nav-principal { grid-column:1 / -1; grid-row:2; }
+  .quem { display:none; }
+  .barra-doente { grid-template-columns:1fr; padding:1rem 1rem 0; }
+  .barra-doente .seletor { grid-column:1; grid-row:2; }
+  .nav-doente { margin:.75rem -1rem 0; padding:0 .5rem; }
+}
+.utilizador { grid-column:3; justify-self:end; }
+.marca-nome { white-space:nowrap; }
+@media (max-width:860px) {
+  .utilizador { grid-column:2; }
+  button.sair { padding:.4rem .7rem; font-size:.85rem; }
+}
+
+/* ================= Menu lateral com ícones (como a app My São João) ================= */
+.app-layout { flex:1; width:100%; max-width:1340px; margin:1.5rem auto 0; padding:0 1rem; display:grid; grid-template-columns:250px minmax(0,1fr); gap:1.5rem; align-items:start; }
+.app-layout > main { margin:0; padding:0; max-width:none; min-width:0; }
+.menu-lateral { position:sticky; top:84px; background:var(--card); border-radius:12px; box-shadow:0 1px 3px #5a3a2014, 0 0 0 1px #ecdfd2; padding:.6rem; }
+.menu-lateral nav { display:flex; flex-direction:column; gap:.2rem; }
+.menu-lateral button[role="tab"] { display:flex; align-items:center; gap:.75rem; width:100%; text-align:left; background:transparent; color:var(--text);
+  font-weight:600; padding:.7rem .85rem; border-radius:8px; border:0; white-space:nowrap; }
+.menu-lateral button[role="tab"] .icone { width:20px; height:20px; flex:none; color:var(--primary); }
+.menu-lateral button[role="tab"] .rotulo { flex:1; overflow:hidden; text-overflow:ellipsis; }
+.menu-lateral button[role="tab"]:hover { background:var(--neutro); filter:none; }
+.menu-lateral button[role="tab"][aria-selected="true"] { background:var(--primary); color:#fff; }
+.menu-lateral button[role="tab"][aria-selected="true"] .icone { color:#fff; }
+.menu-lateral .contador { margin-left:auto; }
+.menu-lateral button[aria-selected="true"] .contador { background:#fff; color:var(--p-critica); }
+.menu-titulo { margin:.5rem 0 .15rem; padding:.75rem .85rem .3rem; border-top:1px solid var(--line); font-size:.72rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+@media (max-width:900px) {
+  .app-layout { grid-template-columns:1fr; gap:1rem; margin-top:1rem; }
+  .menu-lateral { position:static; padding:.4rem; }
+  .menu-lateral nav { flex-direction:row; overflow-x:auto; scrollbar-width:none; }
+  .menu-lateral button[role="tab"] { width:auto; padding:.55rem .75rem; }
+  .menu-titulo { display:none; }
+}
+.app-layout { grid-template-columns:265px minmax(0,1fr); }
+.menu-lateral button[role="tab"] { white-space:normal; line-height:1.25; }
+@media (max-width:900px) { .app-layout { grid-template-columns:1fr; } .menu-lateral button[role="tab"] { white-space:nowrap; } }

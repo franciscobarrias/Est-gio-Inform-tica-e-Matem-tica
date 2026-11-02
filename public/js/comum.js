@@ -70,7 +70,10 @@ function exigirSessao(perfisDaPagina) {
   }
   token = sessao.token;
   user = sessao.utilizador;
-  $('etiquetaUtilizador').textContent = `${user.nome} · ${NOMES_PERFIL[user.perfil] || user.perfil}`;
+  // Utilizador no cabeçalho: iniciais num círculo, nome e perfil.
+  const iniciais = user.nome.split(/\s+/).filter(Boolean).map(parte => parte[0]).filter(letra => /\p{L}|\d/u.test(letra)).slice(0, 2).join('').toUpperCase();
+  $('etiquetaUtilizador').innerHTML = `<span class="avatar" aria-hidden="true">${escapar(iniciais)}</span>
+    <span class="quem"><strong>${escapar(user.nome)}</strong><span>${escapar(NOMES_PERFIL[user.perfil] || user.perfil)}</span></span>`;
   $('terminarSessao').addEventListener('click', terminarSessao);
   $('fecharMsg').addEventListener('click', () => mostrarMensagem(''));
   return true;
@@ -137,21 +140,41 @@ function idade(dataNascimento) {
 // separadores = [['alertas', 'Alertas'], ...]; cada id corresponde a um <section id="painel-<id>">.
 // Os separadores em "semBarraDoente" escondem a barra do doente (por exemplo, a lista de alertas de todos os doentes).
 let separadoresSemBarra = [];
+// Ícones do menu lateral (traço simples, 24×24), como na app My São João.
+const ICONES_MENU = {
+  alertas: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  doentes: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.3c2.3.2 4.1 1.8 4.6 4.7"/>',
+  resumo: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6v2.5H9z"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
+  diagnostico: '<rect x="3.5" y="9" width="17" height="7" rx="3.5" transform="rotate(-45 12 12.5)"/><path d="M9.2 9.7l5 5"/>',
+  evolucao: '<path d="M4 4v16h16"/><path d="M7.5 15l3.5-4 3 2.5 4.5-6"/>',
+  historico: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  gestao: '<path d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  registar: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'
+};
+const icone = id => ICONES_MENU[id]
+  ? `<svg class="icone" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONES_MENU[id]}</svg>` : '';
+
+// Menu lateral: primeiro as áreas gerais (Alertas, Doentes) e, quando há um doente escolhido,
+// as áreas do processo desse doente, com o nome dele como título do grupo.
 function construirSeparadores(separadores, semBarraDoente = []) {
   separadoresSemBarra = semBarraDoente;
-  $('separadores').innerHTML = separadores.map(([id, nome]) =>
-    `<button type="button" role="tab" id="tab-${id}" aria-controls="painel-${id}" aria-selected="false" tabindex="-1" data-tab="${id}">${nome}${id === 'alertas' ? '<span class="contador hidden" id="contadorAlertas"></span>' : ''}</button>`
-  ).join('');
-  $('separadores').addEventListener('click', evento => {
+  const botao = ([id, nome]) =>
+    `<button type="button" role="tab" id="tab-${id}" aria-controls="painel-${id}" aria-selected="false" tabindex="-1" data-tab="${id}">${icone(id)}<span class="rotulo">${nome}</span>${id === 'alertas' ? '<span class="contador hidden" id="contadorAlertas"></span>' : ''}</button>`;
+  const globais = separadores.filter(([id]) => semBarraDoente.includes(id));
+  const doDoente = separadores.filter(([id]) => !semBarraDoente.includes(id));
+  const lista = $('separadores');
+  lista.innerHTML = (globais.length ? globais.map(botao).join('') + '<p class="menu-titulo hidden" id="menuTituloDoente"></p>' : '')
+    + doDoente.map(botao).join('');
+  lista.addEventListener('click', evento => {
     const tab = evento.target.closest('[role="tab"]');
     if (tab) abrirSeparador(tab.dataset.tab);
   });
-  $('separadores').addEventListener('keydown', evento => {
-    const tabs = [...document.querySelectorAll('[role="tab"]:not(.hidden)')];
+  lista.addEventListener('keydown', evento => {
+    const tabs = [...lista.querySelectorAll('[role="tab"]:not(.hidden)')];
     const i = tabs.findIndex(t => t.dataset.tab === separadorAtivo);
     let novo = null;
-    if (evento.key === 'ArrowRight') novo = tabs[(i + 1) % tabs.length];
-    if (evento.key === 'ArrowLeft') novo = tabs[(i - 1 + tabs.length) % tabs.length];
+    if (['ArrowDown', 'ArrowRight'].includes(evento.key)) novo = tabs[(i + 1) % tabs.length];
+    if (['ArrowUp', 'ArrowLeft'].includes(evento.key)) novo = tabs[(i - 1 + tabs.length) % tabs.length];
     if (evento.key === 'Home') novo = tabs[0];
     if (evento.key === 'End') novo = tabs[tabs.length - 1];
     if (novo) { evento.preventDefault(); abrirSeparador(novo.dataset.tab, true); }
@@ -162,6 +185,7 @@ function atualizarSeparadoresVisiveis() {
   const semDoente = ehClinico() && !idDoenteAtivo;
   document.querySelectorAll('[role="tab"]').forEach(tab =>
     tab.classList.toggle('hidden', semDoente && !separadoresSemBarra.includes(tab.dataset.tab)));
+  $('menuTituloDoente')?.classList.toggle('hidden', !ehClinico() || !idDoenteAtivo);
 }
 function abrirSeparador(id, focar = false) {
   // Nas páginas clínicas, os separadores do processo só abrem depois de escolher um doente.
@@ -239,6 +263,7 @@ function renderizarIdentidade() {
   ].filter(([, v]) => v);
   const cuidadorObrig = Boolean(doente.participacao_cuidador_obrigatoria);
   const abertos = (p.alertas || []).filter(a => a.estado_atual !== 'Concluído').length;
+  if ($('menuTituloDoente')) $('menuTituloDoente').textContent = doente.nome;
   $('identidadeDoente').innerHTML = `
     ${papel ? `<p class="papel">${papel}</p>` : ''}
     <h1>${escapar(doente.nome)}</h1>
