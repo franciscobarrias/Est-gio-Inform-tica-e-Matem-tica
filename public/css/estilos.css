@@ -1,13 +1,15 @@
 /* Estilos comuns a todas as páginas da plataforma. */
 :root {
-  --primary:#0f4c81; --primary-soft:#e8f1fa; --bg:#f4f7fb; --card:#fff; --text:#1a202c; --muted:#4a5568;
-  --border:#cbd5e0; --line:#e2e8f0; --danger:#9b2c2c; --ok:#22543d;
+  /* Cores da ULS São João (a partir do logótipo e da app My São João): laranja e vermelho-tijolo sobre fundo creme. */
+  --primary:#b4441c; --primary-escuro:#8f2f1f; --laranja:#e07000; --primary-soft:#fcebdd; --bg:#f6efe7; --card:#fff;
+  --text:#2b2420; --muted:#6b5d52; --border:#d9c6b3; --line:#ecdfd2; --danger:#9b2c2c; --ok:#22543d;
+  --neutro:#f3ebe3; --cabecalho:linear-gradient(90deg,#c9520f 0%,#a8381e 55%,#8f2f1f 100%);
   --p-critica:#b42318; --p-critica-bg:#fee4e2; --p-alta:#b54708; --p-alta-bg:#fef0c7;
   --p-media:#8a6d00; --p-media-bg:#fdf6d8; --p-baixa:#475467; --p-baixa-bg:#eef2f6;
 }
 * { box-sizing:border-box; }
 body { font-family:system-ui,sans-serif; background:var(--bg); margin:0; color:var(--text); line-height:1.5; }
-header.topo { background:var(--primary); color:#fff; padding:.8rem max(1rem,calc((100vw - 1220px)/2)); display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+header.topo { background:var(--cabecalho); color:#fff; padding:.8rem max(1rem,calc((100vw - 1220px)/2)); display:flex; justify-content:space-between; align-items:center; gap:1rem; }
 main { max-width:1220px; margin:1.25rem auto 4rem; padding:0 1rem; }
 h1,h2,h3 { line-height:1.25; }
 h2 { font-size:1.2rem; margin:0 0 .75rem; }
@@ -20,7 +22,7 @@ button:hover { filter:brightness(.92); }
 button.secundario { background:#fff; color:var(--primary); border:1px solid var(--primary); }
 button.perigo { background:var(--danger); }
 button:disabled { opacity:.55; cursor:not-allowed; }
-:focus-visible { outline:3px solid #ed8936; outline-offset:2px; }
+:focus-visible { outline:3px solid #1d4ed8; outline-offset:2px; }
 input,select,textarea { width:100%; min-height:2.6rem; padding:.5rem .6rem; margin:.25rem 0 .75rem; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text); font:inherit; }
 textarea { min-height:5rem; resize:vertical; }
 label { display:block; font-weight:600; }
@@ -32,7 +34,7 @@ th { color:var(--muted); font-weight:650; }
 .badge { padding:.15rem .55rem; border-radius:999px; font-size:.8rem; font-weight:700; display:inline-block; white-space:nowrap; }
 .badge-alerta { background:#fed7d7; color:#742a2a; }
 .badge-ok { background:#c6f6d5; color:#22543d; }
-.badge-neutro { background:#edf2f7; color:#2d3748; }
+.badge-neutro { background:var(--neutro); color:#4a3b31; }
 .notice { padding:.6rem .8rem; border-left:4px solid var(--primary); background:var(--primary-soft); border-radius:0 6px 6px 0; }
 .aviso { padding:.6rem .8rem; border-left:4px solid var(--p-alta); background:var(--p-alta-bg); border-radius:0 6px 6px 0; }
 .error { color:var(--danger); font-weight:650; }
@@ -56,7 +58,7 @@ ul.lista li:last-child { border-bottom:0; }
 .identidade h1 { font-size:1.35rem; margin:0; }
 .identidade .meta { color:var(--muted); font-size:.9rem; margin:.1rem 0 .4rem; }
 .chips { display:flex; flex-wrap:wrap; gap:.4rem; }
-.chip { display:inline-flex; gap:.3rem; align-items:center; padding:.2rem .6rem; border-radius:999px; background:#edf2f7; font-size:.82rem; }
+.chip { display:inline-flex; gap:.3rem; align-items:center; padding:.2rem .6rem; border-radius:999px; background:var(--neutro); font-size:.82rem; }
 .chip strong { font-weight:700; }
 .chip.chip-alerta { background:#fed7d7; color:#742a2a; }
 .chip.chip-ok { background:#c6f6d5; color:#22543d; }
@@ -84,10 +86,10 @@ ul.lista li:last-child { border-bottom:0; }
 .prioridade.p-Alta { background:var(--p-alta-bg); color:var(--p-alta); }
 .prioridade.p-Média { background:var(--p-media-bg); color:var(--p-media); }
 .prioridade.p-Baixa { background:var(--p-baixa-bg); color:var(--p-baixa); }
-.estado { font-size:.8rem; font-weight:650; padding:.15rem .5rem; border-radius:4px; background:#edf2f7; }
+.estado { font-size:.8rem; font-weight:650; padding:.15rem .5rem; border-radius:4px; background:var(--neutro); }
 .estado.e-Encaminhado { background:#e9d8fd; color:#44337a; }
 .estado.e-Concluído { background:#c6f6d5; color:#22543d; }
-.nota { background:#f7fafc; border-radius:6px; padding:.4rem .6rem; font-size:.88rem; }
+.nota { background:#fbf6f1; border-radius:6px; padding:.4rem .6rem; font-size:.88rem; }
 .triagem { margin-top:.6rem; border-top:1px dashed var(--line); padding-top:.6rem; }
 .triagem summary { cursor:pointer; font-weight:650; color:var(--primary); }
 
@@ -98,8 +100,8 @@ ul.lista li:last-child { border-bottom:0; }
 .cel.v1 { background:#fefcbf; color:#744210; }
 .cel.v2 { background:#feebc8; color:#7b341e; }
 .cel.v3 { background:#fed7d7; color:#742a2a; font-weight:700; }
-.cel.na { background:#edf2f7; color:#4a5568; }
-.cel.vazio { color:#a0aec0; }
+.cel.na { background:var(--neutro); color:var(--muted); }
+.cel.vazio { color:#b3a394; }
 .registo { border-left:4px solid var(--primary); padding:.25rem 0 .25rem .9rem; margin-bottom:1.25rem; }
 .registo .resp { margin:2px; }
 
@@ -134,7 +136,7 @@ ul.lista li:last-child { border-bottom:0; }
 .grupo-perguntas.bloco-v2 > legend { font-size:1.15rem; font-weight:750; color:var(--primary); padding:0; margin-bottom:.3rem; }
 .nota-bloco { margin:0 0 1rem; max-width:62ch; }
 .pergunta-v2 { border:1px solid var(--line); border-radius:10px; background:#fff; margin:0 0 1rem; padding:1rem 1.1rem 1.1rem; min-width:0; }
-.pergunta-v2.respondida { border-color:#b9cfe6; background:#fbfdff; }
+.pergunta-v2.respondida { border-color:#e9b893; background:#fffaf6; }
 .pergunta-v2 > legend { float:left; width:100%; font-weight:650; font-size:1.02rem; padding:0; margin:0 0 .75rem; }
 .pergunta-v2 > legend + * { clear:both; }
 .pergunta-v2 .codigo { display:inline-block; min-width:2.3rem; color:var(--muted); font-weight:600; font-size:.8rem; margin-right:.4rem; }
@@ -224,6 +226,28 @@ details.formulario-medico > input, details.formulario-medico > label { max-width
 .tabela-doentes thead th { font-size:.8rem; color:var(--muted); font-weight:650; }
 .tabela-doentes tbody tr { cursor:pointer; }
 .tabela-doentes tbody tr:hover, .tabela-doentes tbody tr:focus-visible { background:var(--primary-soft); }
-.tabela-doentes tbody tr.ativo { box-shadow:inset 4px 0 0 var(--primary); background:#f7faff; }
+.tabela-doentes tbody tr.ativo { box-shadow:inset 4px 0 0 var(--primary); background:#fff7f0; }
 .tabela-doentes th .nome { display:block; font-weight:650; }
 .tabela-doentes td button { padding:.4rem .8rem; }
+
+/* ---------- Identidade visual ULS São João ---------- */
+header.topo { padding-top:.7rem; padding-bottom:.7rem; box-shadow:0 2px 8px #5a1d0f33; }
+.marca { display:flex; align-items:center; gap:.85rem; min-width:0; }
+.marca-arvore { width:38px; height:auto; flex:none; }
+.marca-texto { display:flex; flex-direction:column; line-height:1.2; min-width:0; }
+.marca-nome { font-family:Georgia,'Times New Roman',serif; font-size:1.3rem; letter-spacing:.09em; text-transform:uppercase; }
+.marca-sub { font-size:.85rem; opacity:.95; }
+header.topo .acoes { color:#fff; }
+header.topo button.perigo { background:#fff; color:var(--primary-escuro); }
+header.topo button.perigo:hover { background:var(--primary-soft); filter:none; }
+.card, .barra-doente { box-shadow:0 1px 3px #5a3a2014, 0 0 0 1px #ecdfd2; border-radius:12px; }
+.barra-doente { border-top:4px solid var(--laranja); }
+.tabs button[role="tab"][aria-selected="true"] { border-bottom-color:var(--laranja); }
+h2 { color:var(--primary-escuro); }
+.grupo-perguntas.bloco-v2 > legend { color:var(--primary-escuro); }
+/* Página de entrada */
+.login-marca { display:flex; flex-direction:column; align-items:center; text-align:center; margin:-.25rem 0 1rem; }
+.login-marca img { width:120px; height:auto; }
+.login-marca .servico { margin:.6rem 0 0; color:var(--muted); font-size:.95rem; }
+#ecraLogin h1 { text-align:center; font-size:1.5rem; color:var(--text); }
+@media (max-width:600px) { .marca-sub { display:none; } .marca-nome { font-size:1.1rem; } }

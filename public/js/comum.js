@@ -299,7 +299,7 @@ function desenharLinha({ pontos, yMax, marcas, limiar, cor, titulo, degraus = fa
   const y = v => base - v * (base - topo) / yMax;
   const passo = Math.max(1, Math.ceil(pontos.length / 8));
   return `<svg class="chart" viewBox="0 0 ${L} ${A}" role="img" aria-label="${escapar(titulo)}: ${pontos.map(p => `${dataCurta(p.data)} ${escapar(p.rotulo)}`).join('; ')}">
-    ${marcas.map(m => `<line x1="${esq}" y1="${y(m.v)}" x2="${dir}" y2="${y(m.v)}" stroke="#e2e8f0"/><text x="${esq - 8}" y="${y(m.v) + 4}" text-anchor="end" font-size="12" fill="#4a5568">${escapar(m.t)}</text>`).join('')}
+    ${marcas.map(m => `<line x1="${esq}" y1="${y(m.v)}" x2="${dir}" y2="${y(m.v)}" stroke="#ecdfd2"/><text x="${esq - 8}" y="${y(m.v) + 4}" text-anchor="end" font-size="12" fill="#6b5d52">${escapar(m.t)}</text>`).join('')}
     ${limiar ? `<line x1="${esq}" y1="${y(limiar.v)}" x2="${dir}" y2="${y(limiar.v)}" stroke="#b54708" stroke-dasharray="6 4" stroke-width="1.5"/><text x="${zona ? esq + 6 : dir}" y="${zona ? y(limiar.v) + 15 : y(limiar.v) - 6}" text-anchor="${zona ? 'start' : 'end'}" font-size="11" fill="#b54708">${escapar(limiar.t)}</text>` : ''}
     ${zona ? `<rect x="${esq}" y="${y(zona.ate)}" width="${dir - esq}" height="${base - y(zona.ate)}" fill="${zona.cor}"/>` : ''}
     ${pontos.length > 1 ? `<polyline points="${pontos.map((p, i) => degraus && i > 0
@@ -307,7 +307,7 @@ function desenharLinha({ pontos, yMax, marcas, limiar, cor, titulo, degraus = fa
       ? `${x(i)},${y(pontos[i - 1].v)} ${x(i)},${y(p.v)}` : `${x(i)},${y(p.v)}`).join(' ')}" fill="none" stroke="${cor}" stroke-width="3"/>` : ''}
     ${mostrarValores ? pontos.map((p, i) => `<text x="${i === pontos.length - 1 ? x(i) - 9 : x(i) + 9}" y="${y(p.v) - 9}" text-anchor="${i === pontos.length - 1 ? 'end' : 'start'}" font-size="13" font-weight="700" fill="${cor}">${escapar(p.v)}</text>`).join('') : ''}
     ${pontos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="5.5" fill="${cor}" stroke="#fff" stroke-width="2"><title>${dataCurta(p.data)}: ${escapar(p.rotulo)}</title></circle>`).join('')}
-    ${pontos.map((p, i) => i % passo === 0 || i === pontos.length - 1 ? `<text x="${x(i)}" y="${base + 22}" text-anchor="middle" font-size="12" fill="#1a202c">${dataCurta(p.data).slice(0, 5)}</text>` : '').join('')}
+    ${pontos.map((p, i) => i % passo === 0 || i === pontos.length - 1 ? `<text x="${x(i)}" y="${base + 22}" text-anchor="middle" font-size="12" fill="#2b2420">${dataCurta(p.data).slice(0, 5)}</text>` : '').join('')}
   </svg>`;
 }
 function desenharKps(avaliacoes) {
@@ -315,7 +315,7 @@ function desenharKps(avaliacoes) {
   if (!avaliacoes.length) { $('chartKps').innerHTML = '<p class="muted">Ainda não existem avaliações funcionais registadas.</p>'; return; }
   const pontos = avaliacoes.map(a => ({ data: a.data_avaliacao, v: Number(a.score_kps), rotulo: `${a.score_kps} pontos` }));
   const ultima = pontos[pontos.length - 1];
-  $('chartKps').innerHTML = desenharLinha({ pontos, yMax: 100, cor: '#0f4c81', titulo: 'Evolução do KPS', degraus: true, mostrarValores: true,
+  $('chartKps').innerHTML = desenharLinha({ pontos, yMax: 100, cor: '#8f2f1f', titulo: 'Evolução do KPS', degraus: true, mostrarValores: true,
     zona: { ate: 70, cor: '#fef0c780' },
     marcas: [0, 50, 70, 100].map(v => ({ v, t: String(v) })), limiar: { v: 70, t: '≤ 70 · cuidador obrigatório' } }) +
     `<p class="muted pequeno">O KPS é avaliado pelo médico nas consultas (${pontos.length} avaliação(ões) até agora), por isso o gráfico mostra degraus: o valor mantém-se até à avaliação seguinte. Mais recente: <strong>${ultima.v}/100</strong> em ${dataCurta(ultima.data)}.</p>`;
@@ -341,7 +341,7 @@ function desenharSintomas(submissoes) {
     .map(o => ({ v: Number(o.valor_numerico), t: curto(rotuloCurto(o.rotulo)) }));
   const yMax = Math.max(1, ...marcas.map(m => m.v), ...pontos.map(p => p.v));
   pontos.forEach(p => { p.rotulo = rotuloCurto(p.rotulo); });
-  $('chartSintomas').innerHTML = desenharLinha({ pontos, yMax, marcas, cor: '#6b46c1', titulo: 'Evolução do sintoma selecionado' }) +
+  $('chartSintomas').innerHTML = desenharLinha({ pontos, yMax, marcas, cor: '#d35a14', titulo: 'Evolução do sintoma selecionado' }) +
     '<p class="muted pequeno">Só são representadas respostas presentes e avaliáveis; cada ponto corresponde à data dos sintomas.</p>';
 }
 function desenharQuadroComparativo(submissoes) {
