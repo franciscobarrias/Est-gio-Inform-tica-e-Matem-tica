@@ -238,6 +238,10 @@ test('v2: sinal de alarme dá Crítica e a instrução de ligar 112', () => {
   assert.equal(r.prioridade, 'Crítica');
   assert.deepEqual(r.instrucoes, ['LIGAR_112']);
   assert.deepEqual(avaliar({ A5: 1 }).instrucoes, ['CONTACTAR_JA']);
+  // Perna inchada (A7) e sangramento (A8): contactar hoje → Alta, coerente com a instrução.
+  assert.equal(avaliar({ A7: 1 }).prioridade, 'Alta');
+  assert.deepEqual(avaliar({ A8: 1 }).instrucoes, ['CONTACTAR_HOJE']);
+  assert.equal(avaliar({ A8: 1 }).prioridade, 'Alta');
   assert.equal(avaliar({ A1: 0, A2: 0, A5: 0 }).prioridade, null);
 });
 
@@ -452,4 +456,23 @@ test('v2: a mensagem livre (B20) é guardada como texto e não conta para o scor
     id_formulario: formulario.id_formulario, data_referencia_sintomas: hoje,
     respostas: [{ id_pergunta: 'v2-b1-cefaleia', texto: 'Dói' }]
   }), /opção válida/);
+});
+
+test('o médico cria um doente com palavra-passe temporária, que fica a seu cargo', () => {
+  const dados = { nome: 'Doente  Novo de Teste', email: 'Novo.Doente@example.invalid', numero_processo_clinico: 'pc-999001',
+    data_nascimento: '1970-03-04', sexo: 'F' };
+  const novo = MedicoService.criarDoente(idMedico, dados);
+  assert.equal(novo.nome, 'Doente Novo de Teste');
+  assert.equal(novo.numero_processo_clinico, 'PC-999001');
+  assert.ok(novo.palavra_passe_temporaria.length >= 10);
+  const sessao = AuthService.login('novo.doente@example.invalid', novo.palavra_passe_temporaria);
+  assert.equal(sessao.utilizador.perfil, 'DOENTE');
+  const medico = { id_utilizador: idMedico, nome: 'Médico', email: 'm', perfil: 'MEDICO' as const };
+  assert.equal(AuthService.podeAcederDoente(medico, novo.id_doente), true);
+  const plano = db.prepare("SELECT periodicidade_dias FROM PlanoMonitorizacao WHERE id_doente = ? AND estado = 'ATIVO'").get(novo.id_doente) as any;
+  assert.equal(plano.periodicidade_dias, 7);
+  assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, numero_processo_clinico: 'PC-999002' }), /email/);
+  assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, email: 'outro@example.invalid' }), /n\.º de processo/);
+  assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, email: 'x@example.invalid', numero_processo_clinico: 'PC-1', data_nascimento: '2999-01-01' }), /data de nascimento/);
+  assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, email: 'y@example.invalid', numero_processo_clinico: 'PC-777', sexo: 'X' }), /sexo/);
 });

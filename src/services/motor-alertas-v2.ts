@@ -133,6 +133,9 @@ export function avaliarSubmissaoV2(entrada: {
       instrucoes.add('LIGAR_112');
     }
   }
+  // A prioridade acompanha a instrução dada ao doente: ligar 112 ou contactar já → Crítica; contactar hoje → Alta
+  // (como na convulsão única com recuperação). Matriz prioridade × instrução a validar com a equipa clínica.
+  const PRIORIDADE_DA_INSTRUCAO: Record<Instrucao, Prioridade> = { LIGAR_112: 'Crítica', CONTACTAR_JA: 'Crítica', CONTACTAR_HOJE: 'Alta' };
   const alarmes: Array<[string, string, Instrucao]> = [
     ['A2', 'Dor de cabeça súbita, a pior da vida', 'LIGAR_112'],
     ['A3', 'Sonolência ou confusão súbita, ou dificuldade em acordar', 'LIGAR_112'],
@@ -144,7 +147,7 @@ export function avaliarSubmissaoV2(entrada: {
     ['A9', 'Vómitos que não param com os antieméticos', 'CONTACTAR_JA']
   ];
   for (const [codigo, texto, instrucao] of alarmes) {
-    if (sim(codigo)) { motivo(`${texto} (${codigo})`, 'Crítica', 'SINAL_ALARME_V2', [codigo]); instrucoes.add(instrucao); }
+    if (sim(codigo)) { motivo(`${texto} (${codigo})`, PRIORIDADE_DA_INSTRUCAO[instrucao], 'SINAL_ALARME_V2', [codigo]); instrucoes.add(instrucao); }
   }
   if (v('B4') === 3) { motivo('Sonolência em nível grave (B4)', 'Crítica', 'SINAL_ALARME_V2', ['B4']); instrucoes.add('CONTACTAR_JA'); }
 

@@ -41,6 +41,7 @@
         <h2>Alertas dos doentes acompanhados</h2>
         <p class="muted pequeno">Ordenados por prioridade. Analise cada alerta e registe a triagem; encaminhe ao médico quando necessário.</p>
         <div class="filtros" id="filtrosAlertas" role="group" aria-label="Filtrar alertas por estado"></div>
+        <div id="avisoAtrasos"></div>
         <div id="listaAlertas"></div>
       </div>
     </section>
@@ -49,7 +50,7 @@
     <section id="painel-doentes" role="tabpanel" class="hidden" aria-labelledby="tab-doentes">
       <div class="card">
         <h2>Doentes</h2>
-        <p class="muted pequeno">Escolha um doente para ver o resumo, o diagnóstico e a medicação, a evolução e os registos. Os doentes com alertas por concluir ou registos em atraso aparecem primeiro.</p>
+        <p class="muted pequeno">Escolha um doente para ver o resumo, o diagnóstico, os tratamentos e a medicação, a evolução e os registos. Os doentes com alertas por concluir ou registos em atraso aparecem primeiro.</p>
         <label for="pesquisaDoentes">Procurar por nome ou n.º de processo</label>
         <input id="pesquisaDoentes" type="search" autocomplete="off" style="max-width:420px" />
         <div id="listaDoentes" class="table-wrap"></div>
@@ -68,11 +69,16 @@
       </div>
     </section>
 
-    <!-- DIAGNÓSTICO E MEDICAÇÃO -->
+    <!-- DIAGNÓSTICO -->
     <section id="painel-diagnostico" role="tabpanel" class="hidden" aria-labelledby="tab-diagnostico">
       <section class="card"><h2>Diagnóstico</h2><div id="dmDiagnostico"></div></section>
-      <section class="card"><h2>Medicação</h2><div id="dmMedicacao"></div></section>
+    </section>
+
+    <!-- TRATAMENTOS E MEDICAÇÃO -->
+    <section id="painel-tratamentos" role="tabpanel" class="hidden" aria-labelledby="tab-tratamentos">
       <section class="card"><h2>Tratamentos</h2><div id="dmTratamentos"></div></section>
+      <section class="card"><h2>Medicação</h2><div id="dmMedicacao"></div></section>
+
     </section>
 
     <!-- EVOLUÇÃO -->
@@ -89,6 +95,11 @@
           <div id="chartSintomas" aria-live="polite"></div>
         </section>
       </div>
+      <section class="card" style="margin-top:1rem" aria-labelledby="tScore">
+        <h2 id="tScore">Score de evolução calculado pelo algoritmo</h2>
+        <p class="muted pequeno">Score ponderado de 0 a 100 de cada registo, comparado com a linha de base do doente. Acima da linha do limiar, o algoritmo assinala «agravamento global». Os registos com menos de 60% das perguntas respondidas não têm score. Limiares demonstrativos, ainda não validados clinicamente.</p>
+        <div id="chartScore"></div>
+      </section>
       <section class="card" style="margin-top:1rem">
         <h2>Comparação entre registos</h2>
         <p class="muted pequeno">Últimos registos lado a lado. «—» significa sem resposta, que não é o mesmo que ausência do sintoma.</p>

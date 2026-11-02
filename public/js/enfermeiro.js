@@ -68,7 +68,7 @@ function aoCarregarProcesso() {
 // ---------- Arranque ----------
 iniciarPagina({
   perfis: ['ENFERMEIRO'],
-  separadores: [['alertas', 'Alertas'], ['doentes', 'Doentes'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente']],
+  separadores: [['alertas', 'Alertas'], ['doentes', 'Doentes'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico'], ['tratamentos', 'Tratamentos e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente']],
   semBarraDoente: ['alertas', 'doentes'],
   separadorInicial: 'alertas',
   depoisDeCarregar: async () => {

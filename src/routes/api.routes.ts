@@ -6,6 +6,7 @@ export const router = Router();
 router.post('/auth/login', ApiController.login);
 router.get('/formularios/ativo', autenticarJWT, ApiController.obterFormularioAtivo);
 router.get('/doentes', autenticarJWT, ApiController.listarDoentes);
+router.post('/doentes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.criarDoente);
 router.get('/doentes/:idDoente/processo', autenticarJWT, ApiController.obterProcessoDoente);
 router.post('/doentes/:idDoente/submissoes', autenticarJWT, ApiController.submeterMonitorizacao);
 router.post('/doentes/:idDoente/kps', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarKps);

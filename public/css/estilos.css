@@ -374,3 +374,20 @@ dl.identificacao dd { white-space:normal; overflow:visible; }
 .mensagem-doente { margin:.5rem 0; padding:.55rem .8rem; border-left:4px solid #6b5d52; background:#f7f1ea; border-radius:0 8px 8px 0; font-size:.92rem; }
 .badge-mensagem { display:inline-block; margin-top:.3rem; background:#efe4d8; color:#4a3b31; font-size:.72rem; }
 .cel.mensagem { font-size:.8rem; color:var(--text); background:#f7f1ea; }
+
+/* ---------- Gráfico do score ---------- */
+.legenda-score { display:flex; flex-wrap:wrap; gap:.4rem 1.25rem; margin:.35rem 0 .25rem; color:var(--muted); }
+.legenda-score span { display:inline-flex; align-items:center; gap:.4rem; }
+.legenda-score i { display:inline-block; width:22px; height:0; border-top:3px solid #d35a14; }
+.legenda-score i.l-base { border-top:2px dotted #6b5d52; }
+.legenda-score i.l-limiar { border-top:2px dashed #b42318; }
+.legenda-score i.l-alerta { width:12px; height:12px; border:0; border-radius:50%; background:#b42318; }
+
+/* ---------- Alertas sem triagem fora do prazo ---------- */
+.aviso-atraso { margin:0 0 1rem; padding:.8rem 1rem; border-radius:10px; border-left:6px solid var(--p-critica); background:var(--p-critica-bg); color:#7a1c14; }
+.aviso-atraso ul { margin:.4rem 0 0; padding-left:1.1rem; }
+.aviso-atraso li { margin:.2rem 0; }
+.alerta.atrasado { box-shadow:0 0 0 2px var(--p-critica-bg), 0 0 0 3px #f2b8b5; }
+.nota.nota-atraso { background:var(--p-critica-bg); color:#7a1c14; }
+.novo-doente { margin:0 0 1rem; border-top:0; padding-top:0; }
+code.senha { font-size:1rem; padding:.1rem .4rem; background:#fff; border:1px dashed var(--primary); border-radius:6px; letter-spacing:.05em; }

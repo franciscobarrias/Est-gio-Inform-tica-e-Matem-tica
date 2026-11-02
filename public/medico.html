@@ -41,6 +41,7 @@
         <h2>Alertas dos doentes acompanhados</h2>
         <p class="muted pequeno">Separados pela fase da triagem e, dentro de cada grupo, ordenados por prioridade.</p>
         <div class="filtros" id="filtrosAlertas" role="group" aria-label="Filtrar alertas por estado"></div>
+        <div id="avisoAtrasos"></div>
         <div id="listaAlertas"></div>
       </div>
     </section>
@@ -49,7 +50,20 @@
     <section id="painel-doentes" role="tabpanel" class="hidden" aria-labelledby="tab-doentes">
       <div class="card">
         <h2>Os meus doentes</h2>
-        <p class="muted pequeno">Escolha um doente para ver o resumo, o diagnóstico e a medicação, a evolução e os registos. Os doentes com alertas por concluir ou registos em atraso aparecem primeiro.</p>
+        <p class="muted pequeno">Escolha um doente para ver o resumo, o diagnóstico, os tratamentos e a medicação, a evolução e os registos. Os doentes com alertas por concluir ou registos em atraso aparecem primeiro.</p>
+        <details class="formulario-medico novo-doente" id="caixaNovoDoente">
+          <summary>+ Novo doente</summary>
+          <p class="muted pequeno">O doente fica a seu cargo, com um registo de sintomas pedido a cada 7 dias (pode mudar depois na Gestão clínica). Depois de criar, preencha o diagnóstico.</p>
+          <div class="linha-campos">
+            <div><label for="ndNome">Nome completo</label><input id="ndNome" type="text" maxlength="120" autocomplete="off" /></div>
+            <div><label for="ndProcesso">N.º de processo</label><input id="ndProcesso" type="text" maxlength="30" placeholder="Ex.: PC-205000" autocomplete="off" /></div>
+            <div><label for="ndNascimento">Data de nascimento</label><input id="ndNascimento" type="date" /></div>
+            <div><label for="ndSexo">Sexo</label><select id="ndSexo"><option value="">Selecionar</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="OUTRO">Outro</option></select></div>
+            <div><label for="ndEmail">Email (para entrar na aplicação)</label><input id="ndEmail" type="email" maxlength="160" autocomplete="off" /></div>
+          </div>
+          <button id="criarDoente" type="button">Criar doente</button>
+          <div id="resultadoNovoDoente" aria-live="polite"></div>
+        </details>
         <label for="pesquisaDoentes">Procurar por nome ou n.º de processo</label>
         <input id="pesquisaDoentes" type="search" autocomplete="off" style="max-width:420px" />
         <div id="listaDoentes" class="table-wrap"></div>
@@ -68,7 +82,7 @@
       </div>
     </section>
 
-    <!-- DIAGNÓSTICO E MEDICAÇÃO -->
+    <!-- DIAGNÓSTICO -->
     <section id="painel-diagnostico" role="tabpanel" class="hidden" aria-labelledby="tab-diagnostico">
       <section class="card"><h2>Diagnóstico</h2><div id="dmDiagnostico"></div>
         <details class="formulario-medico">
@@ -84,6 +98,25 @@
           <datalist id="listaLocalizacoes"><option>Lobo Frontal</option><option>Lobo Temporal</option><option>Lobo Parietal</option><option>Lobo Occipital</option><option>Corpo caloso</option><option>Tronco cerebral</option><option>Multifocal</option></datalist>
           <datalist id="listaFases"><option>Pós-operatório</option><option>Radioterapia</option><option>Quimioterapia Adjuvante</option><option>Seguimento</option><option>Recidiva</option><option>Cuidados paliativos</option></datalist>
           <button id="guardarDiagnostico" type="button">Guardar diagnóstico</button>
+        </details>
+      </section>
+    </section>
+
+    <!-- TRATAMENTOS E MEDICAÇÃO -->
+    <section id="painel-tratamentos" role="tabpanel" class="hidden" aria-labelledby="tab-tratamentos">
+      <section class="card"><h2>Tratamentos</h2><div id="dmTratamentos"></div>
+        <details class="formulario-medico">
+          <summary>+ Registar tratamento</summary>
+          <div class="linha-campos">
+            <div><label for="tratTipo">Tipo</label>
+              <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select></div>
+            <div><label for="tratEstado">Estado</label>
+              <select id="tratEstado"><option value="PLANEADO">Planeado</option><option value="EM_CURSO">Em curso</option><option value="CONCLUIDO">Concluído</option><option value="SUSPENSO">Suspenso</option></select></div>
+            <div><label for="tratInicio">Data de início</label><input id="tratInicio" type="date" /></div>
+            <div><label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" /></div>
+          </div>
+          <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
+          <button id="guardarTratamento" type="button">Registar tratamento</button>
         </details>
       </section>
       <section class="card"><h2>Medicação</h2><div id="dmMedicacao"></div>
@@ -102,21 +135,7 @@
           <button id="guardarMedicacao" type="button">Registar medicação</button>
         </details>
       </section>
-      <section class="card"><h2>Tratamentos</h2><div id="dmTratamentos"></div>
-        <details class="formulario-medico">
-          <summary>+ Registar tratamento</summary>
-          <div class="linha-campos">
-            <div><label for="tratTipo">Tipo</label>
-              <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select></div>
-            <div><label for="tratEstado">Estado</label>
-              <select id="tratEstado"><option value="PLANEADO">Planeado</option><option value="EM_CURSO">Em curso</option><option value="CONCLUIDO">Concluído</option><option value="SUSPENSO">Suspenso</option></select></div>
-            <div><label for="tratInicio">Data de início</label><input id="tratInicio" type="date" /></div>
-            <div><label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" /></div>
-          </div>
-          <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
-          <button id="guardarTratamento" type="button">Registar tratamento</button>
-        </details>
-      </section>
+
     </section>
 
     <!-- EVOLUÇÃO -->
@@ -133,6 +152,11 @@
           <div id="chartSintomas" aria-live="polite"></div>
         </section>
       </div>
+      <section class="card" style="margin-top:1rem" aria-labelledby="tScore">
+        <h2 id="tScore">Score de evolução calculado pelo algoritmo</h2>
+        <p class="muted pequeno">Score ponderado de 0 a 100 de cada registo, comparado com a linha de base do doente. Acima da linha do limiar, o algoritmo assinala «agravamento global». Os registos com menos de 60% das perguntas respondidas não têm score. Limiares demonstrativos, ainda não validados clinicamente.</p>
+        <div id="chartScore"></div>
+      </section>
       <section class="card" style="margin-top:1rem">
         <h2>Comparação entre registos</h2>
         <p class="muted pequeno">Últimos registos lado a lado. «—» significa sem resposta, que não é o mesmo que ausência do sintoma.</p>

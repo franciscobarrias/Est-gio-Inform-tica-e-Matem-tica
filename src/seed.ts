@@ -651,6 +651,7 @@ const criarDados = db.transaction(() => {
       // SITUAÇÕES EXTRA NO ÚLTIMO REGISTO (para haver alertas de vários tipos na demonstração)
       // [pergunta, código da opção]; substituem a resposta que já existir para essa pergunta.
       const EXTRAS: Record<number, Array<[string, string]>> = {
+        5: [['v2-a7-perna', 'SIM']],                                         // perna inchada → Alta e contactar hoje (fica sem triagem)
         6: [['v2-c3-quedas', 'MODERADA']],                                   // 2 ou mais quedas → Alta
         8: [['v2-c1-andar', 'GRAVE']],                                       // deixou de andar → declínio neurológico
         11: [['v2-b18-engolir', 'GRAVE'], ['v2-b18-liquidos', 'SIM']],       // dificuldade grave em engolir → declínio
@@ -734,7 +735,8 @@ const criarDados = db.transaction(() => {
 
   // TRIAGEM PELA ENFERMAGEM E DECISÕES MÉDICAS
   // Cada alerta passa pelos estados que teria na realidade: «Em análise» e, depois, «Encaminhado» ou «Concluído».
-  // Os doentes 5 e 14 ficam de propósito sem triagem, para se ver o grupo «Ainda sem triagem».
+  // Os doentes 5 e 14 ficam de propósito sem triagem (alerta do último registo, há 2 dias), para se ver o grupo
+  // «Ainda sem triagem» e o aviso de prazo ultrapassado.
 
   type Triagem = {
     doente: number;
@@ -778,6 +780,19 @@ const criarDados = db.transaction(() => {
       ['Em análise', 'Crítica', 'Sonolência marcada e vómitos relatados pela cuidadora.'],
       ['Encaminhado', 'Crítica', 'Suspeita de hipertensão intracraniana. Encaminho de imediato.']] }
   ];
+
+  // Alertas antigos (de registos anteriores ao último) já foram tratados pela enfermagem há muito tempo:
+  // ficam concluídos, para não aparecerem alertas «sem triagem há 50 dias», que não seriam realistas.
+  const antigos = db.prepare(`
+    SELECT a.id_alerta FROM AlertaClinico a JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
+    WHERE a.estado_atual != 'Concluído' AND a.id_alerta != (
+      SELECT a2.id_alerta FROM AlertaClinico a2 JOIN SubmissaoMonitorizacao s2 ON s2.id_submissao = a2.id_submissao
+      WHERE s2.id_doente = s.id_doente ORDER BY a2.data_hora_geracao DESC LIMIT 1)
+  `).all() as Array<{ id_alerta: string }>;
+  for (const a of antigos) {
+    AlertaService.registarTriagemAlerta(a.id_alerta, id('enfermeiro', 1), 'Em análise', undefined, 'Contacto telefónico com o doente.');
+    AlertaService.registarTriagemAlerta(a.id_alerta, id('enfermeiro', 1), 'Concluído', undefined, 'Sintomas controlados após ajuste da medicação de suporte. Mantém seguimento.');
+  }
 
   for (const t of triagens) {
 

@@ -44,7 +44,7 @@ Os nomes, números de processo e datas são **fictícios** e não correspondem a
 | 2 | Maria do Céu Lopes | Estável |
 | 3 | Joaquim Pereira | Agravamento progressivo; alerta concluído com decisão médica; mensagem para a equipa |
 | 4 | Helena Sousa | Agravamento súbito: dor de cabeça, vómitos e sonolência (Crítica, encaminhado) |
-| 5 | Manuel Rodrigues | Melhoria gradual; alerta ainda sem triagem |
+| 5 | Manuel Rodrigues | Melhoria gradual; perna inchada no último registo (Alta, sem triagem fora do prazo) |
 | 6 | Rosa Martins | Respostas muito parciais; duas quedas (em análise pela enfermagem) |
 | 7 | José Carvalho | «Não consigo avaliar» em vários itens cognitivos; concluído pela enfermagem |
 | 8 | Fernanda Almeida | Preenchimento pelo cuidador; deixou de andar (encaminhado) |
@@ -64,7 +64,7 @@ Os nomes, números de processo e datas são **fictícios** e não correspondem a
 - Respostas «Não tive», «Não consigo avaliar» e perguntas omitidas são representadas separadamente. Só respostas efetivamente fornecidas são persistidas.
 - Histórico com autor e data/hora, lembretes, gráficos cronológicos de KPS e de respostas comparáveis.
 - Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria. O motor do questionário v2 (`src/services/motor-alertas-v2.ts`) avalia por camadas (limiares demonstrativos, **não validados clinicamente**):
-  1. **Sinais de alarme** (Bloco A, ou sonolência B4 em nível 3): **Crítica**, com indicação imediata ao doente (ligar 112, contactar já ou contactar hoje). Na convulsão (A1) pergunta-se a duração, o número e se recuperou: uma só, com menos de 5 minutos e recuperação → Alta e contactar hoje; várias curtas com recuperação → contactar já (a validar); restantes casos ou detalhes em falta → 112. Enquanto o doente responde, a recomendação mais urgente fica fixa no topo do formulário;
+  1. **Sinais de alarme** (Bloco A, ou sonolência B4 em nível 3): **Crítica** quando a instrução é ligar 112 ou contactar já, **Alta** quando é contactar hoje (A7, A8 e convulsão única com recuperação), com indicação imediata ao doente (ligar 112, contactar já ou contactar hoje). Na convulsão (A1) pergunta-se a duração, o número e se recuperou: uma só, com menos de 5 minutos e recuperação → Alta e contactar hoje; várias curtas com recuperação → contactar já (a validar); restantes casos ou detalhes em falta → 112. Enquanto o doente responde, a recomendação mais urgente fica fixa no topo do formulário;
   2. **Combinações de sintomas**: hipertensão intracraniana provável (Crítica) ou possível (Alta), toxicidade da temozolomida, declínio neurológico face ao habitual do doente, quedas repetidas (Alta); sintoma grave isolado (Média);
   3. **Score de evolução** 0–100 ponderado, comparado com a mediana dos três primeiros registos elegíveis (cobertura ≥ 60%). O limiar demonstrativo é adaptado à linha de base e à variabilidade individual (MAD), com mínimo de 10 pontos;
   4. **Ajustes**: KPS ≤ 70 e frequência diária ou constante sobem um nível cada, sem passar de Alta.

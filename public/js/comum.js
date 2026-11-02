@@ -145,7 +145,8 @@ const ICONES_MENU = {
   alertas: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   doentes: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.3c2.3.2 4.1 1.8 4.6 4.7"/>',
   resumo: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6v2.5H9z"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
-  diagnostico: '<rect x="3.5" y="9" width="17" height="7" rx="3.5" transform="rotate(-45 12 12.5)"/><path d="M9.2 9.7l5 5"/>',
+  diagnostico: '<path d="M6 3v6a4 4 0 0 0 8 0V3"/><path d="M10 13v3a4 4 0 0 0 8 0v-2"/><circle cx="18" cy="12" r="2"/>',
+  tratamentos: '<rect x="3.5" y="9" width="17" height="7" rx="3.5" transform="rotate(-45 12 12.5)"/><path d="M9.2 9.7l5 5"/>',
   evolucao: '<path d="M4 4v16h16"/><path d="M7.5 15l3.5-4 3 2.5 4.5-6"/>',
   historico: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   gestao: '<path d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
@@ -242,6 +243,7 @@ async function carregarProcesso() {
     desenharQuadroComparativo(processoAtual.submissoes);
     renderizarHistorico(processoAtual.submissoes);
     renderizarDiagnosticoMedicacao();
+    desenharScore(processoAtual.avaliacoesAlgoritmo || []);
     if (typeof aoCarregarProcesso === 'function') aoCarregarProcesso();
   } catch (erro) { mostrarMensagem(erro.message, 'error'); }
 }
@@ -401,6 +403,46 @@ function desenharQuadroComparativo(submissoes) {
   }).join('') + linhaMensagem;
   $('quadroComparativo').innerHTML = `<table class="quadro"><thead><tr><th>Sintoma / domínio</th>${ultimas.map(s => `<th style="text-align:center">${dataCurta(s.data_referencia_sintomas)}<div class="muted pequeno" style="font-weight:400">${escapar(NOMES_PERFIL[s.perfil_autor_no_registo] || '')}</div></th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
 }
+// Score do algoritmo (só médico e enfermagem): pontos do score, linha de base e limiar de cada registo.
+function desenharScore(avaliacoes) {
+  if (!$('chartScore')) return;
+  const pontos = avaliacoes.filter(a => a.score !== null && a.score !== undefined)
+    .map(a => ({ data: a.data_referencia_sintomas, score: Number(a.score), base: a.linha_de_base === null ? null : Number(a.linha_de_base),
+      limiar: a.linha_de_base === null || a.limiar_score === null ? null : Number(a.linha_de_base) + Number(a.limiar_score),
+      alerta: String(a.motivos_json || '').includes('SCORE_EVOLUCAO_V2') }));
+  const semScore = avaliacoes.length - pontos.length;
+  if (!pontos.length) {
+    $('chartScore').innerHTML = '<p class="muted">Ainda não há registos com respostas suficientes para calcular o score.</p>';
+    return;
+  }
+  const L = 960, A = 260, esq = 44, dir = 940, topo = 14, base = 214;
+  const yMax = Math.max(20, Math.ceil((Math.max(...pontos.map(p => Math.max(p.score, p.limiar ?? 0))) + 5) / 10) * 10);
+  const x = i => pontos.length === 1 ? (esq + dir) / 2 : esq + i * (dir - esq) / (pontos.length - 1);
+  const y = v => base - v * (base - topo) / yMax;
+  // Linha de base e limiar só existem depois dos primeiros registos: desenham-se por troços.
+  const troco = campo => {
+    const partes = []; let atual = [];
+    pontos.forEach((p, i) => { if (p[campo] === null) { if (atual.length) partes.push(atual); atual = []; } else atual.push(`${x(i)},${y(p[campo])}`); });
+    if (atual.length) partes.push(atual);
+    return partes;
+  };
+  const marcasY = Array.from({ length: Math.floor(yMax / 10) + 1 }, (_, k) => k * 10).filter(v => v % (yMax > 50 ? 20 : 10) === 0);
+  const passo = Math.max(1, Math.ceil(pontos.length / 10));
+  const ultimo = pontos[pontos.length - 1];
+  $('chartScore').innerHTML = `<svg class="chart" viewBox="0 0 ${L} ${A}" role="img" aria-label="Score de evolução: ${pontos.map(p => `${dataCurta(p.data)} ${p.score}`).join('; ')}">
+    ${marcasY.map(v => `<line x1="${esq}" y1="${y(v)}" x2="${dir}" y2="${y(v)}" stroke="#ecdfd2"/><text x="${esq - 8}" y="${y(v) + 4}" text-anchor="end" font-size="12" fill="#6b5d52">${v}</text>`).join('')}
+    ${troco('limiar').map(t => `<polyline points="${t.join(' ')}" fill="none" stroke="#b42318" stroke-width="1.5" stroke-dasharray="6 4"/>`).join('')}
+    ${troco('base').map(t => `<polyline points="${t.join(' ')}" fill="none" stroke="#6b5d52" stroke-width="2" stroke-dasharray="2 4"/>`).join('')}
+    ${pontos.length > 1 ? `<polyline points="${pontos.map((p, i) => `${x(i)},${y(p.score)}`).join(' ')}" fill="none" stroke="#d35a14" stroke-width="3"/>` : ''}
+    ${pontos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.score)}" r="${p.alerta ? 7 : 5}" fill="${p.alerta ? '#b42318' : '#d35a14'}" stroke="#fff" stroke-width="2"><title>${dataCurta(p.data)}: score ${p.score}${p.base !== null ? ` · linha de base ${p.base} · limiar ${Math.round(p.limiar * 10) / 10}` : ' · ainda sem linha de base'}</title></circle>`).join('')}
+    ${pontos.map((p, i) => i % passo === 0 || i === pontos.length - 1 ? `<text x="${x(i)}" y="${base + 22}" text-anchor="middle" font-size="12" fill="#2b2420">${dataCurta(p.data).slice(0, 5)}</text>` : '').join('')}
+  </svg>
+  <div class="legenda-score pequeno">
+    <span><i class="l-score"></i>Score do registo</span><span><i class="l-base"></i>Linha de base</span><span><i class="l-limiar"></i>Limiar de agravamento</span><span><i class="l-alerta"></i>Registo que gerou alerta pelo score</span>
+  </div>
+  <p class="muted pequeno">Último registo (${dataCurta(ultimo.data)}): score <strong>${ultimo.score}</strong>${ultimo.base !== null ? `, linha de base ${ultimo.base}, limiar ${Math.round(ultimo.limiar * 10) / 10}` : ', ainda sem linha de base (são precisos 3 registos comparáveis)'}.${semScore ? ` ${semScore} registo(s) sem score por terem poucas respostas.` : ''}</p>`;
+}
+
 // Liga o seletor de sintoma do gráfico e preenche-o com as perguntas do formulário ativo.
 function prepararEvolucao() {
   $('perguntaGrafico').innerHTML = perguntasComEscala().map(pergunta =>

@@ -20,6 +20,21 @@ async function carregarAlertas() {
 }
 
 // filtrosDaPagina = [['id', 'Nome', função que diz se o alerta entra], ...]
+// Tempo máximo sem triagem, por prioridade (valores demonstrativos, a validar com a equipa clínica).
+const PRAZO_TRIAGEM_HORAS = { 'Crítica': 1, 'Alta': 24, 'Média': 72, 'Baixa': 168 };
+function duracao(horas) {
+  if (horas < 1) return `${Math.max(1, Math.round(horas * 60))} min`;
+  if (horas < 48) return `${Math.round(horas)} h`;
+  return `${Math.round(horas / 24)} dias`;
+}
+// Um alerta pendente que já passou o prazo de triagem da sua prioridade.
+function atrasoTriagem(a) {
+  if (a.estado_atual !== 'Pendente') return null;
+  const horas = (Date.now() - new Date(a.data_hora_geracao).getTime()) / 3600000;
+  const prazo = PRAZO_TRIAGEM_HORAS[a.prioridade] ?? 24;
+  return horas > prazo ? { horas, prazo } : null;
+}
+
 function renderizarAlertas() {
   const filtros = filtrosDaPagina();
   $('filtrosAlertas').innerHTML = filtros.map(([id, nome, fn]) =>
@@ -27,6 +42,12 @@ function renderizarAlertas() {
   const porTratar = alertas.filter(alertaPorTratarDaPagina).length;
   const contador = $('contadorAlertas');
   if (contador) { contador.textContent = porTratar; contador.classList.toggle('hidden', !porTratar); contador.setAttribute('aria-label', `${porTratar} por tratar`); }
+  const atrasados = alertas.filter(atrasoTriagem);
+  $('avisoAtrasos').innerHTML = atrasados.length ? `<div class="aviso-atraso" role="alert">
+      <strong>${atrasados.length} alerta(s) sem triagem para além do prazo previsto</strong>
+      <ul>${atrasados.map(a => { const t = atrasoTriagem(a); return `<li><span class="prioridade p-${escapar(a.prioridade)}">${escapar(a.prioridade)}</span>
+        ${escapar(a.nome_doente)}: há ${duracao(t.horas)} (prazo: ${duracao(t.prazo)})</li>`; }).join('')}</ul>
+    </div>` : '';
   const fn = (filtros.find(f => f[0] === filtroAlertas) || filtros[0])[2];
   const lista = alertas.filter(fn);
   // Na vista «Por concluir», a página pode separar os alertas por fase da triagem (secções com título).
@@ -44,7 +65,8 @@ function renderizarAlertas() {
 }
 
 function cartaoAlerta(a) {
-  return `<article class="alerta p-${escapar(a.prioridade)}" aria-label="Alerta ${escapar(a.prioridade)} de ${escapar(a.nome_doente)}">
+  const atraso = atrasoTriagem(a);
+  return `<article class="alerta p-${escapar(a.prioridade)}${atraso ? ' atrasado' : ''}" aria-label="Alerta ${escapar(a.prioridade)} de ${escapar(a.nome_doente)}">
     <div class="alerta-cabecalho">
       <div><span class="prioridade p-${escapar(a.prioridade)}">${escapar(a.prioridade)}</span>
         <span class="alerta-doente">${escapar(a.nome_doente)}</span> <span class="muted pequeno">${escapar(a.numero_processo_clinico)}</span></div>
@@ -55,7 +77,8 @@ function cartaoAlerta(a) {
       ? ` · prioridade ajustada na triagem (o algoritmo indicou ${escapar(a.prioridade_algoritmo)})` : ''}</p>
     ${a.mensagem_doente ? `<p class="mensagem-doente"><strong>Mensagem do doente/cuidador:</strong> «${escapar(a.mensagem_doente)}»</p>` : ''}
     ${a.ultima_nota ? `<p class="nota"><strong>Nota de triagem</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>`
-      : a.estado_atual === 'Pendente' ? '<p class="nota muted">Ainda não avaliado pela enfermagem.</p>' : ''}
+      : a.estado_atual === 'Pendente' ? `<p class="nota ${atraso ? 'nota-atraso' : 'muted'}">Ainda não avaliado pela enfermagem${atraso
+        ? `: <strong>sem triagem há ${duracao(atraso.horas)}</strong>, para um prazo de ${duracao(atraso.prazo)} nesta prioridade` : ''}.</p>` : ''}
     ${acoesAlertaDaPagina(a)}
   </article>`;
 }

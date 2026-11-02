@@ -188,15 +188,50 @@ function ligarGestao() {
   });
 }
 
+// ---------- Novo doente ----------
+function ligarNovoDoente() {
+  $('ndNascimento').max = new Date().toISOString().slice(0, 10);
+  $('criarDoente').addEventListener('click', async () => {
+    $('resultadoNovoDoente').innerHTML = '';
+    try {
+      const novo = await pedidoApi('/api/doentes', { method: 'POST', body: JSON.stringify({
+        nome: $('ndNome').value, numero_processo_clinico: $('ndProcesso').value, data_nascimento: $('ndNascimento').value,
+        sexo: $('ndSexo').value, email: $('ndEmail').value
+      }) });
+      ['ndNome', 'ndProcesso', 'ndNascimento', 'ndEmail'].forEach(id => { $(id).value = ''; });
+      $('ndSexo').value = '';
+      // A palavra-passe temporária só é mostrada agora: o médico entrega-a ao doente.
+      $('resultadoNovoDoente').innerHTML = `<div class="notice" style="margin-top:1rem">
+        <strong>${escapar(novo.nome)}</strong> foi criado(a) com o n.º de processo ${escapar(novo.numero_processo_clinico)}.<br />
+        Entregue ao doente o email <code>${escapar(novo.email)}</code> e a palavra-passe temporária <code class="senha">${escapar(novo.palavra_passe_temporaria)}</code>.
+        Esta palavra-passe não volta a ser mostrada.
+        <div class="acoes" style="margin-top:.6rem"><button type="button" id="abrirNovoDoente" data-id="${escapar(novo.id_doente)}">Abrir processo e preencher o diagnóstico</button></div>
+      </div>`;
+      await atualizarTudo();
+      mostrarMensagem(`Doente ${novo.nome} criado.`, 'success');
+    } catch (erro) { $('resultadoNovoDoente').innerHTML = `<p class="error" role="alert">${escapar(erro.message)}</p>`; }
+  });
+  $('resultadoNovoDoente').addEventListener('click', async evento => {
+    const botao = evento.target.closest('#abrirNovoDoente');
+    if (!botao) return;
+    await selecionarDoente(botao.dataset.id);
+    renderizarListaDoentes();
+    abrirSeparador('diagnostico');
+    document.querySelector('#painel-diagnostico details.formulario-medico')?.setAttribute('open', '');
+    window.scrollTo({ top: 0 });
+  });
+}
+
 // ---------- Arranque ----------
 iniciarPagina({
   perfis: ['MEDICO'],
-  separadores: [['alertas', 'Alertas'], ['doentes', 'Doentes'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente'], ['gestao', 'Gestão clínica']],
+  separadores: [['alertas', 'Alertas'], ['doentes', 'Doentes'], ['resumo', 'Resumo clínico'], ['diagnostico', 'Diagnóstico'], ['tratamentos', 'Tratamentos e medicação'], ['evolucao', 'Evolução'], ['historico', 'Registos do doente'], ['gestao', 'Gestão clínica']],
   semBarraDoente: ['alertas', 'doentes'],
   separadorInicial: 'alertas',
   depoisDeCarregar: async () => {
     ligarAlertas();
     ligarListaDoentes();
+    ligarNovoDoente();
     ligarGestao();
     await carregarAlertas();
   }

@@ -159,6 +159,11 @@ export class ApiController {
     try { res.status(201).json(MedicoService.definirPlanoMonitorizacao(req.params.idDoente, req.user!.id_utilizador, 'Ad hoc', Number(req.body.periodicidade_dias), req.body.fase_clinica_atual)); } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
 
+  static criarDoente(req: Request, res: Response) {
+    try { res.status(201).json(MedicoService.criarDoente(req.user!.id_utilizador, req.body)); }
+    catch (e: any) { res.status(400).json({ erro: e.message }); }
+  }
+
   static registarMedicacao(req: Request, res: Response) {
     if (!AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
       res.status(403).json({ erro: 'Sem autorização para atualizar este processo clínico.' });

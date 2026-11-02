@@ -291,7 +291,7 @@ function aoCarregarProcesso() {
   const sessao = lerSessao();
   const ehDoente = sessao?.utilizador?.perfil === 'DOENTE';
   const separadores = [['registar', 'Registar sintomas'], ['evolucao', ehDoente ? 'A minha evolução' : 'Evolução'], ['historico', 'Histórico'],
-    ['diagnostico', ehDoente ? 'A minha doença e medicação' : 'Diagnóstico e medicação']];
+    ['diagnostico', ehDoente ? 'O meu diagnóstico' : 'Diagnóstico'], ['tratamentos', 'Tratamentos e medicação']];
   iniciarPagina({
     perfis: ['DOENTE', 'CUIDADOR'],
     separadores,

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { db, registarAuditoria } from '../database/dados-locais';
 import { SintomaService } from './sintoma.service';
 import { AlertaService } from './alerta.service';
+import { AuthService } from './auth.service';
 
 function dataIsoValida(data: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return false;
@@ -114,6 +115,48 @@ export class MedicoService {
     });
     tx();
     return { id_tratamento, ...dados };
+  }
+
+  // ---------- Novo doente (criado pelo médico, que fica como médico responsável) ----------
+  // Devolve uma palavra-passe temporária, mostrada uma única vez, para o médico entregar ao doente.
+  static criarDoente(idMedico: string, dados: {
+    nome: string; email: string; numero_processo_clinico: string; data_nascimento: string; sexo: string; periodicidade_dias?: number;
+  }) {
+    if (!dados || typeof dados !== 'object') throw new Error('Dados do doente inválidos.');
+    const nome = typeof dados.nome === 'string' ? dados.nome.trim().replace(/\s+/g, ' ') : '';
+    const email = typeof dados.email === 'string' ? dados.email.trim().toLowerCase() : '';
+    const processo = typeof dados.numero_processo_clinico === 'string' ? dados.numero_processo_clinico.trim().toUpperCase() : '';
+    if (nome.length < 3 || nome.length > 120) throw new Error('Indique o nome completo do doente.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 160) throw new Error('Indique um email válido.');
+    if (!/^[A-Z0-9-]{3,30}$/.test(processo)) throw new Error('O n.º de processo só pode ter letras, números e hífenes (3 a 30 caracteres).');
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (!dataIsoValida(dados.data_nascimento) || dados.data_nascimento > hoje || dados.data_nascimento < '1900-01-01') {
+      throw new Error('Indique uma data de nascimento válida (AAAA-MM-DD) e não futura.');
+    }
+    if (!['M', 'F', 'OUTRO'].includes(dados.sexo)) throw new Error('Indique o sexo do doente.');
+    const periodicidade = dados.periodicidade_dias === undefined ? 7 : Number(dados.periodicidade_dias);
+    if (!Number.isInteger(periodicidade) || periodicidade < 1 || periodicidade > 365) {
+      throw new Error('A periodicidade deve ser um número inteiro de dias entre 1 e 365.');
+    }
+    if (db.prepare('SELECT 1 FROM Utilizador WHERE lower(email) = ?').get(email)) throw new Error('Já existe uma conta com este email.');
+    if (db.prepare('SELECT 1 FROM Doente WHERE numero_processo_clinico = ?').get(processo)) throw new Error('Já existe um doente com este n.º de processo.');
+
+    const idDoente = `doente-${crypto.randomUUID()}`;
+    // Palavra-passe temporária legível (sem 0/O nem 1/l), para entregar ao doente.
+    const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const palavraPasse = Array.from(crypto.randomBytes(10), b => letras[b % letras.length]).join('');
+    const agora = new Date().toISOString();
+    const tx = db.transaction(() => {
+      db.prepare(`INSERT INTO Utilizador (id_utilizador, nome, email, password_hash, perfil, estado_conta, criado_em)
+        VALUES (?, ?, ?, ?, 'DOENTE', 'ATIVA', ?)`).run(idDoente, nome, email, AuthService.gerarHashPassword(palavraPasse), agora);
+      db.prepare(`INSERT INTO Doente (id_doente, numero_processo_clinico, data_nascimento, sexo, id_medico_responsavel)
+        VALUES (?, ?, ?, ?, ?)`).run(idDoente, processo, dados.data_nascimento, dados.sexo, idMedico);
+      db.prepare(`INSERT INTO PlanoMonitorizacao VALUES (?, ?, ?, 'Ad hoc', ?, ?, 'ATIVO')`)
+        .run(crypto.randomUUID(), idDoente, idMedico, periodicidade, agora);
+      registarAuditoria(idMedico, 'CRIACAO_DOENTE', `Doente ${processo} criado; plano de ${periodicidade} dias`);
+    });
+    tx();
+    return { id_doente: idDoente, nome, email, numero_processo_clinico: processo, palavra_passe_temporaria: palavraPasse };
   }
 
   // ---------- Medicação ----------
