@@ -14,6 +14,15 @@ function filtrosDaPagina() {
 }
 const alertaPorTratarDaPagina = a => a.estado_atual === 'Pendente';
 
+// Vista «Por concluir» da enfermagem: por triar, em análise e já encaminhados ao médico.
+function seccoesAlertasDaPagina() {
+  return [
+    ['Por triar', 'Alertas novos, gerados pelo questionário. Avalie e decida se encaminha ao médico.', a => a.estado_atual === 'Pendente', 'destaque'],
+    ['Em análise', 'Alertas que a enfermagem já começou a avaliar.', a => a.estado_atual === 'Em análise'],
+    ['Encaminhados ao médico', 'A aguardar a decisão do médico responsável.', a => a.estado_atual === 'Encaminhado']
+  ];
+}
+
 function acoesAlertaDaPagina(a) {
   const id = escapar(a.id_alerta);
   let triagem = '';

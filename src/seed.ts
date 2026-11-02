@@ -727,11 +727,7 @@ const criarDados = db.transaction(() => {
       estado: 'Em análise',
       prioridade: 'Crítica'
     },
-    {
-      doente: 5,
-      estado: 'Em análise',
-      prioridade: 'Baixa'
-    },
+    // O doente 5 fica de propósito sem triagem, para se ver o grupo «Ainda sem triagem».
     {
       doente: 8,
       estado: 'Encaminhado',

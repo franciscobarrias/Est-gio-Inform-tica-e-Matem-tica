@@ -267,7 +267,7 @@ function renderizarIdentidade() {
   $('identidadeDoente').innerHTML = `
     ${papel ? `<p class="papel">${papel}</p>` : ''}
     <h1>${escapar(doente.nome)}</h1>
-    ${campos.length ? `<dl class="identificacao">${campos.map(([t, v]) => `<div><dt>${t}</dt><dd>${v}</dd></div>`).join('')}</dl>` : ''}
+    ${campos.length ? `<dl class="identificacao">${campos.map(([t, v]) => `<div><dt>${t}</dt><dd title="${v}">${v}</dd></div>`).join('')}</dl>` : ''}
     <div class="chips">
       <span class="chip ${cuidadorObrig ? 'chip-alerta' : ''}"><strong>KPS ${escapar(doente.ultimo_kps)}</strong>${cuidadorObrig ? ' · cuidador obrigatório' : ''}</span>
       ${d.fase_clinica_atual ? `<span class="chip">Fase: <strong>${escapar(d.fase_clinica_atual)}</strong></span>` : ''}

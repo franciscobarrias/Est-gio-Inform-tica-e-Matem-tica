@@ -29,6 +29,17 @@ function renderizarAlertas() {
   if (contador) { contador.textContent = porTratar; contador.classList.toggle('hidden', !porTratar); contador.setAttribute('aria-label', `${porTratar} por tratar`); }
   const fn = (filtros.find(f => f[0] === filtroAlertas) || filtros[0])[2];
   const lista = alertas.filter(fn);
+  // Na vista «Por concluir», a página pode separar os alertas por fase da triagem (secções com título).
+  if (filtroAlertas === filtros[0][0] && typeof seccoesAlertasDaPagina === 'function') {
+    $('listaAlertas').innerHTML = seccoesAlertasDaPagina().map(([titulo, descricao, filtro, classe]) => {
+      const doGrupo = lista.filter(filtro);
+      return `<section class="grupo-alertas ${classe || ''}">
+        <header><h3>${titulo} <span class="contagem">${doGrupo.length}</span></h3><p class="muted pequeno">${descricao}</p></header>
+        ${doGrupo.length ? doGrupo.map(cartaoAlerta).join('') : '<p class="muted pequeno vazio">Nenhum alerta.</p>'}
+      </section>`;
+    }).join('');
+    return;
+  }
   $('listaAlertas').innerHTML = lista.length ? lista.map(cartaoAlerta).join('') : '<p class="muted">Não existem alertas neste filtro.</p>';
 }
 
@@ -40,8 +51,10 @@ function cartaoAlerta(a) {
       <div class="pequeno"><span class="estado e-${escapar(a.estado_atual)}">${escapar(a.estado_atual)}</span> <span class="muted">${dataHora(a.data_hora_geracao)}</span></div>
     </div>
     <p>${escapar(a.resumo_agravamento)}</p>
-    <p class="muted pequeno">Regra: ${escapar(a.nome_regra)}</p>
-    ${a.ultima_nota ? `<p class="nota"><strong>Última nota</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>` : ''}
+    <p class="muted pequeno">Regra: ${escapar(a.nome_regra)}${a.prioridade_algoritmo && a.prioridade_algoritmo !== a.prioridade
+      ? ` · prioridade ajustada na triagem (o algoritmo indicou ${escapar(a.prioridade_algoritmo)})` : ''}</p>
+    ${a.ultima_nota ? `<p class="nota"><strong>Nota de triagem</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>`
+      : a.estado_atual === 'Pendente' ? '<p class="nota muted">Ainda não avaliado pela enfermagem.</p>' : ''}
     ${acoesAlertaDaPagina(a)}
   </article>`;
 }

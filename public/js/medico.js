@@ -22,12 +22,23 @@ const KPS = [
 function filtrosDaPagina() {
   return [
     ['abertos', 'Por concluir', a => a.estado_atual !== 'Concluído'],
-    ['encaminhados', 'Encaminhados para mim', a => a.estado_atual === 'Encaminhado'],
+    ['encaminhados', 'Encaminhados pela enfermagem', a => a.estado_atual === 'Encaminhado'],
+    ['sem-triagem', 'Sem triagem', a => a.estado_atual === 'Pendente'],
     ['concluidos', 'Concluídos', a => a.estado_atual === 'Concluído'],
     ['todos', 'Todos', () => true]
   ];
 }
 const alertaPorTratarDaPagina = a => a.estado_atual === 'Encaminhado';
+
+// Vista «Por concluir» do médico: primeiro o que a enfermagem já triou e lhe encaminhou,
+// depois o que está em avaliação pela enfermagem e, por fim, o que ainda ninguém viu.
+function seccoesAlertasDaPagina() {
+  return [
+    ['Encaminhados pela enfermagem', 'A enfermagem avaliou estes alertas e pede a sua decisão.', a => a.estado_atual === 'Encaminhado', 'destaque'],
+    ['Em avaliação pela enfermagem', 'A enfermagem está a tratar destes alertas. Pode consultá-los ou decidir, se entender.', a => a.estado_atual === 'Em análise'],
+    ['Ainda sem triagem', 'Gerados automaticamente pelo questionário; a enfermagem ainda não os avaliou.', a => a.estado_atual === 'Pendente', 'sem-triagem']
+  ];
+}
 
 function acoesAlertaDaPagina(a) {
   const decidir = a.estado_atual !== 'Concluído'

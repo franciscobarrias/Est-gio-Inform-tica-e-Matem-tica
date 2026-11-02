@@ -133,7 +133,7 @@ export class SintomaService {
       WHERE id_doente = ? ORDER BY data_referencia_sintomas DESC, data_hora_submissao DESC LIMIT 1`).get(idDoente) as any;
 
     if (!ultimaSub) {
-      return { periodicidade_dias: periodicidade, lembreteAtivo: true, mensagem: `Lembrete (RF18): Preenchimento pendente (periodicidade: a cada ${periodicidade} dias).` };
+      return { periodicidade_dias: periodicidade, lembreteAtivo: true, mensagem: `Ainda sem registos (pedido a cada ${periodicidade} dias) (RF18)` };
     }
     const proxData = new Date(`${ultimaSub.data_referencia_sintomas}T00:00:00Z`);
     proxData.setUTCDate(proxData.getUTCDate() + periodicidade);
@@ -141,7 +141,7 @@ export class SintomaService {
     return {
       periodicidade_dias: periodicidade,
       lembreteAtivo: atrasado,
-      mensagem: atrasado ? `Lembrete Ativo (RF18): Novo registo solicitado.` : `Monitorização regularizada (RF18). Próximo até ${proxData.toLocaleDateString('pt-PT')}.`
+      mensagem: atrasado ? `Registo em atraso desde ${proxData.toLocaleDateString('pt-PT')} (RF18)` : `Próximo registo até ${proxData.toLocaleDateString('pt-PT')} (RF18)`
     };
   }
 }

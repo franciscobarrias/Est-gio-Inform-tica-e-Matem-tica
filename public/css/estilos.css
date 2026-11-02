@@ -339,3 +339,32 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--pri
 .app-layout { grid-template-columns:265px minmax(0,1fr); }
 .menu-lateral button[role="tab"] { white-space:normal; line-height:1.25; }
 @media (max-width:900px) { .app-layout { grid-template-columns:1fr; } .menu-lateral button[role="tab"] { white-space:nowrap; } }
+
+/* ---------- Alertas separados pela fase da triagem ---------- */
+.grupo-alertas { margin:1.25rem 0 0; }
+.grupo-alertas > header { margin-bottom:.6rem; padding-bottom:.4rem; border-bottom:1px solid var(--line); }
+.grupo-alertas h3 { display:flex; align-items:center; gap:.5rem; margin:0; font-size:1rem; color:var(--text); }
+.grupo-alertas > header p { margin:.15rem 0 0; }
+.grupo-alertas .contagem { min-width:1.6rem; padding:0 .45rem; border-radius:999px; background:var(--neutro); font-size:.8rem; line-height:1.5rem; text-align:center; }
+.grupo-alertas.destaque > header { border-bottom-color:var(--laranja); }
+.grupo-alertas.destaque h3 { color:var(--primary-escuro); }
+.grupo-alertas.destaque .contagem { background:var(--primary); color:#fff; }
+.grupo-alertas.sem-triagem .alerta { background:#fffdfb; border-style:dashed; border-left-style:solid; }
+.grupo-alertas .vazio { padding:.4rem 0 .2rem; }
+
+/* ---------- Cartão do doente: dados em colunas alinhadas e estado numa só linha ---------- */
+.barra-doente { grid-template-columns:minmax(0,1fr) 260px; padding-bottom:1.25rem; }
+dl.identificacao { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.6rem 1.25rem; margin:.5rem 0 .8rem; }
+dl.identificacao dd { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.identidade .chips { gap:.35rem; }
+.identidade .chip { font-size:.78rem; padding:.18rem .55rem; line-height:1.35; }
+@media (max-width:900px) { .barra-doente { grid-template-columns:1fr; } dl.identificacao dd { white-space:normal; } }
+/* Nome e seletor na primeira linha; os dados e o estado ocupam a largura toda do cartão. */
+.barra-doente .identidade { display:contents; }
+.barra-doente .seletor { grid-column:2; grid-row:1; align-self:center; }
+.barra-doente .identidade > .papel, .barra-doente .identidade > h1 { grid-column:1; }
+.barra-doente .identidade > dl, .barra-doente .identidade > .chips { grid-column:1 / -1; }
+.barra-doente .identidade > h1 { align-self:center; }
+dl.identificacao { display:flex; flex-wrap:wrap; gap:.6rem 2.25rem; margin:.35rem 0 .7rem; }
+dl.identificacao dd { white-space:normal; overflow:visible; }
+@media (max-width:900px) { .barra-doente .seletor, .barra-doente .identidade > * { grid-column:1; grid-row:auto; } }
