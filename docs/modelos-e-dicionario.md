@@ -1,5 +1,7 @@
 # Modelos e dicionário de dados
 
+O inventário completo de tabelas e colunas, domínios, relações e semântica de nulos está em [Dicionário de dados](./dicionario-de-dados.md).
+
 ## Arquitetura implementada
 
 O runtime usa Express e SQLite através de `better-sqlite3`, com SQL parametrizado nos serviços. Não há TypeORM nem camada de repositórios. As regras executáveis e pesos estão em `src/services/motor-alertas-v2.ts`; a base de dados guarda o catálogo descritivo de regras. Não existe uma operação `reprocessar()`. As rotas implementadas estão em `src/routes/api.routes.ts`, incluindo `/doentes/:idDoente/submissoes`, `/alertas/:idAlerta/triagem` e `/fhir/Patient/:idDoente/$everything`.

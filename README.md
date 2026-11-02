@@ -99,7 +99,7 @@ O token de sessão passa entre páginas no `sessionStorage` e é apagado ao term
 
 ## Modelo de dados e arquitetura
 
-[docs/modelos-e-dicionario.md](./docs/modelos-e-dicionario.md) descreve o esquema implementado, as novas tabelas, as responsabilidades dos serviços e a semântica dos nulos. As [decisões de desenho](./docs/decisoes-de-desenho.md) registam imutabilidade, separação algoritmo/decisão humana, versionamento e linha de base derivada. O runtime usa Express e `better-sqlite3` com SQL direto; não usa TypeORM nem repositórios e ainda não implementa reprocessamento de avaliações.
+[docs/dicionario-de-dados.md](./docs/dicionario-de-dados.md) documenta as 27 tabelas canónicas, as colunas, relações, domínios, respostas do questionário, nulabilidade e artefactos locais legados. [Modelos e arquitetura](./docs/modelos-e-dicionario.md) descreve as responsabilidades dos serviços e o modelo físico; as [decisões de desenho](./docs/decisoes-de-desenho.md) registam imutabilidade, separação algoritmo/decisão humana, versionamento e linha de base derivada. O runtime usa Express e `better-sqlite3` com SQL direto; não usa TypeORM nem repositórios e ainda não implementa reprocessamento de avaliações.
 
 ## Verificação
 
