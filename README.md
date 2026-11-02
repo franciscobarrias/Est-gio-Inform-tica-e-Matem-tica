@@ -40,20 +40,20 @@ Os nomes, números de processo e datas são **fictícios** e não correspondem a
 
 | N.º | Doente | Cenário de demonstração |
 |---|---|---|
-| 1 | António Ferreira | Dependência crescente (KPS 80 → 60), preenchido pela cuidadora |
+| 1 | António Ferreira | Dependência crescente (KPS 80 → 60), preenchido pela cuidadora; alerta encaminhado; mensagem para a equipa |
 | 2 | Maria do Céu Lopes | Estável |
-| 3 | Joaquim Pereira | Agravamento progressivo |
-| 4 | Helena Sousa | Agravamento súbito: dor de cabeça, vómitos e sonolência (alerta Crítica) |
-| 5 | Manuel Rodrigues | Melhoria gradual |
-| 6 | Rosa Martins | Respostas muito parciais |
-| 7 | José Carvalho | «Não consigo avaliar» |
-| 8 | Fernanda Almeida | Preenchimento pelo cuidador |
-| 9 | Carlos Ribeiro | Alertas e triagem |
-| 10 | Isabel Gomes | Histórico prolongado |
-| 11 | Luís Teixeira | Autonomia variável |
-| 12 | Teresa Moreira | Tratamentos múltiplos |
-| 13 | Fernando Costa | Agravamento neurológico agudo (alerta Crítica) |
-| 14 | Ana Paula Mendes | Agravamento ligeiro com cuidador |
+| 3 | Joaquim Pereira | Agravamento progressivo; alerta concluído com decisão médica; mensagem para a equipa |
+| 4 | Helena Sousa | Agravamento súbito: dor de cabeça, vómitos e sonolência (Crítica, encaminhado) |
+| 5 | Manuel Rodrigues | Melhoria gradual; alerta ainda sem triagem |
+| 6 | Rosa Martins | Respostas muito parciais; duas quedas (em análise pela enfermagem) |
+| 7 | José Carvalho | «Não consigo avaliar» em vários itens cognitivos; concluído pela enfermagem |
+| 8 | Fernanda Almeida | Preenchimento pelo cuidador; deixou de andar (encaminhado) |
+| 9 | Carlos Ribeiro | Declínio neurológico (encaminhado) |
+| 10 | Isabel Gomes | Histórico prolongado; diarreia por temozolomida (encaminhado) |
+| 11 | Luís Teixeira | Autonomia variável; disfagia grave (concluído com decisão médica) |
+| 12 | Teresa Moreira | Tratamentos múltiplos; febre em quimioterapia (Crítica, encaminhado) |
+| 13 | Fernando Costa | Agravamento neurológico agudo (Crítica, encaminhado) |
+| 14 | Ana Paula Mendes | Agravamento com cuidador; hipertensão intracraniana possível (sem triagem) |
 
 ## Funcionalidades implementadas
 
@@ -91,7 +91,7 @@ A interface está dividida por perfil. Todas as páginas usam os mesmos estilos 
 
 As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. As alterações ao esquema são aplicadas por migrações versionadas em `src/database/migrations.ts`; ao arrancar, o formulário v2 passa a ser o ativo (o v1 fica inativo). Para ter os dados de demonstração no v2, corra `npm run seed`.
 
-O score usa os pesos 3/2/1 como importância relativa proposta (função/autonomia, cognição/deglutição e restantes sintomas). A soma é uma aproximação de rastreio sobre respostas ordinais, não uma medida intervalar validada. O limiar adaptativo é `max(5, 10% da linha de base, 2 × MAD)`, pelo que varia com o nível e a variabilidade basais. Sensibilidade no cenário de subida 0→2 em D1, C4 e B7: com pesos 3/2/1 a variação é 11,6 pontos (16/138); com pesos iguais é 7,8 (6/77). O caso dispara com limiares absolutos 8 ou 10, mas não com 15 ou 20; logo a escolha muda a decisão e carece de validação clínica. A cobertura mínima de 60% e a regra de MAD também são parâmetros exploratórios, sem validação clínica.
+O score usa os pesos 3/2/1 como importância relativa proposta (função/autonomia, cognição/deglutição e restantes sintomas). A soma é uma aproximação de rastreio sobre respostas ordinais, não uma medida intervalar validada. O limiar adaptativo é `max(5, 10% da linha de base, 2 × MAD)`, pelo que varia com o nível e a variabilidade basais. Sensibilidade no cenário de subida 0→2 em D1, C4 e B7: com pesos 3/2/1 a variação é 11,9 pontos (16/135); com pesos iguais é 7,9 (6/76). O B20 é texto livre para a equipa e não entra no score. O caso dispara com limiares absolutos 8 ou 10, mas não com 15 ou 20; logo a escolha muda a decisão e carece de validação clínica. A cobertura mínima de 60% e a regra de MAD também são parâmetros exploratórios, sem validação clínica.
 
 As bases SQLite e os ficheiros WAL/SHM são locais e ignorados pelo Git. Use `npm run seed` para gerar dados sintéticos; não distribua nem inclua bases de dados locais em ZIPs.
 

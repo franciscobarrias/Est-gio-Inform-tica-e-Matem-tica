@@ -27,7 +27,8 @@ export class FhirObservationMapper {
       item: sub.respostas.map((r: any) => ({
         linkId: r.codigo || r.id_pergunta,
         text: `[${r.categoria}] ${r.enunciado}`,
-        answer: [{
+        // Texto livre (B20): a resposta é um valueString, não uma opção codificada.
+        answer: r.tipo_resposta === 'TEXTO_LIVRE' ? [{ valueString: r.texto }] : [{
           valueCoding: {
             system: 'https://chsj.min-saude.pt/fhir/CodeSystem/resposta-gbm',
             code: r.valor_codificado,
@@ -64,4 +65,4 @@ export class FhirObservationMapper {
       method: { text: `Versão de parâmetros ${avaliacao.versao_parametros}` }
     };
   }
-}
+}

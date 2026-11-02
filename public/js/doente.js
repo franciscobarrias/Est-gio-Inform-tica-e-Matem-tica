@@ -50,8 +50,20 @@ function valorEscolhido(pergunta) {
   return Number(o.valor_numerico ?? 0);
 }
 
+const ehTextoLivre = p => p.tipo_resposta === 'TEXTO_LIVRE';
+const respondida = p => ehTextoLivre(p) ? Boolean($(`texto_${p.id_pergunta}`)?.value.trim()) : Boolean(opcaoEscolhida(p));
+
 function htmlPergunta(pergunta) {
   const id = escapar(pergunta.id_pergunta);
+  // Texto livre (B20): uma caixa de texto para a equipa; não tem escala e não conta para os alertas.
+  if (ehTextoLivre(pergunta)) {
+    return `<fieldset class="pergunta-v2 texto-livre" data-pergunta="${id}">
+      <legend>${pergunta.codigo ? `<span class="codigo">${escapar(pergunta.codigo)}</span>` : ''}${escapar(textoPergunta(pergunta))}</legend>
+      <label for="texto_${id}" class="sr-only">${escapar(textoPergunta(pergunta))}</label>
+      <textarea id="texto_${id}" data-texto-livre="${id}" maxlength="500" rows="3" placeholder="Escreva aqui, se quiser (opcional)"></textarea>
+      <p class="muted pequeno">A equipa lê esta mensagem no seu registo. Não serve para pedir ajuda urgente: se for urgente, ligue 112 ou contacte o serviço.</p>
+    </fieldset>`;
+  }
   const curtas = pergunta.opcoes.every(o => rotuloOpcao(o).length <= 14);
   const opcoes = pergunta.opcoes.map(o => `<label><input type="radio" name="resp_${id}" value="${escapar(o.id_opcao)}" />${escapar(rotuloOpcao(o))}</label>`).join('');
   const presente = ['SINTOMA', 'FUNCAO'].includes(pergunta.categoria);
@@ -123,7 +135,7 @@ function atualizarPergunta(pergunta) {
       if ($(`texto_${id}`)) $(`texto_${id}`).value = '';
     }
   }
-  document.querySelector(`[data-pergunta="${CSS.escape(id)}"]`)?.classList.toggle('respondida', Boolean(opcaoEscolhida(pergunta)));
+  document.querySelector(`[data-pergunta="${CSS.escape(id)}"]`)?.classList.toggle('respondida', respondida(pergunta));
   atualizarContagem();
   atualizarAvisoFixo();
   const caixa = $(`instrucao_${id}`);
@@ -137,7 +149,7 @@ function atualizarPergunta(pergunta) {
 function atualizarContagem() {
   if (!$('contagemRespostas')) return;
   const principais = formAtivo.perguntas.filter(p => !p.id_pergunta_pai);
-  const respondidas = principais.filter(p => opcaoEscolhida(p)).length;
+  const respondidas = principais.filter(respondida).length;
   $('contagemRespostas').textContent = `${respondidas} de ${principais.length} perguntas respondidas`;
 }
 
@@ -185,6 +197,10 @@ function atualizarAvisoFixo() {
 function recolherRespostas() {
   const visivel = p => !document.querySelector(`[data-pergunta="${CSS.escape(p.id_pergunta)}"]`)?.closest('.hidden');
   return formAtivo.perguntas.filter(visivel).map(pergunta => {
+    if (ehTextoLivre(pergunta)) {
+      const texto = $(`texto_${pergunta.id_pergunta}`)?.value.trim();
+      return texto ? { id_pergunta: pergunta.id_pergunta, texto } : null;
+    }
     const opcao = opcaoEscolhida(pergunta);
     if (!opcao) return null;
     const id = pergunta.id_pergunta;
@@ -243,6 +259,10 @@ function ligarFormulario() {
   $('contentorPerguntas').addEventListener('click', evento => {
     const botao = evento.target.closest('[data-preencher]');
     if (botao) preencherRestantes(botao.dataset.preencher);
+  });
+  $('contentorPerguntas').addEventListener('input', evento => {
+    const caixa = evento.target.closest('[data-texto-livre]');
+    if (caixa) atualizarPergunta(perguntaPorId(caixa.dataset.textoLivre));
   });
   $('contentorPerguntas').addEventListener('change', evento => {
     const campo = evento.target.closest('[data-pergunta]');

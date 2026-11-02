@@ -50,7 +50,7 @@ export interface PerguntaV2 {
   texto: string;
   textoCuidador?: string; // texto quando é o cuidador a responder; sem ele, usa-se o mesmo texto
   opcoes: Opcao[];
-  tipo?: 'SELECAO_UNICA' | 'SELECAO_UNICA_COM_TEXTO';
+  tipo?: 'SELECAO_UNICA' | 'SELECAO_UNICA_COM_TEXTO' | 'TEXTO_LIVRE';  // TEXTO_LIVRE: sem opções, só texto
   pai?: string;          // código da pergunta principal
   valorMinimoPai?: number;
 }
@@ -105,7 +105,10 @@ export const PERGUNTAS_V2: PerguntaV2[] = [
   { codigo: 'B18', id: 'v2-b18-engolir', categoria: 'SINTOMA', texto: 'Dificuldade em engolir ou engasgar-se', opcoes: INTENSIDADE },
   { codigo: 'B18a', id: 'v2-b18-liquidos', categoria: 'DETALHE', pai: 'B18', valorMinimoPai: 1, texto: 'Engasga-se com líquidos?', textoCuidador: 'O doente engasga-se com líquidos?', opcoes: SIM_NAO },
   { codigo: 'B19', id: 'v2-b19-confusao', categoria: 'SINTOMA', texto: 'Confusão ou desorientação que tem vindo a agravar', opcoes: INTENSIDADE },
-  { codigo: 'B20', id: 'v2-b20-outro', categoria: 'SINTOMA', tipo: 'SELECAO_UNICA_COM_TEXTO', texto: 'Outro sintoma', opcoes: INTENSIDADE },
+  // B20: texto livre para a equipa. Não tem escala e não entra no score nem nas regras de alerta.
+  { codigo: 'B20', id: 'v2-b20-outro', categoria: 'SINTOMA', tipo: 'TEXTO_LIVRE',
+    texto: 'Há mais alguma coisa que queira dizer à equipa? (outro sintoma ou preocupação)',
+    textoCuidador: 'Há mais alguma coisa que queira dizer à equipa sobre o doente? (outro sintoma ou preocupação)', opcoes: [] },
 
   // ---------- Bloco C — Função ----------
   { codigo: 'C1', id: 'v2-c1-andar', categoria: 'FUNCAO', texto: 'Marcha e equilíbrio',
@@ -146,12 +149,12 @@ export function garantirFormularioV2(db: any): void {
       (id_opcao, id_pergunta, rotulo, valor_codificado, ordem, valor_numerico) VALUES (?, ?, ?, ?, ?, ?)`);
     const idDoCodigo = (codigo?: string) => codigo ? PERGUNTAS_V2.find(p => p.codigo === codigo)!.id : null;
     // Os textos são sempre atualizados a partir deste ficheiro, também em bases de dados já existentes.
-    const atualizarTextos = db.prepare(`UPDATE PerguntaFormulario SET enunciado = ?, enunciado_cuidador = ?, ordem = ? WHERE id_pergunta = ?`);
+    const atualizarTextos = db.prepare(`UPDATE PerguntaFormulario SET enunciado = ?, enunciado_cuidador = ?, ordem = ?, tipo_resposta = ? WHERE id_pergunta = ?`);
     const atualizarRotulos = db.prepare(`UPDATE OpcaoResposta SET rotulo = ?, rotulo_cuidador = ?, ordem = ? WHERE id_opcao = ?`);
     PERGUNTAS_V2.forEach((p, indice) => {
       inserirPergunta.run(p.id, ID_FORMULARIO_V2, p.categoria, p.texto, p.tipo || 'SELECAO_UNICA', indice + 1,
         p.codigo, idDoCodigo(p.pai), p.valorMinimoPai ?? null);
-      atualizarTextos.run(p.texto, p.textoCuidador ?? p.texto, indice + 1, p.id);
+      atualizarTextos.run(p.texto, p.textoCuidador ?? p.texto, indice + 1, p.tipo || 'SELECAO_UNICA', p.id);
       const intensidade = p.opcoes === INTENSIDADE;
       p.opcoes.forEach(([sufixo, rotulo, codigo, valor], ordem) => {
         const id = `op-${p.id}-${sufixo}`;

@@ -53,6 +53,7 @@ function cartaoAlerta(a) {
     <p>${escapar(a.resumo_agravamento)}</p>
     <p class="muted pequeno">Regra: ${escapar(a.nome_regra)}${a.prioridade_algoritmo && a.prioridade_algoritmo !== a.prioridade
       ? ` · prioridade ajustada na triagem (o algoritmo indicou ${escapar(a.prioridade_algoritmo)})` : ''}</p>
+    ${a.mensagem_doente ? `<p class="mensagem-doente"><strong>Mensagem do doente/cuidador:</strong> «${escapar(a.mensagem_doente)}»</p>` : ''}
     ${a.ultima_nota ? `<p class="nota"><strong>Nota de triagem</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>`
       : a.estado_atual === 'Pendente' ? '<p class="nota muted">Ainda não avaliado pela enfermagem.</p>' : ''}
     ${acoesAlertaDaPagina(a)}
@@ -109,7 +110,8 @@ function renderizarListaDoentes() {
       const anos = idade(p.data_nascimento);
       return `<tr data-escolher-doente="${escapar(p.id_doente)}" class="${p.id_doente === idDoenteAtivo ? 'ativo' : ''}" tabindex="0">
         <th scope="row"><span class="nome">${escapar(p.nome)}</span>
-          <span class="muted pequeno">${escapar(p.numero_processo_clinico || '')}${anos !== null ? ` · ${anos} anos` : ''}${p.sexo ? ` · ${sexo[p.sexo] || ''}` : ''}</span></th>
+          <span class="muted pequeno">${escapar(p.numero_processo_clinico || '')}${anos !== null ? ` · ${anos} anos` : ''}${p.sexo ? ` · ${sexo[p.sexo] || ''}` : ''}</span>
+          ${p.mensagem_ultimo_registo ? `<span class="badge badge-mensagem" title="${escapar(p.mensagem_ultimo_registo)}">Mensagem no último registo</span>` : ''}</th>
         <td>${p.ultimo_kps ?? '—'}${p.ultimo_kps !== null && p.ultimo_kps <= 70 ? ' <span class="badge badge-neutro">cuidador</span>' : ''}</td>
         <td>${escapar(p.fase_clinica_atual || '—')}</td>
         <td>${p.alertas_abertos ? `<span class="badge badge-alerta">${p.alertas_abertos}</span>` : '<span class="muted">0</span>'}</td>

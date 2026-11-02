@@ -368,3 +368,9 @@ dl.identificacao dd { white-space:nowrap; overflow:hidden; text-overflow:ellipsi
 dl.identificacao { display:flex; flex-wrap:wrap; gap:.6rem 2.25rem; margin:.35rem 0 .7rem; }
 dl.identificacao dd { white-space:normal; overflow:visible; }
 @media (max-width:900px) { .barra-doente .seletor, .barra-doente .identidade > * { grid-column:1; grid-row:auto; } }
+
+/* ---------- Mensagem livre do doente/cuidador (B20) ---------- */
+.pergunta-v2.texto-livre textarea { max-width:620px; margin-bottom:.35rem; }
+.mensagem-doente { margin:.5rem 0; padding:.55rem .8rem; border-left:4px solid #6b5d52; background:#f7f1ea; border-radius:0 8px 8px 0; font-size:.92rem; }
+.badge-mensagem { display:inline-block; margin-top:.3rem; background:#efe4d8; color:#4a3b31; font-size:.72rem; }
+.cel.mensagem { font-size:.8rem; color:var(--text); background:#f7f1ea; }

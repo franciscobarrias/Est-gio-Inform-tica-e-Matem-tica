@@ -50,8 +50,8 @@ export class FhirService {
           item: perguntas.map(pergunta => ({
             linkId: pergunta.codigo || pergunta.id_pergunta,
             text: pergunta.enunciado,
-            type: 'choice',
-            answerOption: db.prepare(`SELECT valor_codificado, rotulo FROM OpcaoResposta
+            type: pergunta.tipo_resposta === 'TEXTO_LIVRE' ? 'text' : 'choice',
+            ...(pergunta.tipo_resposta === 'TEXTO_LIVRE' ? {} : { answerOption: db.prepare(`SELECT valor_codificado, rotulo FROM OpcaoResposta
               WHERE id_pergunta = ? ORDER BY ordem ASC`).all(pergunta.id_pergunta)
               .map((opcao: any) => ({
                 valueCoding: {
@@ -59,7 +59,7 @@ export class FhirService {
                   code: opcao.valor_codificado,
                   display: opcao.rotulo
                 }
-              }))
+              })) })
           }))
         }
       });
@@ -89,4 +89,4 @@ export class FhirService {
 
     return { resourceType: 'Bundle', type: 'collection', timestamp: new Date().toISOString(), total: entries.length, entry: entries };
   }
-}
+}

@@ -13,7 +13,10 @@ const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, 
       ORDER BY k.data_avaliacao DESC, k.rowid DESC LIMIT 1) AS ultimo_kps,
     (SELECT COUNT(*) FROM AlertaClinico a JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
       WHERE s.id_doente = d.id_doente AND a.estado_atual != 'Concluído') AS alertas_abertos,
-    (SELECT MAX(s.data_hora_submissao) FROM SubmissaoMonitorizacao s WHERE s.id_doente = d.id_doente) AS ultimo_registo
+    (SELECT MAX(s.data_hora_submissao) FROM SubmissaoMonitorizacao s WHERE s.id_doente = d.id_doente) AS ultimo_registo,
+    (SELECT r.texto FROM RespostaMonitorizacao r JOIN PerguntaFormulario p ON p.id_pergunta = r.id_pergunta
+      WHERE p.tipo_resposta = 'TEXTO_LIVRE' AND r.id_submissao = (SELECT s.id_submissao FROM SubmissaoMonitorizacao s
+        WHERE s.id_doente = d.id_doente ORDER BY s.data_hora_submissao DESC LIMIT 1)) AS mensagem_ultimo_registo
   FROM Doente d JOIN Utilizador u ON d.id_doente = u.id_utilizador
   LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente`;
 

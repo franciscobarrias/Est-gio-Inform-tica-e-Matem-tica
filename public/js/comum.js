@@ -33,7 +33,7 @@ const CATEGORIAS = {
 // Perguntas com escala de gravidade (as que fazem sentido num gráfico): sem alarmes Sim/Não e sem detalhes.
 const CATEGORIAS_COM_ESCALA = ['SINTOMA', 'FUNCAO', 'AUTONOMIA', 'SINTOMA_GERAL', 'ESCALA_NANO', 'AUTONOMIA_AVD'];
 function perguntasComEscala() {
-  return formAtivo.perguntas.filter(p => !p.id_pergunta_pai && CATEGORIAS_COM_ESCALA.includes(p.categoria));
+  return formAtivo.perguntas.filter(p => !p.id_pergunta_pai && CATEGORIAS_COM_ESCALA.includes(p.categoria) && p.tipo_resposta !== 'TEXTO_LIVRE');
 }
 // "Ligeira — notei, mas não me impediu…" passa a "Ligeira".
 function rotuloCurto(rotulo) { return String(rotulo || '').split(' — ')[0].replace(' / sem alteração', ''); }
@@ -382,6 +382,13 @@ function desenharQuadroComparativo(submissoes) {
         return sim.length ? `<td class="cel v3" title="${escapar(sim.map(r => r.enunciado).join('; '))}">Sim (${sim.map(r => escapar(r.codigo || '')).join(', ')})</td>`
           : '<td class="cel v0">Nenhum</td>';
       }).join('')}</tr>` : '';
+  // Última linha: mensagem livre (B20), se houver em algum dos registos.
+  const textoLivre = formAtivo.perguntas.find(p => p.tipo_resposta === 'TEXTO_LIVRE');
+  const mensagens = ultimas.map(s => s.respostas.find(r => r.tipo_resposta === 'TEXTO_LIVRE' && r.texto));
+  const linhaMensagem = textoLivre && mensagens.some(Boolean)
+    ? `<tr><th scope="row">Mensagem para a equipa</th>${mensagens.map(m => m
+        ? `<td class="cel mensagem" title="${escapar(m.texto)}">${escapar(m.texto.length > 40 ? `${m.texto.slice(0, 38)}…` : m.texto)}</td>`
+        : '<td class="cel vazio">—</td>').join('')}</tr>` : '';
   const linhas = linhaAlarmes + perguntasComEscala().map(p => {
     const celulas = ultimas.map(s => {
       const r = s.respostas.find(x => x.id_pergunta === p.id_pergunta);
@@ -391,7 +398,7 @@ function desenharQuadroComparativo(submissoes) {
       return `<td class="cel v${Math.min(3, Number(r.valor_numerico))}" title="${escapar(r.rotulo)}">${escapar(rotuloCurto(r.rotulo))}${nota ? `<div class="pequeno">${escapar(nota)}</div>` : ''}</td>`;
     }).join('');
     return `<tr><th scope="row">${p.codigo ? `<span class="muted">${escapar(p.codigo)}</span> ` : ''}${escapar(p.enunciado)}</th>${celulas}</tr>`;
-  }).join('');
+  }).join('') + linhaMensagem;
   $('quadroComparativo').innerHTML = `<table class="quadro"><thead><tr><th>Sintoma / domínio</th>${ultimas.map(s => `<th style="text-align:center">${dataCurta(s.data_referencia_sintomas)}<div class="muted pequeno" style="font-weight:400">${escapar(NOMES_PERFIL[s.perfil_autor_no_registo] || '')}</div></th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
 }
 // Liga o seletor de sintoma do gráfico e preenche-o com as perguntas do formulário ativo.
@@ -413,7 +420,8 @@ function renderizarHistorico(submissoes) {
     const detalhesDe = r => s.respostas.filter(d => d.id_pergunta_pai === r.id_pergunta);
     const alarmes = principais.filter(r => r.categoria === 'ALARME');
     const alarmesSim = alarmes.filter(r => Number(r.valor_numerico) === 1);
-    const escala = principais.filter(r => r.categoria !== 'ALARME');
+    const mensagem = principais.find(r => r.tipo_resposta === 'TEXTO_LIVRE' && r.texto);
+    const escala = principais.filter(r => r.categoria !== 'ALARME' && r.tipo_resposta !== 'TEXTO_LIVRE');
     const alteradas = escala.filter(r => !r.motivo_nao_avaliavel && Number(r.valor_numerico) > 0)
       .sort((a, b) => Number(b.valor_numerico) - Number(a.valor_numerico));
     const semAlteracao = escala.filter(r => !r.motivo_nao_avaliavel && Number(r.valor_numerico) === 0);
@@ -442,6 +450,7 @@ function renderizarHistorico(submissoes) {
       </div>
       <div class="muted pequeno">Preenchido por ${escapar(s.nome_autor)} (${escapar(NOMES_PERFIL[s.perfil_autor_no_registo] || s.perfil_autor_no_registo)}) em ${dataHora(s.data_hora_submissao)}</div>
       ${alarmesHtml}
+      ${mensagem ? `<p class="mensagem-doente"><strong>Mensagem para a equipa:</strong> «${escapar(mensagem.texto)}»</p>` : ''}
       ${alteradas.length ? `<ul class="alteracoes">${alteradas.map(linhaAlteracao).join('')}</ul>`
         : '<p class="pequeno">Nenhum sintoma ou alteração reportado.</p>'}
       ${semAlteracao.length || naoAval.length || semResposta ? `<details class="pequeno"><summary>${[

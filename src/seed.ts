@@ -313,7 +313,7 @@ const criarDados = db.transaction(() => {
     SELECT id_pergunta, categoria
     FROM PerguntaFormulario
     WHERE id_formulario = ? AND ativa = 1 AND id_pergunta_pai IS NULL
-      AND categoria IN ('SINTOMA', 'FUNCAO', 'AUTONOMIA')
+      AND categoria IN ('SINTOMA', 'FUNCAO', 'AUTONOMIA') AND tipo_resposta != 'TEXTO_LIVRE'
     ORDER BY ordem
   `).all(idFormulario) as Pergunta[];
   const alarmes = db.prepare(`
@@ -648,6 +648,35 @@ const criarDados = db.transaction(() => {
         respostas.push({ id_pergunta: a.id_pergunta, id_opcao: obterOpcao(a.id_pergunta, 'NAO') });
       }
 
+      // SITUAÇÕES EXTRA NO ÚLTIMO REGISTO (para haver alertas de vários tipos na demonstração)
+      // [pergunta, código da opção]; substituem a resposta que já existir para essa pergunta.
+      const EXTRAS: Record<number, Array<[string, string]>> = {
+        6: [['v2-c3-quedas', 'MODERADA']],                                   // 2 ou mais quedas → Alta
+        8: [['v2-c1-andar', 'GRAVE']],                                       // deixou de andar → declínio neurológico
+        11: [['v2-b18-engolir', 'GRAVE'], ['v2-b18-liquidos', 'SIM']],       // dificuldade grave em engolir → declínio
+        7: [['v2-b7-memoria', 'IMPOSSIVEL_AVALIAR'], ['v2-b9-compreender', 'IMPOSSIVEL_AVALIAR'],
+            ['v2-b19-confusao', 'IMPOSSIVEL_AVALIAR']],                        // indicadores cognitivos não avaliáveis → Média
+        10: [['v2-b15-diarreia', 'MODERADA'], ['v2-b15-dejecoes', 'N2']],     // 4 a 6 dejeções a mais → toxicidade da temozolomida
+        12: [['v2-a5-temperatura', 'SIM']],                                   // febre durante a quimioterapia → Crítica
+        14: [['v2-b1-cefaleia', 'MODERADA'], ['v2-b3-vomitos', 'LIGEIRA'], ['v2-b3-vezes', 'N1']] // hipertensão intracraniana possível
+      };
+      if (EXTRAS[c.n] && indice === c.evolucao.length - 1) {
+        for (const [idPergunta, codigo] of EXTRAS[c.n]) {
+          const resposta = { id_pergunta: idPergunta, id_opcao: obterOpcao(idPergunta, codigo) };
+          const existente = respostas.findIndex(r => r.id_pergunta === idPergunta);
+          if (existente >= 0) respostas.splice(existente, 1, resposta); else respostas.push(resposta);
+        }
+      }
+
+      // Mensagem livre para a equipa (B20) no último registo de alguns cenários.
+      const MENSAGENS: Record<number, string> = {
+        1: 'Tem andado com mais tonturas quando se levanta da cama.',
+        3: 'As dores de cabeça pioram ao fim do dia; gostava de falar sobre a medicação para as dores.'
+      };
+      if (MENSAGENS[c.n] && indice === c.evolucao.length - 1) {
+        (respostas as any[]).push({ id_pergunta: 'v2-b20-outro', texto: MENSAGENS[c.n] });
+      }
+
       // IDENTIFICAR O AUTOR
 
       const autor =
@@ -703,52 +732,51 @@ const criarDados = db.transaction(() => {
     });
   }
 
-  // TRIAGEM DE ALGUNS ALERTAS
+  // TRIAGEM PELA ENFERMAGEM E DECISÕES MÉDICAS
+  // Cada alerta passa pelos estados que teria na realidade: «Em análise» e, depois, «Encaminhado» ou «Concluído».
+  // Os doentes 5 e 14 ficam de propósito sem triagem, para se ver o grupo «Ainda sem triagem».
 
-  const triagens: Array<{
+  type Triagem = {
     doente: number;
-    estado: string;
-    prioridade: string;
-    concluir?: boolean;
-  }> = [
-    {
-      doente: 1,
-      estado: 'Em análise',
-      prioridade: 'Alta'
-    },
-    {
-      doente: 3,
-      estado: 'Encaminhado',
-      prioridade: 'Alta',
-      concluir: true
-    },
-    {
-      doente: 4,
-      estado: 'Em análise',
-      prioridade: 'Crítica'
-    },
-    // O doente 5 fica de propósito sem triagem, para se ver o grupo «Ainda sem triagem».
-    {
-      doente: 8,
-      estado: 'Encaminhado',
-      prioridade: 'Média'
-    },
-    {
-      doente: 9,
-      estado: 'Encaminhado',
-      prioridade: 'Alta'
-    },
-    {
-      doente: 11,
-      estado: 'Encaminhado',
-      prioridade: 'Média',
-      concluir: true
-    },
-    {
-      doente: 13,
-      estado: 'Encaminhado',
-      prioridade: 'Crítica'
-    }
+    passos: Array<[estado: string, prioridade: string, nota: string]>;
+    decisao?: [decisao: string, fundamentacao: string];
+  };
+
+  const triagens: Triagem[] = [
+    { doente: 1, passos: [
+      ['Em análise', 'Alta', 'Contacto telefónico com a cuidadora: cefaleia moderada há 3 dias, sem vómitos. Doente mais dependente nas últimas semanas.'],
+      ['Encaminhado', 'Alta', 'KPS 60 e cefaleia persistente apesar do paracetamol. Peço avaliação médica.']] },
+    { doente: 3, passos: [
+      ['Em análise', 'Alta', 'Doente refere cefaleia grave ao fim do dia. Sem sinais de alarme.'],
+      ['Encaminhado', 'Alta', 'Agravamento progressivo da cefaleia nas últimas 4 semanas. Encaminho ao médico.']],
+      decisao: ['Proposta de antecipação de consulta', 'Agravamento progressivo da cefaleia. Antecipar consulta e pedir RM cerebral.'] },
+    { doente: 4, passos: [
+      ['Em análise', 'Crítica', 'Contacto com a doente: vómitos desde ontem, cefaleia intensa e sonolência. Família orientada para o serviço de urgência.'],
+      ['Encaminhado', 'Crítica', 'Suspeita de hipertensão intracraniana. Doente a caminho da urgência; peço avaliação médica imediata.']] },
+    { doente: 6, passos: [
+      ['Em análise', 'Alta', 'Duas quedas em casa esta semana, sem traumatismo craniano. A aguardar contacto com a família para avaliar a marcha.']] },
+    { doente: 7, passos: [
+      ['Em análise', 'Média', 'Cuidador não conseguiu avaliar memória, compreensão nem confusão. Agendado contacto telefónico.'],
+      ['Concluído', 'Baixa', 'Contacto com o doente: orientado e a responder bem. Sem alterações cognitivas novas. Mantém seguimento.']] },
+    { doente: 8, passos: [
+      ['Em análise', 'Alta', 'Cuidador refere que o doente deixou de conseguir andar, mesmo com apoio.'],
+      ['Encaminhado', 'Alta', 'Declínio marcado da marcha face ao habitual. Peço avaliação neurológica.']] },
+    { doente: 9, passos: [
+      ['Em análise', 'Alta', 'Doente deixou de conseguir andar sem ajuda. KPS 50.'],
+      ['Encaminhado', 'Alta', 'Declínio neurológico marcado. Encaminho para decisão sobre antecipação de consulta.']] },
+    { doente: 10, passos: [
+      ['Em análise', 'Alta', 'Diarreia com 4 a 6 dejeções a mais por dia desde o início do ciclo de temozolomida. Hidratação oral reforçada.'],
+      ['Encaminhado', 'Alta', 'Possível toxicidade da temozolomida. Peço avaliação médica e análises.']] },
+    { doente: 11, passos: [
+      ['Em análise', 'Alta', 'Cuidadora refere que o doente se engasga com líquidos a quase todas as refeições.'],
+      ['Encaminhado', 'Alta', 'Disfagia grave com risco de aspiração. Peço avaliação médica.']],
+      decisao: ['Necessidade de avaliação adicional', 'Disfagia com engasgamento a líquidos. Pedir avaliação da deglutição em terapia da fala.'] },
+    { doente: 12, passos: [
+      ['Em análise', 'Crítica', 'Temperatura de 38,4 °C em quimioterapia. Doente orientada para o serviço de urgência.'],
+      ['Encaminhado', 'Crítica', 'Febre durante a temozolomida: risco de neutropenia febril. Peço avaliação médica imediata.']] },
+    { doente: 13, passos: [
+      ['Em análise', 'Crítica', 'Sonolência marcada e vómitos relatados pela cuidadora.'],
+      ['Encaminhado', 'Crítica', 'Suspeita de hipertensão intracraniana. Encaminho de imediato.']] }
   ];
 
   for (const t of triagens) {
@@ -767,26 +795,15 @@ const criarDados = db.transaction(() => {
 
     if (!alerta) continue;
 
-    AlertaService.registarTriagemAlerta(
-      alerta.id_alerta,
-      id('enfermeiro', 1),
-      t.estado,
-      t.prioridade,
-      'Triagem fictícia para demonstração.'
-    );
+    for (const [estado, prioridade, nota] of t.passos) {
+      AlertaService.registarTriagemAlerta(alerta.id_alerta, id('enfermeiro', 1 + (t.doente % 3)), estado, prioridade, nota);
+    }
 
-    if (t.concluir) {
-
+    if (t.decisao) {
       MedicoService.registarDecisaoAcompanhamento(
         id('doente', t.doente),
         medicoDe(t.doente),
-        {
-          id_alerta: alerta.id_alerta,
-          decisao_medica:
-            'Necessidade de avaliação adicional',
-          fundamentacao_clinica:
-            'Decisão fictícia para demonstração.'
-        }
+        { id_alerta: alerta.id_alerta, decisao_medica: t.decisao[0], fundamentacao_clinica: t.decisao[1] }
       );
     }
   }

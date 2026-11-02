@@ -16,7 +16,7 @@ export class SintomaService {
   static submeterMonitorizacao(idDoente: string, idAutor: string, perfilAutor: string, payload: {
     id_formulario: string;
     data_referencia_sintomas: string;
-    respostas: Array<{ id_pergunta: string; id_opcao: string; frequencia?: string; novo_ou_pior?: boolean; texto?: string }>;
+    respostas: Array<{ id_pergunta: string; id_opcao?: string | null; frequencia?: string; novo_ou_pior?: boolean; texto?: string }>;
   }) {
     if (!payload || typeof payload.id_formulario !== 'string' ||
         typeof payload.data_referencia_sintomas !== 'string' ||
@@ -31,17 +31,34 @@ export class SintomaService {
       .get(payload.id_formulario);
     if (!formulario) throw new Error('O formulário selecionado não está ativo.');
 
-    const respostasEnviadas = payload.respostas.filter(r => r && r.id_opcao !== '');
+    // Uma resposta tem uma opção escolhida ou, nas perguntas de texto livre, só texto.
+    const respostasEnviadas = payload.respostas.filter(r => r && ((typeof r.id_opcao === 'string' && r.id_opcao !== '') ||
+      (!r.id_opcao && typeof r.texto === 'string' && r.texto.trim() !== '')));
+    const textosLivres = new Set<string>();
     if (respostasEnviadas.length === 0) throw new Error('Registe pelo menos uma resposta antes de submeter.');
     const idsPergunta = new Set<string>();
     const valores = new Map<string, number>();   // id_pergunta → valor numérico escolhido
     const detalhes: Array<{ id_pergunta: string; pai: string; minimo: number }> = [];
     for (const resposta of respostasEnviadas) {
-      if (typeof resposta.id_pergunta !== 'string' || typeof resposta.id_opcao !== 'string' ||
-          idsPergunta.has(resposta.id_pergunta)) {
+      if (typeof resposta.id_pergunta !== 'string' || idsPergunta.has(resposta.id_pergunta)) {
         throw new Error('As respostas contêm campos inválidos ou perguntas repetidas.');
       }
       idsPergunta.add(resposta.id_pergunta);
+      // Texto livre (B20): só texto, sem escala, sem frequência; não conta para o score nem para os alertas.
+      if (!resposta.id_opcao) {
+        const pergunta = db.prepare(`SELECT tipo_resposta FROM PerguntaFormulario
+          WHERE id_pergunta = ? AND id_formulario = ? AND ativa = 1`).get(resposta.id_pergunta, payload.id_formulario) as { tipo_resposta: string } | undefined;
+        if (!pergunta || pergunta.tipo_resposta !== 'TEXTO_LIVRE') {
+          throw new Error('Uma resposta não corresponde a uma opção válida do formulário.');
+        }
+        if ((resposta.texto as string).trim().length > 500) throw new Error('A mensagem para a equipa tem no máximo 500 caracteres.');
+        if (resposta.frequencia !== undefined || resposta.novo_ou_pior !== undefined) {
+          throw new Error('A mensagem para a equipa não leva frequência nem «novo ou pior».');
+        }
+        textosLivres.add(resposta.id_pergunta);
+        continue;
+      }
+      if (typeof resposta.id_opcao !== 'string') throw new Error('As respostas contêm campos inválidos ou perguntas repetidas.');
       const opcaoValida = db.prepare(`SELECT p.categoria, p.tipo_resposta, p.id_pergunta_pai, p.valor_minimo_pai,
           o.valor_codificado, o.valor_numerico
         FROM PerguntaFormulario p
@@ -101,6 +118,10 @@ export class SintomaService {
       `);
 
       for (const r of respostasEnviadas) {
+        if (textosLivres.has(r.id_pergunta)) {
+          stmtResp.run(crypto.randomUUID(), id_submissao, r.id_pergunta, null, null, 0, null, null, (r.texto as string).trim());
+          continue;
+        }
         const opcao = db.prepare('SELECT * FROM OpcaoResposta WHERE id_opcao = ?').get(r.id_opcao) as any;
         const naoAvaliavel = opcao?.valor_codificado === 'IMPOSSIVEL_AVALIAR' ? 1 : 0;
         const valorNum = naoAvaliavel ? null : SintomaService.valorDaOpcao(opcao);

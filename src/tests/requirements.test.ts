@@ -304,7 +304,7 @@ test('v2: o score só gera alerta com linha de base e cobertura suficientes', ()
   assert.ok((r.score ?? 0) >= 10);
   assert.ok(r.motivos.some(m => m.tipo === 'SCORE_EVOLUCAO_V2'));
   assert.equal(r.prioridade, 'Média');
-  assert.ok(Math.abs((r.score ?? 0) - 11.6) < 0.1);
+  assert.ok(Math.abs((r.score ?? 0) - 11.9) < 0.1);  // 16 / 135 (sem o B20, que é texto livre)
   // Só com dois registos anteriores ainda não há linha de base.
   assert.equal(avaliar(pior, 90, estavel.slice(0, 2)).linhaDeBase, null);
   // Poucas perguntas respondidas: cobertura abaixo de 60%, sem score.
@@ -423,4 +423,33 @@ test('regista, suspende e termina medicação, validando os dados', () => {
   const processo = MedicoService.obterProcessoLongitudinal(idDoente) as any;
   assert.ok(processo.medicacoes.some((m: any) => m.id_medicacao === med.id_medicacao));
   assert.equal(processo.medicacoes[0].estado, 'ATIVA');
+});
+
+test('v2: a mensagem livre (B20) é guardada como texto e não conta para o score nem para os alertas', () => {
+  const formulario = SintomaService.obterFormularioAtivo();
+  const b20 = formulario.perguntas.find((p: any) => p.codigo === 'B20');
+  assert.equal(b20.tipo_resposta, 'TEXTO_LIVRE');
+  assert.equal(b20.opcoes.length, 0);
+  const hoje = new Date().toISOString().slice(0, 10);
+  const { id_submissao, alertasGerados } = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario, data_referencia_sintomas: hoje,
+    respostas: [{ id_pergunta: b20.id_pergunta, texto: '  Tem tido soluços.  ' }]
+  });
+  const r = db.prepare('SELECT id_opcao, valor_numerico, texto FROM RespostaMonitorizacao WHERE id_submissao = ?').get(id_submissao) as any;
+  assert.deepEqual({ ...r }, { id_opcao: null, valor_numerico: null, texto: 'Tem tido soluços.' });
+  assert.equal(alertasGerados.length, 0);
+  assert.equal(calcularScore({ B20: { valor: 3, naoAvaliavel: false } }).score, null);
+  assert.throws(() => SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario, data_referencia_sintomas: hoje,
+    respostas: [{ id_pergunta: b20.id_pergunta, texto: 'x'.repeat(501) }]
+  }), /500 caracteres/);
+  assert.throws(() => SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario, data_referencia_sintomas: hoje,
+    respostas: [{ id_pergunta: b20.id_pergunta, texto: 'Soluços', frequencia: 'DIARIA' }]
+  }), /não leva frequência/);
+  // Uma pergunta com escala continua a precisar de uma opção.
+  assert.throws(() => SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario, data_referencia_sintomas: hoje,
+    respostas: [{ id_pergunta: 'v2-b1-cefaleia', texto: 'Dói' }]
+  }), /opção válida/);
 });

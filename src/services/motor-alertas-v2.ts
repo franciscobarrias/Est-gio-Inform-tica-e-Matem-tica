@@ -57,7 +57,7 @@ export const PESOS: Record<string, number> = {
   // Peso 2: pressão intracraniana, cognição e deglutição
   B1: 2, B3: 2, B4: 2, B7: 2, B18: 2, B19: 2,
   // Peso 1: restantes sintomas do Bloco B
-  B2: 1, B5: 1, B10: 1, B11: 1, B12: 1, B13: 1, B14: 1, B15: 1, B16: 1, B17: 1, B20: 1
+  B2: 1, B5: 1, B10: 1, B11: 1, B12: 1, B13: 1, B14: 1, B15: 1, B16: 1, B17: 1  // B20 é texto livre: não entra no score
 };
 // Valor máximo de cada pergunta (as quedas vão só até 2).
 export const MAXIMOS: Record<string, number> = { C3: 2 };
