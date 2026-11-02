@@ -20,13 +20,18 @@ if (process.env.NODE_ENV === 'production') {
 inicializarBaseDados();
 
 // FUNÇÕES AUXILIARES
+const dataReferenciaSeed = process.env.SEED_REFERENCE_DATE || new Date().toISOString().slice(0, 10);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(dataReferenciaSeed) ||
+    Number.isNaN(Date.parse(`${dataReferenciaSeed}T00:00:00Z`)) ||
+    new Date(`${dataReferenciaSeed}T00:00:00Z`).toISOString().slice(0, 10) !== dataReferenciaSeed) {
+  throw new Error('A data de referência do seed deve ter o formato AAAA-MM-DD.');
+}
 
 const id = (perfil: string, n: number) =>
   `user-${perfil}-${String(n).padStart(3, '0')}`;
 
 function diasAtras(dias: number): string {
-  const data = new Date();
-  data.setUTCHours(10, 0, 0, 0);
+  const data = new Date(`${dataReferenciaSeed}T10:00:00Z`);
   data.setUTCDate(data.getUTCDate() - dias);
   return data.toISOString();
 }
@@ -181,30 +186,6 @@ const NOMES_ENFERMEIROS = ['Enfermeiro 1', 'Enfermeiro 2', 'Enfermeiro 3'];
 const criarDados = db.transaction(() => {
 
 
-  db.exec(`
-    DELETE FROM RegistoAuditoria;
-    DELETE FROM DecisaoAcompanhamento;
-    DELETE FROM HistoricoAcaoAlerta;
-    DELETE FROM AlertaClinico;
-    DELETE FROM RegraAlerta;
-    DELETE FROM RespostaMonitorizacao;
-    DELETE FROM SubmissaoMonitorizacao;
-    DELETE FROM OpcaoResposta;
-    DELETE FROM PerguntaFormulario;
-    DELETE FROM Formulario;
-    DELETE FROM PlanoMonitorizacao;
-    DELETE FROM AvaliacaoKarnofsky;
-    DELETE FROM Medicacao;
-    DELETE FROM Tratamento;
-    DELETE FROM DiagnosticoGB;
-    DELETE FROM DoenteCuidador;
-    DELETE FROM Doente;
-    DELETE FROM Cuidador;
-    DELETE FROM Enfermeiro;
-    DELETE FROM Medico;
-    DELETE FROM Utilizador;
-  `);
-
   // UTILIZADORES
 
   const criarUtilizador = db.prepare(`
@@ -244,7 +225,7 @@ const criarDados = db.transaction(() => {
       'medico',
       n,
       NOMES_MEDICOS[n - 1],
-      `medico${n}@chsj.min-saude.pt`
+      n === 1 ? 'medico1@chsj.min-saude.pt' : `medico${n}@example.invalid`
     );
 
     db.prepare(`
@@ -259,7 +240,7 @@ const criarDados = db.transaction(() => {
       'enfermeiro',
       n,
       NOMES_ENFERMEIROS[n - 1],
-      `enfermeiro${n}@chsj.min-saude.pt`
+      n === 1 ? 'enfermeiro1@chsj.min-saude.pt' : `enfermeiro${n}@example.invalid`
     );
 
     db.prepare(`
@@ -438,6 +419,9 @@ const criarDados = db.transaction(() => {
         : c.n % 3 === 1 ? 'MGMT Não metilado' : 'Não determinado',
       c.n % 2 === 0 || c.n === 1 ? 'Quimioterapia Adjuvante' : 'Seguimento'
     );
+    db.prepare(`INSERT INTO FaseClinica (id_fase_clinica, id_doente, fase_clinica, data_inicio)
+      VALUES (?, ?, ?, ?)`).run(crypto.randomUUID(), doente,
+      c.n % 2 === 0 || c.n === 1 ? 'Quimioterapia Adjuvante' : 'Seguimento', dataAtras(115));
 
     // TRATAMENTOS
 
@@ -708,28 +692,9 @@ const criarDados = db.transaction(() => {
             data_referencia_sintomas:
               dataAtras(dias),
             respostas
-          }
+          },
+          { dataHoraSubmissao: diasAtras(dias) }
         );
-
-      // AJUSTAR AS DATAS PARA O HISTÓRICO FICTÍCIO
-
-      db.prepare(`
-        UPDATE SubmissaoMonitorizacao
-        SET data_hora_submissao = ?
-        WHERE id_submissao = ?
-      `).run(
-        diasAtras(dias),
-        resultado.id_submissao
-      );
-
-      db.prepare(`
-        UPDATE AlertaClinico
-        SET data_hora_geracao = ?
-        WHERE id_submissao = ?
-      `).run(
-        diasAtras(dias),
-        resultado.id_submissao
-      );
     });
   }
 

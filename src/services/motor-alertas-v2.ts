@@ -67,7 +67,7 @@ export const SUBIDA_SCORE_MINIMA = 5;    // mínimo demonstrativo; requer valida
 export const COBERTURA_MINIMA = 0.6;     // fração do peso total que tem de estar respondida
 export const REGISTOS_LINHA_DE_BASE = 3; // a linha de base é a mediana dos 3 primeiros registos
 export const JANELA_MINIMA_DIAS = 7;     // evita sobreposição da recordação dos sintomas
-export const VERSAO_PARAMETROS = '3.0';
+export const VERSAO_PARAMETROS = '4.0';
 
 // Valor de uma resposta, ou null se não foi respondida ou se "não consegue avaliar".
 export function valorDe(respostas: RespostasPorCodigo, codigo: string): number | null {
@@ -169,12 +169,11 @@ export function avaliarSubmissaoV2(entrada: {
     const resultado = calcularScore(registo);
     return resultado.score !== null && resultado.cobertura >= COBERTURA_MINIMA;
   });
-  const base = anteriores.slice(0, REGISTOS_LINHA_DE_BASE);
   const basePontuacao = historicoElegivel.slice(0, REGISTOS_LINHA_DE_BASE);
   for (const codigo of ['C1', 'C2', 'B8', 'B9', 'B18']) {
     const atual = v(codigo);
     if (atual === null) continue;
-    const valoresBase = base.map(r => valorDe(r, codigo)).filter((x): x is number => x !== null);
+    const valoresBase = basePontuacao.map(r => valorDe(r, codigo)).filter((x): x is number => x !== null);
     const referencia = valoresBase.length ? mediana(valoresBase) : null;
     if (atual >= 3 || (referencia !== null && atual - referencia >= 2)) {
       motivo(`Declínio neurológico em ${codigo}: nível ${atual}${referencia !== null ? ` (habitual ${referencia})` : ''}`, 'Alta', 'COMBINACAO_V2', [codigo]);

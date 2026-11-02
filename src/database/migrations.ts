@@ -1,4 +1,6 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
+import path from 'path';
 
 type Migration = { version: number; up: (db: Database.Database) => void };
 
@@ -93,6 +95,12 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_submissao_doente_referencia
           ON SubmissaoMonitorizacao(id_doente, id_formulario, data_referencia_sintomas, data_hora_submissao);
       `);
+    }
+  },
+  {
+    version: 4,
+    up(db) {
+      db.exec(fs.readFileSync(path.join(__dirname, 'migracao_v4_delta.sql'), 'utf8'));
     }
   }
 ];

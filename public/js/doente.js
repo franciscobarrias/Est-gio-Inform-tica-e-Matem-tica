@@ -223,8 +223,10 @@ async function submeterMonitorizacao() {
     });
     const instrucoes = resultado.alertasGerados.flatMap(a => a.instrucoes || []);
     const maisUrgente = ORDEM_INSTRUCOES.find(i => instrucoes.includes(i));
-    $('msgErroForm').className = maisUrgente ? `instrucao ${maisUrgente}` : 'success';
-    $('msgErroForm').textContent = maisUrgente
+    $('msgErroForm').className = resultado.erroAvaliacao ? 'error' : maisUrgente ? `instrucao ${maisUrgente}` : 'success';
+    $('msgErroForm').textContent = resultado.erroAvaliacao
+      ? 'Registo guardado, mas a avaliação automática não foi concluída. Contacte a equipa clínica.'
+      : maisUrgente
       ? `Registo guardado. ${INSTRUCOES[maisUrgente]} A equipa foi notificada.`
       : resultado.alertasGerados.length
         ? 'Registo guardado. A equipa de enfermagem foi notificada das alterações reportadas.'
@@ -232,7 +234,7 @@ async function submeterMonitorizacao() {
     formAtivo.perguntas.forEach(limparPergunta);
     formAtivo.perguntas.forEach(atualizarPergunta);
     // Depois de guardar, a recomendação confirmada pelo servidor fica no topo até o doente voltar a responder.
-    if (maisUrgente) {
+    if (maisUrgente && !resultado.erroAvaliacao) {
       $('avisoRecomendacao').className = `aviso-fixo ${maisUrgente}`;
       $('avisoRecomendacao').innerHTML = `<strong>${escapar(INSTRUCOES[maisUrgente])}</strong>
         <span class="motivo">O registo foi guardado e a equipa foi notificada.</span>`;

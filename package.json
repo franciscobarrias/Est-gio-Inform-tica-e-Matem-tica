@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "npx --yes --package=node@22 -c \"node node_modules/ts-node/dist/bin.js src/app.ts\"",
-    "seed": "npx --yes --package=node@22 -c \"node node_modules/ts-node/dist/bin.js src/seed.ts\"",
+    "seed": "npx --yes --package=node@22 node -r ts-node/register src/seed-cli.ts",
     "typecheck": "npx tsc --noEmit",
     "test": "npx --yes --package=node@22 -c \"node -r ts-node/register --test src/tests/*.test.ts\""
   },

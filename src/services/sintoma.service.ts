@@ -17,7 +17,7 @@ export class SintomaService {
     id_formulario: string;
     data_referencia_sintomas: string;
     respostas: Array<{ id_pergunta: string; id_opcao?: string | null; frequencia?: string; novo_ou_pior?: boolean; texto?: string }>;
-  }) {
+  }, opcoesInternas: { dataHoraSubmissao?: string } = {}) {
     if (!payload || typeof payload.id_formulario !== 'string' ||
         typeof payload.data_referencia_sintomas !== 'string' ||
         !/^\d{4}-\d{2}-\d{2}$/.test(payload.data_referencia_sintomas) ||
@@ -104,7 +104,7 @@ export class SintomaService {
 
     const planoAtivo = db.prepare(`SELECT id_plano FROM PlanoMonitorizacao WHERE id_doente = ? AND estado = 'ATIVO' ORDER BY data_definicao DESC LIMIT 1`).get(idDoente) as any;
     const id_submissao = crypto.randomUUID();
-    const agora = new Date().toISOString();
+    const agora = opcoesInternas.dataHoraSubmissao ?? new Date().toISOString();
 
     const tx = db.transaction(() => {
       db.prepare(`
@@ -130,11 +130,23 @@ export class SintomaService {
           r.novo_ou_pior === undefined ? null : (r.novo_ou_pior ? 1 : 0), texto);
       }
       registarAuditoria(idAutor, 'SUBMISSAO_MONITORIZACAO', `Submissão ${id_submissao}`);
-      const alertasGerados = AlertaService.processarRegrasNaSubmissao(idDoente, id_submissao, idAutor);
-      return alertasGerados;
     });
-    const alertasGerados = tx();
-    return { id_submissao, data_hora_submissao: agora, alertasGerados };
+    tx();
+
+    let alertasGerados: any[] = [];
+    let erroAvaliacao: string | null = null;
+    try {
+      alertasGerados = AlertaService.processarRegrasNaSubmissao(idDoente, id_submissao, idAutor, agora);
+    } catch (erro) {
+      erroAvaliacao = erro instanceof Error ? erro.message : String(erro);
+      try {
+        AlertaService.registarFalhaAvaliacao(id_submissao, erroAvaliacao, agora);
+      } catch (erroAoRegistar) {
+        const detalhe = erroAoRegistar instanceof Error ? erroAoRegistar.message : String(erroAoRegistar);
+        throw new Error(`A submissão ${id_submissao} foi guardada, mas a avaliação falhou e não foi possível registar a falha: ${detalhe}`);
+      }
+    }
+    return { id_submissao, data_hora_submissao: agora, alertasGerados, erroAvaliacao };
   }
 
   // Valor numérico de uma opção: o do formulário v2, ou a conversão do código nas opções do formulário antigo.

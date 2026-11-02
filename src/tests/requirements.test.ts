@@ -36,8 +36,13 @@ test('migração versionada converte «não avaliável» de zero para NULL', () 
         id_submissao TEXT PRIMARY KEY, id_doente TEXT, id_formulario TEXT,
         data_referencia_sintomas TEXT, data_hora_submissao TEXT
       );
+      CREATE TABLE Doente (id_doente TEXT PRIMARY KEY);
       CREATE TABLE PerguntaFormulario (id_pergunta TEXT PRIMARY KEY);
       CREATE TABLE OpcaoResposta (id_opcao TEXT PRIMARY KEY);
+      CREATE TABLE DiagnosticoGB (
+        id_diagnostico TEXT PRIMARY KEY, id_doente TEXT, data_diagnostico TEXT,
+        fase_clinica_atual TEXT
+      );
       CREATE TABLE RespostaMonitorizacao (
         id_resposta TEXT PRIMARY KEY, id_submissao TEXT NOT NULL, id_pergunta TEXT NOT NULL, id_opcao TEXT,
         valor_numerico INTEGER NOT NULL DEFAULT 0, motivo_nao_avaliavel INTEGER NOT NULL DEFAULT 0,
@@ -62,7 +67,15 @@ test('migração versionada converte «não avaliável» de zero para NULL', () 
     assert.equal(coluna?.notnull, 0);
     assert.equal(coluna?.dflt_value, null);
     const versoes = legado.prepare('SELECT COUNT(*) AS total FROM SchemaMigracao').get() as { total: number };
-    assert.equal(versoes.total, 3);
+    assert.equal(versoes.total, 4);
+    const chaveAvaliacao = legado.prepare('PRAGMA table_info(AvaliacaoAlgoritmo)').all() as Array<{ name: string; pk: number }>;
+    assert.equal(chaveAvaliacao.find(coluna => coluna.name === 'id_submissao')?.pk, 1);
+    assert.equal(chaveAvaliacao.find(coluna => coluna.name === 'versao_parametros')?.pk, 2);
+    const foreignKeys = legado.prepare('PRAGMA foreign_key_list(AvaliacaoAlgoritmo)').all() as Array<{ on_delete: string }>;
+    assert.ok(foreignKeys.every(chave => chave.on_delete === 'NO ACTION'));
+    const totalTriggers = legado.prepare(`SELECT COUNT(*) AS total FROM sqlite_master
+      WHERE type = 'trigger' AND name LIKE 'trg_%'`).get() as { total: number };
+    assert.equal(totalTriggers.total, 6);
   } finally {
     legado.close();
   }
@@ -76,6 +89,9 @@ test('guarda hashes individuais e migra credenciais antigas após autenticação
   const hashAntigo = require('crypto').scryptSync('123456', 'salt_gbm_chsj', 64).toString('hex');
   db.prepare('UPDATE Utilizador SET password_hash = ? WHERE id_utilizador = ?').run(hashAntigo, idMedico);
   assert.equal(AuthService.login('medico1@chsj.min-saude.pt', '123456').utilizador.perfil, 'MEDICO');
+  assert.equal(AuthService.login('medico@chsj.pt', '123456').utilizador.perfil, 'MEDICO');
+  assert.equal(AuthService.login('enfermeiro1@chsj.min-saude.pt', '123456').utilizador.perfil, 'ENFERMEIRO');
+  assert.equal(AuthService.login('enfermeiro@chsj.pt', '123456').utilizador.perfil, 'ENFERMEIRO');
   const hashMigrado = db.prepare('SELECT password_hash FROM Utilizador WHERE id_utilizador = ?').get(idMedico) as { password_hash: string };
   assert.ok(hashMigrado.password_hash.startsWith('scrypt$'));
   assert.throws(() => AuthService.login('medico1@chsj.min-saude.pt', 'errada'), /Credenciais inválidas/);
@@ -283,11 +299,14 @@ test('v2: diarreia com 4 ou mais dejeções e quedas repetidas dão Alta', () =>
 });
 
 test('v2: declínio neurológico conta a subida face ao habitual do doente', () => {
-  const base = [{ C1: 0 }, { C1: 0 }, { C1: 0 }];
+  const completa = (c1: number) => ({ ...Object.fromEntries(Object.keys(PESOS).map(codigo => [codigo, 0])), C1: c1 });
+  const base = [completa(0), completa(0), completa(0)];
   assert.equal(avaliar({ C1: 2 }, 90, base).prioridade, 'Alta');
   assert.equal(avaliar({ C1: 1 }, 90, base).prioridade, null);
   // Quem já andava com dificuldade (habitual 1) não dispara com 2.
-  assert.equal(avaliar({ C1: 2 }, 90, [{ C1: 1 }, { C1: 1 }, { C1: 1 }]).prioridade, null);
+  assert.equal(avaliar({ C1: 2 }, 90, [completa(1), completa(1), completa(1)]).prioridade, null);
+  // Registos incompletos não constituem uma linha de base comparável.
+  assert.equal(avaliar({ C1: 2 }, 90, [{ C1: 0 }, { C1: 0 }, { C1: 0 }]).prioridade, null);
 });
 
 test('v2: sintoma grave isolado dá Média e sobe com KPS ≤ 70 ou frequência diária', () => {
@@ -378,13 +397,19 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.deepEqual(alertasGerados[0].instrucoes, ['LIGAR_112']);
   const avaliacaoPersistida = db.prepare(`SELECT score, cobertura, linha_de_base, versao_parametros,
     prioridade_algoritmo, motivos_json
-    FROM AvaliacaoAlgoritmo WHERE id_submissao = ?`).get(id_submissao) as {
+    FROM AvaliacaoAlgoritmo WHERE id_submissao = ? AND versao_parametros = '4.0'`).get(id_submissao) as {
       score: number | null; cobertura: number; linha_de_base: number | null;
       versao_parametros: string; prioridade_algoritmo: string; motivos_json: string;
     };
-  assert.equal(avaliacaoPersistida.versao_parametros, '3.0');
+  assert.equal(avaliacaoPersistida.versao_parametros, '4.0');
   assert.equal(avaliacaoPersistida.prioridade_algoritmo, 'Crítica');
   assert.match(JSON.parse(avaliacaoPersistida.motivos_json)[0].texto, /Dor de cabeça súbita/);
+  assert.throws(() => db.prepare(`UPDATE AvaliacaoAlgoritmo SET score = score
+    WHERE id_submissao = ? AND versao_parametros = '4.0'`).run(id_submissao), /imutável/);
+  assert.throws(() => db.prepare(`UPDATE MotivoEvidencia SET texto = texto
+    WHERE id_submissao = ? AND versao_parametros = '4.0'`).run(id_submissao), /imutável/);
+  assert.throws(() => db.prepare(`UPDATE InstrucaoEmitida SET codigo = codigo
+    WHERE id_submissao = ? AND versao_parametros = '4.0'`).run(id_submissao), /imutável/);
 
   const submissaoRepetida = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
     id_formulario: formulario.id_formulario,
@@ -396,11 +421,52 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   const ligacoes = db.prepare(`SELECT COUNT(*) AS total FROM AlertaSubmissao WHERE id_alerta = ?`)
     .get(alertasGerados[0].id_alerta) as { total: number };
   assert.ok(ligacoes.total >= 2);
+  const motivoNovo = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+    id_formulario: formulario.id_formulario,
+    data_referencia_sintomas: hoje,
+    respostas: [{ id_pergunta: 'v2-a3-sonolencia-subita', id_opcao: opcao('v2-a3-sonolencia-subita', 'SIM') }]
+  }).alertasGerados[0];
+  assert.notEqual(motivoNovo.id_alerta, alertasGerados[0].id_alerta);
+  assert.equal(motivoNovo.id_alerta_anterior, alertasGerados[0].id_alerta);
+  assert.equal(motivoNovo.tipo_associacao, 'MOTIVO_NOVO');
+  const associacao = db.prepare(`SELECT tipo_associacao FROM AlertaSubmissao
+    WHERE id_alerta = ? AND id_submissao = ?`).get(motivoNovo.id_alerta, motivoNovo.id_submissao) as {
+      tipo_associacao: string;
+    };
+  assert.equal(associacao.tipo_associacao, 'MOTIVO_NOVO');
+  const alertaListado = AlertaService.listarAlertas().find((alerta: any) => alerta.id_alerta === motivoNovo.id_alerta);
+  assert.ok(alertaListado && alertaListado.submissoes_associadas.length >= 1);
 
   const bundle = FhirService.exportarBundleFhir(idDoente);
   assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire' &&
     entrada.resource.id === formulario.id_formulario));
   assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'DetectedIssue'));
+  const detectedIssue = bundle.entry.find((entrada: any) => entrada.resource.resourceType === 'DetectedIssue')?.resource;
+  assert.ok(detectedIssue.evidence.length > 0);
+});
+
+test('uma falha do motor não reverte a submissão e fica registada como avaliação com erro', () => {
+  const formulario = SintomaService.obterFormularioAtivo();
+  const opcao = formulario.perguntas.find((p: any) => p.id_pergunta === 'v2-a2-cefaleia-subita')
+    .opcoes.find((o: any) => o.valor_codificado === 'SIM').id_opcao;
+  db.prepare(`UPDATE RegraAlerta SET ativa = 0 WHERE id_regra = 'regra-v2-alarme'`).run();
+  try {
+    const resultado = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
+      id_formulario: formulario.id_formulario,
+      data_referencia_sintomas: new Date().toISOString().slice(0, 10),
+      respostas: [{ id_pergunta: 'v2-a2-cefaleia-subita', id_opcao: opcao }]
+    });
+    assert.ok(db.prepare('SELECT 1 FROM SubmissaoMonitorizacao WHERE id_submissao = ?').get(resultado.id_submissao));
+    assert.match(resultado.erroAvaliacao || '', /não está configurada ou ativa/);
+    const avaliacao = db.prepare(`SELECT estado, erro FROM AvaliacaoAlgoritmo
+      WHERE id_submissao = ? AND versao_parametros = '4.0'`).get(resultado.id_submissao) as {
+        estado: string; erro: string;
+      };
+    assert.equal(avaliacao.estado, 'ERRO');
+    assert.match(avaliacao.erro, /não está configurada ou ativa/);
+  } finally {
+    db.prepare(`UPDATE RegraAlerta SET ativa = 1 WHERE id_regra = 'regra-v2-alarme'`).run();
+  }
 });
 
 // ---------- Medicação ----------

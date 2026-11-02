@@ -72,6 +72,13 @@ export class FhirService {
     for (const a of proc.alertas as any[]) {
       const nivel = a.prioridade === 'Crítica' || a.prioridade === 'Alta' ? 'high' :
         a.prioridade === 'Média' ? 'moderate' : 'low';
+      const motivos = db.prepare(`SELECT DISTINCT m.id_submissao, m.ordem, m.texto, m.prioridade, m.tipo
+        FROM AlertaSubmissao ls
+        JOIN MotivoEvidencia m
+          ON m.id_submissao = ls.id_submissao
+        WHERE ls.id_alerta = ?
+        ORDER BY m.id_submissao, m.ordem`)
+        .all(a.id_alerta) as Array<{ id_submissao: string; texto: string; prioridade: string; tipo: string }>;
       entries.push({
         resource: {
           resourceType: 'DetectedIssue',
@@ -82,6 +89,10 @@ export class FhirService {
           identifiedDateTime: a.data_hora_geracao,
           severity: nivel,
           detail: a.resumo_agravamento,
+          evidence: motivos.map(motivo => ({
+            code: { text: `${motivo.prioridade}: ${motivo.texto}` },
+            detail: [{ reference: `QuestionnaireResponse/${motivo.id_submissao}` }]
+          })),
           note: [{ text: `Estado: ${a.estado_atual}. Prioridade algorítmica: ${a.prioridade_algoritmo || a.prioridade}; prioridade atual após triagem: ${a.prioridade}.` }]
         }
       });

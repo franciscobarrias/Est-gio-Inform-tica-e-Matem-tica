@@ -18,8 +18,8 @@ Contas fictícias de demonstração (palavra-passe `123456`):
 
 | Perfil | Email |
 |---|---|
-| Médico | `medico1@chsj.min-saude.pt` (também `medico2`, `medico3`) |
-| Enfermeiro | `enfermeiro1@chsj.min-saude.pt` (também `enfermeiro2`, `enfermeiro3`) |
+| Médico | `medico1@chsj.min-saude.pt` |
+| Enfermeiro | `enfermeiro1@chsj.min-saude.pt` |
 | Doente | `doente@chsj.pt` |
 | Cuidador | `cuidador@chsj.pt` |
 
@@ -36,7 +36,7 @@ npm run dev
 
 **Atenção:** `npm run seed` apaga e recria os registos da base de dados indicada em `DATABASE_PATH` (ou `data.db`, se não for indicada), usando dados sintéticos. Execute-o apenas na primeira configuração ou numa base descartável; não o execute numa base de dados que pretenda conservar.
 
-Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Os profissionais aparecem como «Médico 1», «Enfermeiro 1», etc., para não coincidirem com profissionais reais. Contas principais: `medico1@chsj.min-saude.pt` (Médico 1), `enfermeiro1@chsj.min-saude.pt`, `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os restantes doentes entram com `doenteN@example.invalid`.
+Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Os profissionais aparecem como «Médico 1», «Enfermeiro 1», etc., para não coincidirem com profissionais reais. Contas principais: `medico1@chsj.min-saude.pt` (Médico 1), `enfermeiro1@chsj.min-saude.pt` (Enfermeiro 1), `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os endereços `medico@chsj.pt` e `enfermeiro@chsj.pt` também são aceites para compatibilidade com bases já existentes. Os restantes doentes entram com endereços de demonstração `@example.invalid`.
 
 | N.º | Doente | Cenário de demonstração |
 |---|---|---|
@@ -66,13 +66,13 @@ Os nomes, números de processo e datas são **fictícios** e não correspondem a
 - Alertas determinísticos, triagem e prioridade, com histórico de ações e registo de auditoria. O motor do questionário v2 (`src/services/motor-alertas-v2.ts`) avalia por camadas (limiares demonstrativos, **não validados clinicamente**):
   1. **Sinais de alarme** (Bloco A, ou sonolência B4 em nível 3): **Crítica** quando a instrução é ligar 112 ou contactar já, **Alta** quando é contactar hoje (A7, A8 e convulsão única com recuperação), com indicação imediata ao doente (ligar 112, contactar já ou contactar hoje). Na convulsão (A1) pergunta-se a duração, o número e se recuperou: uma só, com menos de 5 minutos e recuperação → Alta e contactar hoje; várias curtas com recuperação → contactar já (a validar); restantes casos ou detalhes em falta → 112. Enquanto o doente responde, a recomendação mais urgente fica fixa no topo do formulário;
   2. **Combinações de sintomas**: hipertensão intracraniana provável (Crítica) ou possível (Alta), toxicidade da temozolomida, declínio neurológico face ao habitual do doente, quedas repetidas (Alta); sintoma grave isolado (Média);
-  3. **Score de evolução** 0–100 ponderado, comparado com a mediana dos três primeiros registos elegíveis (cobertura ≥ 60%). O limiar demonstrativo é adaptado à linha de base e à variabilidade individual (MAD), com mínimo de 10 pontos;
+  3. **Score de evolução** 0–100 ponderado, comparado com a mediana dos três primeiros registos elegíveis (cobertura ≥ 60%). O limiar demonstrativo é `max(5, 0,1 × S₀, 2 × MAD)`;
   4. **Ajustes**: KPS ≤ 70 e frequência diária ou constante sobem um nível cada, sem passar de Alta.
-  Indicadores cognitivos assinalados como «não consigo avaliar» são preservados como sinal de dados insuficientes, não como zero. Os registos com recordação de sete dias só são comparados quando distam pelo menos sete dias; a linha de base reinicia quando muda a fase clínica, há uma nova cirurgia registada ou uma nova avaliação KPS vigente. KPS ausente ou com mais de 180 dias não é tratado como 100 nem ajusta a prioridade. Alertas repetidos do mesmo tipo ficam ligados ao novo registo sem criar novo alerta enquanto o anterior estiver aberto. O formulário v2 é o único motor de alertas; alertas e submissões históricas v1 permanecem disponíveis para consulta.
+  Dois ou mais indicadores cognitivos «não consigo avaliar» geram um motivo de dados insuficientes, sem os converter em zero. Os registos com recordação de sete dias só são comparados quando distam pelo menos sete dias; a linha de base muda com a fase clínica vigente à data do registo, uma nova cirurgia ou uma variação KPS de pelo menos 20 pontos/cruzamento de 70. A expiração KPS aos 180 dias não reinicia a linha de base. KPS ausente ou expirado não é tratado como 100 nem ajusta a prioridade. A deduplicação compara motivos concretos; motivos repetidos associam registos ao alerta aberto, enquanto motivos novos criam alerta ligado ao anterior. A submissão é persistida antes da avaliação; se o motor falhar, a falha fica registada sem perder as respostas. O formulário v2 é o único motor de alertas; alertas e submissões históricas v1 permanecem disponíveis para consulta.
 - Separador **Diagnóstico e medicação**, para todos os perfis: diagnóstico, linha do tempo dos tratamentos e medicação (ativa e anterior). Só o médico regista diagnóstico, tratamentos e medicação, e pode suspender, retomar ou terminar uma medicação; a enfermagem, o doente e o cuidador consultam.
 - Identificação do doente no topo de todas as páginas: nome, n.º de processo, data de nascimento e idade, sexo, médico responsável e cuidador. O cuidador vê «Está a registar por…».
 - Interface por separadores (Alertas, Doentes, Resumo clínico, Diagnóstico e medicação, Evolução, Registos do doente e Gestão clínica). O médico e a enfermagem começam sem doente escolhido: escolhem-no no separador **Doentes** (pesquisa por nome ou n.º de processo; primeiro os que têm alertas por concluir ou registos em atraso) ou a partir de um alerta.
-- Exportação autenticada de um bundle HL7 FHIR para o processo clínico, incluindo Questionnaire, QuestionnaireResponse completa mesmo quando parcial, score/linha de base e alertas.
+- Exportação autenticada de um bundle HL7 FHIR para o processo clínico, incluindo Questionnaire, QuestionnaireResponse completa mesmo quando parcial, score/linha de base e alertas com motivos em `DetectedIssue.evidence`.
 - Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
 
 ## Estrutura da interface
@@ -89,17 +89,17 @@ A interface está dividida por perfil. Todas as páginas usam os mesmos estilos 
 | `js/clinico.js` | Lista de alertas e resumo clínico, partilhados pelo médico e pela enfermagem |
 | `css/estilos.css` | Estilos comuns |
 
-As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. As alterações ao esquema são aplicadas por migrações versionadas em `src/database/migrations.ts`; ao arrancar, o formulário v2 passa a ser o ativo (o v1 fica inativo). Para ter os dados de demonstração no v2, corra `npm run seed`.
+As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. As alterações ao esquema são aplicadas por migrações versionadas em `src/database/migrations.ts`, incluindo a migração v4 em `src/database/migracao_v4_delta.sql`; ao arrancar, o formulário v2 passa a ser o ativo (o v1 fica inativo). `npm run seed` cria `gbm-seed.db`, sem apagar uma base existente. Pode escolher outro ficheiro e uma data de referência com `npm run seed -- --database=C:\dados\demo.db --date=2026-11-02`.
 
-O score usa os pesos 3/2/1 como importância relativa proposta (função/autonomia, cognição/deglutição e restantes sintomas). A soma é uma aproximação de rastreio sobre respostas ordinais, não uma medida intervalar validada. O limiar adaptativo é `max(5, 10% da linha de base, 2 × MAD)`, pelo que varia com o nível e a variabilidade basais. Sensibilidade no cenário de subida 0→2 em D1, C4 e B7: com pesos 3/2/1 a variação é 11,9 pontos (16/135); com pesos iguais é 7,9 (6/76). O B20 é texto livre para a equipa e não entra no score. O caso dispara com limiares absolutos 8 ou 10, mas não com 15 ou 20; logo a escolha muda a decisão e carece de validação clínica. A cobertura mínima de 60% e a regra de MAD também são parâmetros exploratórios, sem validação clínica.
+O score usa os pesos 3/2/1 como importância relativa proposta (função/autonomia, cognição/deglutição e restantes sintomas). A soma é uma aproximação de rastreio sobre respostas ordinais, não uma medida intervalar validada. O limiar adaptativo é `max(5, 0,1 × S₀, 2 × MAD)`, pelo que varia com o nível e a variabilidade basais. Sensibilidade no cenário de subida 0→2 em D1, C4 e B7: com pesos 3/2/1 a variação é 11,9 pontos (16/135); com pesos iguais é 7,9 (6/76). O B20 é texto livre para a equipa e não entra no score. A cobertura mínima de 60% e a regra de MAD também são parâmetros exploratórios, sem validação clínica. O script e as hipóteses da comparação sintética estão em [docs/metodos-e-simulacao.md](./docs/metodos-e-simulacao.md).
 
 As bases SQLite e os ficheiros WAL/SHM são locais e ignorados pelo Git. Use `npm run seed` para gerar dados sintéticos; não distribua nem inclua bases de dados locais em ZIPs.
 
 O token de sessão passa entre páginas no `sessionStorage` e é apagado ao terminar sessão ou ao fechar o separador. Abrir a página de outro perfil leva de volta à página do próprio perfil. Esta divisão serve só a interface: quem decide o que cada perfil pode ver e alterar é sempre o servidor.
 
-## Diagramas
+## Modelo de dados e arquitetura
 
-`docs/modelo-dados-gbm.drawio` tem o modelo de dados completo (abre em [diagrams.net](https://app.diagrams.net) ou na extensão Draw.io do VS Code). A verde está o que foi acrescentado nesta versão: a tabela `Medicacao` e as colunas para o texto do cuidador.
+[docs/modelos-e-dicionario.md](./docs/modelos-e-dicionario.md) descreve o esquema implementado, as novas tabelas, as responsabilidades dos serviços e a semântica dos nulos. As [decisões de desenho](./docs/decisoes-de-desenho.md) registam imutabilidade, separação algoritmo/decisão humana, versionamento e linha de base derivada. O runtime usa Express e `better-sqlite3` com SQL direto; não usa TypeORM nem repositórios e ainda não implementa reprocessamento de avaliações.
 
 ## Verificação
 

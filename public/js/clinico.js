@@ -75,6 +75,11 @@ function cartaoAlerta(a) {
     <p>${escapar(a.resumo_agravamento)}</p>
     <p class="muted pequeno">Regra: ${escapar(a.nome_regra)}${a.prioridade_algoritmo && a.prioridade_algoritmo !== a.prioridade
       ? ` · prioridade ajustada na triagem (o algoritmo indicou ${escapar(a.prioridade_algoritmo)})` : ''}</p>
+    ${a.id_alerta_anterior ? `<p class="muted pequeno">Escalonado a partir do alerta ${escapar(a.id_alerta_anterior)}.</p>` : ''}
+    ${a.submissoes_associadas?.length ? `<p class="muted pequeno"><strong>Registos associados:</strong> ${a.submissoes_associadas.map(s =>
+      `${dataCurta(s.data_referencia_sintomas)} · ${s.tipo_associacao === 'MOTIVO_REPETIDO' ? 'motivo repetido' :
+        s.tipo_associacao === 'MOTIVO_NOVO' ? 'motivo novo' :
+          s.tipo_associacao === 'ESCALONAMENTO' ? 'escalonamento' : 'origem'}`).join('; ')}</p>` : ''}
     ${a.mensagem_doente ? `<p class="mensagem-doente"><strong>Mensagem do doente/cuidador:</strong> «${escapar(a.mensagem_doente)}»</p>` : ''}
     ${a.ultima_nota ? `<p class="nota"><strong>Nota de triagem</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>`
       : a.estado_atual === 'Pendente' ? `<p class="nota ${atraso ? 'nota-atraso' : 'muted'}">Ainda não avaliado pela enfermagem${atraso

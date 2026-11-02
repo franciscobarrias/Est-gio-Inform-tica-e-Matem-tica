@@ -39,6 +39,7 @@ export class MedicoService {
           fase_clinica_atual = excluded.fase_clinica_atual`)
         .run(idDiagnostico, idDoente, dados.data_diagnostico, dados.localizacao_tumoral.trim(),
           dados.lateralidade.trim(), dados.estatuto_idh.trim(), dados.metilacao_mgmt.trim(), dados.fase_clinica_atual.trim());
+      this.registarFaseClinica(idDoente, dados.fase_clinica_atual.trim(), new Date().toISOString().slice(0, 10));
       registarAuditoria(idMedico, 'ATUALIZACAO_DIAGNOSTICO_RF07', `Diagnóstico atualizado para o processo ${idDoente}`);
     });
     tx();
@@ -91,11 +92,25 @@ export class MedicoService {
     const tx = db.transaction(() => {
       db.prepare(`UPDATE PlanoMonitorizacao SET estado = 'HISTORICO' WHERE id_doente = ? AND estado = 'ATIVO'`).run(idDoente);
       db.prepare(`INSERT INTO PlanoMonitorizacao VALUES (?, ?, ?, ?, ?, ?, 'ATIVO')`).run(id_plano, idDoente, idMedico, modoPeriodicidade, periodicidadeDias, agora);
-      if (faseClinica) db.prepare(`UPDATE DiagnosticoGB SET fase_clinica_atual = ? WHERE id_doente = ?`).run(faseClinica.trim(), idDoente);
+      if (faseClinica) {
+        const atualizado = db.prepare(`UPDATE DiagnosticoGB SET fase_clinica_atual = ? WHERE id_doente = ?`)
+          .run(faseClinica.trim(), idDoente);
+        if (atualizado.changes) this.registarFaseClinica(idDoente, faseClinica.trim(), new Date().toISOString().slice(0, 10));
+      }
       registarAuditoria(idMedico, 'PLANO_MONITORIZACAO_RF09', `Periodicidade de ${periodicidadeDias} dias`);
     });
     tx();
     return { id_plano, periodicidade_dias: periodicidadeDias };
+  }
+
+  private static registarFaseClinica(idDoente: string, faseClinica: string, dataInicio: string): void {
+    const faseAnterior = db.prepare(`SELECT fase_clinica FROM FaseClinica
+      WHERE id_doente = ? AND data_inicio <= ?
+      ORDER BY data_inicio DESC, rowid DESC LIMIT 1`)
+      .get(idDoente, dataInicio) as { fase_clinica: string } | undefined;
+    if (faseAnterior?.fase_clinica === faseClinica) return;
+    db.prepare(`INSERT INTO FaseClinica (id_fase_clinica, id_doente, fase_clinica, data_inicio)
+      VALUES (?, ?, ?, ?)`).run(crypto.randomUUID(), idDoente, faseClinica, dataInicio);
   }
 
   static registarTratamento(idDoente: string, idMedico: string, dados: { tipo: string; estado: string; data_inicio: string; data_fim?: string; descricao_esquema: string }) {
@@ -288,7 +303,12 @@ export class MedicoService {
       WHERE s.id_doente = ? ORDER BY a.data_hora_geracao DESC`).all(idDoente);
     const avaliacoesAlgoritmo = db.prepare(`SELECT a.*, s.data_referencia_sintomas FROM AvaliacaoAlgoritmo a
       JOIN SubmissaoMonitorizacao s ON s.id_submissao = a.id_submissao
-      WHERE s.id_doente = ? ORDER BY s.data_referencia_sintomas ASC, s.data_hora_submissao ASC`).all(idDoente);
+      WHERE s.id_doente = ? AND a.rowid = (
+        SELECT a2.rowid FROM AvaliacaoAlgoritmo a2
+        WHERE a2.id_submissao = a.id_submissao
+        ORDER BY a2.data_hora_avaliacao DESC LIMIT 1
+      )
+      ORDER BY s.data_referencia_sintomas ASC, s.data_hora_submissao ASC`).all(idDoente);
     const decisoes = db.prepare(`SELECT dec.*, u.nome as nome_medico FROM DecisaoAcompanhamento dec JOIN Utilizador u ON dec.id_medico = u.id_utilizador WHERE dec.id_doente = ? ORDER BY dec.data_hora_decisao DESC`).all(idDoente);
 
     return {

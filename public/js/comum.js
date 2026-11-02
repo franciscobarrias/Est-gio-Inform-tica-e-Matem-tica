@@ -406,13 +406,16 @@ function desenharQuadroComparativo(submissoes) {
 // Score do algoritmo (só médico e enfermagem): pontos do score, linha de base e limiar de cada registo.
 function desenharScore(avaliacoes) {
   if (!$('chartScore')) return;
+  const falhas = avaliacoes.filter(a => a.estado === 'ERRO');
+  const avisoFalhas = falhas.length ? `<div class="error" role="alert"><strong>${falhas.length} avaliação(ões) automática(s) falharam:</strong>
+    <ul>${falhas.map(a => `<li>${dataCurta(a.data_referencia_sintomas)}: ${escapar(a.erro || 'Erro não detalhado.')}</li>`).join('')}</ul></div>` : '';
   const pontos = avaliacoes.filter(a => a.score !== null && a.score !== undefined)
     .map(a => ({ data: a.data_referencia_sintomas, score: Number(a.score), base: a.linha_de_base === null ? null : Number(a.linha_de_base),
       limiar: a.linha_de_base === null || a.limiar_score === null ? null : Number(a.linha_de_base) + Number(a.limiar_score),
       alerta: String(a.motivos_json || '').includes('SCORE_EVOLUCAO_V2') }));
   const semScore = avaliacoes.length - pontos.length;
   if (!pontos.length) {
-    $('chartScore').innerHTML = '<p class="muted">Ainda não há registos com respostas suficientes para calcular o score.</p>';
+    $('chartScore').innerHTML = `${avisoFalhas}<p class="muted">Ainda não há avaliações com score disponível.</p>`;
     return;
   }
   const L = 960, A = 260, esq = 44, dir = 940, topo = 14, base = 214;
@@ -429,7 +432,7 @@ function desenharScore(avaliacoes) {
   const marcasY = Array.from({ length: Math.floor(yMax / 10) + 1 }, (_, k) => k * 10).filter(v => v % (yMax > 50 ? 20 : 10) === 0);
   const passo = Math.max(1, Math.ceil(pontos.length / 10));
   const ultimo = pontos[pontos.length - 1];
-  $('chartScore').innerHTML = `<svg class="chart" viewBox="0 0 ${L} ${A}" role="img" aria-label="Score de evolução: ${pontos.map(p => `${dataCurta(p.data)} ${p.score}`).join('; ')}">
+  $('chartScore').innerHTML = `${avisoFalhas}<svg class="chart" viewBox="0 0 ${L} ${A}" role="img" aria-label="Score de evolução: ${pontos.map(p => `${dataCurta(p.data)} ${p.score}`).join('; ')}">
     ${marcasY.map(v => `<line x1="${esq}" y1="${y(v)}" x2="${dir}" y2="${y(v)}" stroke="#ecdfd2"/><text x="${esq - 8}" y="${y(v) + 4}" text-anchor="end" font-size="12" fill="#6b5d52">${v}</text>`).join('')}
     ${troco('limiar').map(t => `<polyline points="${t.join(' ')}" fill="none" stroke="#b42318" stroke-width="1.5" stroke-dasharray="6 4"/>`).join('')}
     ${troco('base').map(t => `<polyline points="${t.join(' ')}" fill="none" stroke="#6b5d52" stroke-width="2" stroke-dasharray="2 4"/>`).join('')}
