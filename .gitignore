@@ -430,3 +430,7 @@ FodyWeavers.xsd
 *.db-shm
 *.db-wal
 *.db-journal
+# Base de dados local (cada pessoa cria a sua com «npm run seed»)
+data.db
+data.db-shm
+data.db-wal

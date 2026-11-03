@@ -429,3 +429,47 @@ code.senha { font-size:1rem; padding:.1rem .4rem; background:#fff; border:1px da
 .legenda-estado span { display:inline-flex; align-items:center; gap:.35rem; }
 .legenda-estado .ponto-info { width:.6rem; height:.6rem; }
 @media (max-width:560px) { .pesquisa-lista li.com-estado { grid-template-columns:auto 1fr; } .pesquisa-lista .op-detalhe { grid-column:2; text-align:left; white-space:normal; } }
+
+/* Cartão de alerta */
+.alerta { padding:0; overflow:hidden; }
+.alerta > * { margin-left:1.1rem; margin-right:1.1rem; }
+.alerta-topo { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .75rem; margin:0; padding:.8rem 1.1rem; border-bottom:1px solid var(--line); }
+.alerta-quem { display:flex; align-items:baseline; gap:.5rem; flex:1 1 auto; min-width:0; }
+.alerta-doente { font-weight:700; font-size:1.02rem; }
+.alerta-processo { color:var(--muted); font-size:.85rem; font-variant-numeric:tabular-nums; }
+.alerta-meta { display:flex; align-items:center; gap:.6rem; font-size:.85rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.alerta-motivos { list-style:none; padding:0; margin-top:.75rem; margin-bottom:.5rem; display:grid; gap:.35rem; }
+.alerta-motivos .motivo { display:grid; grid-template-columns:4.6rem 1fr auto; gap:.25rem .75rem; align-items:baseline; }
+.motivo-nivel { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--p-baixa); }
+.motivo-nivel.p-Crítica { color:var(--p-critica); } .motivo-nivel.p-Alta { color:var(--p-alta); } .motivo-nivel.p-Média { color:var(--p-media); }
+.motivo-texto { font-weight:550; }
+.motivo-codigos { display:flex; flex-wrap:wrap; gap:.25rem; justify-content:flex-end; }
+.motivo-codigo { text-decoration:none; font-size:.75rem; color:var(--muted); background:var(--neutro); border-radius:4px; padding:.05rem .4rem; white-space:nowrap; cursor:help; }
+.alerta-detalhes { display:flex; flex-wrap:wrap; gap:.25rem 1.5rem; margin-top:.25rem; margin-bottom:.6rem; font-size:.85rem; }
+.alerta-detalhes div { display:flex; gap:.35rem; }
+.alerta-detalhes dt { color:var(--muted); }
+.alerta-detalhes dt::after { content:':'; }
+.alerta-detalhes dd { margin:0; font-weight:550; }
+.alerta-ligacao { font-size:.85rem; color:var(--muted); margin-top:.1rem; margin-bottom:.5rem; }
+.alerta-nota { border-left:3px solid var(--border); background:#faf6f2; border-radius:0 6px 6px 0; padding:.5rem .75rem; margin-top:.5rem; margin-bottom:.75rem; font-size:.9rem; }
+.alerta-nota p { margin:0; }
+.alerta-nota-cab { font-size:.75rem; font-weight:650; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.2rem; }
+.alerta-nota.mensagem { border-left-color:#6b5d52; }
+.alerta-nota.sem-nota { color:var(--muted); background:transparent; border-left-style:dashed; }
+.alerta-nota.nota-atraso { background:var(--p-critica-bg); border-left-color:var(--p-critica); color:#7a1c14; }
+.alerta-acoes { margin:0; padding:.6rem 1.1rem; border-top:1px solid var(--line); background:#fcfaf8; }
+.alerta-acoes .acoes button { padding:.45rem .9rem; font-size:.92rem; }
+.alerta-acoes .triagem { margin-top:.5rem; border-top:0; padding-top:0; }
+@media (max-width:640px) {
+  .alerta-motivos .motivo { grid-template-columns:1fr; gap:.1rem; }
+  .motivo-codigos { justify-content:flex-start; }
+  .alerta-meta { width:100%; }
+}
+
+/* Lista de doentes: nome numa linha, KPS e alertas na linha de baixo */
+.pesquisa-lista li.com-detalhe { display:flex; flex-direction:column; gap:.05rem; }
+.pesquisa-lista .op-sub { font-size:.8rem; color:var(--muted); }
+.barra-doente .seletor .pesquisa-lista { left:auto; right:0; min-width:min(22rem, 92vw); }
+.barra-doente .seletor .pesquisa > input { text-overflow:ellipsis; }
+.barra-doente { overflow:visible; position:relative; z-index:5; }
+.alerta > p.alerta-ligacao { margin:.1rem 1.1rem .5rem; }

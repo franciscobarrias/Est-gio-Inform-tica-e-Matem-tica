@@ -238,6 +238,8 @@ export class AlertaService {
                ORDER BY h.data_hora_acao DESC LIMIT 1) as ultima_nota,
              (SELECT ua.nome FROM HistoricoAcaoAlerta h JOIN Utilizador ua ON ua.id_utilizador = h.id_utilizador
                WHERE h.id_alerta = a.id_alerta ORDER BY h.data_hora_acao DESC LIMIT 1) as autor_ultima_nota,
+             (SELECT h.data_hora_acao FROM HistoricoAcaoAlerta h WHERE h.id_alerta = a.id_alerta
+               ORDER BY h.data_hora_acao DESC LIMIT 1) as data_ultima_nota,
              (SELECT r.texto FROM RespostaMonitorizacao r JOIN PerguntaFormulario p ON p.id_pergunta = r.id_pergunta
                WHERE r.id_submissao = a.id_submissao AND p.tipo_resposta = 'TEXTO_LIVRE' LIMIT 1) as mensagem_doente,
              ant.data_hora_geracao as anterior_data, ant.prioridade as anterior_prioridade, ant.estado_atual as anterior_estado
@@ -252,9 +254,18 @@ export class AlertaService {
     const submissoes = db.prepare(`SELECT s.id_submissao, s.data_referencia_sintomas, ls.tipo_associacao
       FROM AlertaSubmissao ls JOIN SubmissaoMonitorizacao s ON s.id_submissao = ls.id_submissao
       WHERE ls.id_alerta = ? ORDER BY s.data_referencia_sintomas DESC, s.data_hora_submissao DESC`);
+    // Motivos e instruções da avaliação que gerou o alerta (versão de parâmetros mais recente dessa submissão).
+    const motivos = db.prepare(`SELECT texto, prioridade, tipo, codigos_json FROM MotivoEvidencia
+      WHERE id_submissao = ? AND versao_parametros = (SELECT MAX(versao_parametros) FROM MotivoEvidencia WHERE id_submissao = ?)
+      ORDER BY ordem`);
+    const instrucoes = db.prepare(`SELECT DISTINCT codigo FROM InstrucaoEmitida
+      WHERE id_submissao = ? AND versao_parametros = (SELECT MAX(versao_parametros) FROM InstrucaoEmitida WHERE id_submissao = ?)`);
     return alertas.map(alerta => ({
       ...alerta,
-      submissoes_associadas: submissoes.all(alerta.id_alerta)
+      submissoes_associadas: submissoes.all(alerta.id_alerta),
+      motivos: (motivos.all(alerta.id_submissao, alerta.id_submissao) as any[])
+        .map(m => ({ ...m, codigos: JSON.parse(m.codigos_json || '[]') })),
+      instrucoes: (instrucoes.all(alerta.id_submissao, alerta.id_submissao) as Array<{ codigo: string }>).map(i => i.codigo)
     }));
   }
 

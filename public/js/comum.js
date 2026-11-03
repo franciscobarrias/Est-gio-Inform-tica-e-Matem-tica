@@ -223,10 +223,11 @@ function preencherSeletorDoentes() {
   $('caixaSeletor').classList.toggle('hidden', !mostrarSeletor);
   $('barraDoente').style.gridTemplateColumns = mostrarSeletor ? '' : '1fr';
   $('doenteSelecionado').innerHTML = (idDoenteAtivo ? '' : '<option value="">— Escolha um doente —</option>') + pacientes.map(p => {
-    const extra = ehClinico()
-      ? ` · KPS ${p.ultimo_kps ?? '—'}${p.alertas_abertos ? ` · ${p.alertas_abertos} alerta(s)` : ''}`
+    // O KPS e os alertas aparecem numa segunda linha na lista de pesquisa.
+    const detalhe = ehClinico()
+      ? `KPS ${p.ultimo_kps ?? '—'}${p.alertas_abertos ? ` · ${p.alertas_abertos} ${p.alertas_abertos === 1 ? 'alerta aberto' : 'alertas abertos'}` : ' · sem alertas abertos'}`
       : '';
-    return `<option value="${escapar(p.id_doente)}">${escapar(p.nome)} · ${escapar(p.numero_processo_clinico || '')}${extra}</option>`;
+    return `<option value="${escapar(p.id_doente)}" data-detalhe="${escapar(detalhe)}">${escapar(p.nome)} · ${escapar(p.numero_processo_clinico || '')}</option>`;
   }).join('');
   $('doenteSelecionado').value = idDoenteAtivo || '';
 }
@@ -587,7 +588,7 @@ async function iniciarPagina({ perfis, separadores, semBarraDoente = [], separad
     formAtivo = await pedidoApi('/api/formularios/ativo');
     if ($('perguntaGrafico')) prepararEvolucao();
     $('doenteSelecionado').addEventListener('change', evento => selecionarDoente(evento.target.value));
-    tornarPesquisavel($('doenteSelecionado'), { placeholder: 'Nome ou n.º de processo…' });
+    tornarPesquisavel($('doenteSelecionado'), { placeholder: 'Nome ou n.º de processo…', mostrarDetalhe: true });
     if ($('perguntaGrafico')) {
       tornarPesquisavel($('perguntaGrafico'), { placeholder: 'Escreva o sintoma…', mostrarEstado: true });
       $('perguntaGrafico').closest('.pesquisa').insertAdjacentHTML('afterend', `<p class="legenda-estado pequeno muted">
