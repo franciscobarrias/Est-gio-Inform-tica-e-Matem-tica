@@ -521,11 +521,12 @@ test('regista, suspende e termina medicação, validando os dados', () => {
   assert.ok(processo.medicacoes.some((m: any) => m.id_medicacao === med.id_medicacao));
   // Na exportação FHIR a medicação sai com o código ATC e o diagnóstico com o código CID-10.
   const fhir = FhirService.exportarBundleFhir(idDoente);
-  const declaracao = fhir.entry.find((e: any) => e.resource.id === med.id_medicacao).resource;
+  const declaracao = fhir.entry.find(e => e.resource.id === med.id_medicacao)?.resource as Record<string, any> | undefined;
+  assert.ok(declaracao);
   assert.equal(declaracao.resourceType, 'MedicationStatement');
   assert.deepEqual(declaracao.medicationCodeableConcept.coding[0], { system: 'http://www.whocc.no/atc', code: 'A03FA01', display: 'Metoclopramida' });
-  const condicao = fhir.entry.find((e: any) => e.resource.resourceType === 'Condition');
-  if (condicao) assert.ok(condicao.resource.code.coding.some((c: any) => c.system === 'http://hl7.org/fhir/sid/icd-10-cm'));
+  const condicao = obterRecursoFhir(fhir, 'Condition');
+  assert.ok(condicao.code.coding.some((c: any) => c.system === 'http://hl7.org/fhir/sid/icd-10-cm'));
   assert.equal(processo.medicacoes[0].estado, 'ATIVA');
 });
 
