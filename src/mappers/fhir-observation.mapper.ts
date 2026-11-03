@@ -1,7 +1,35 @@
 import { FhirResourceBuilder, FhirObservation } from './fhir-resource.builder';
 
+interface DiagnosticoParaFhir {
+  id_diagnostico: string;
+  data_diagnostico: string;
+  lateralidade: string;
+  estatuto_idh: string;
+  metilacao_mgmt: string;
+}
+
+interface AvaliacaoKpsParaFhir {
+  id_avaliacao_kps: string;
+  id_doente: string;
+  id_medico: string;
+  data_avaliacao: string;
+  score_kps: number;
+}
+
+interface AvaliacaoAlgoritmoParaFhir {
+  id_submissao: string;
+  id_doente: string;
+  data_referencia_sintomas: string;
+  score: number | null;
+  cobertura: number | null;
+  linha_de_base: number | null;
+  variabilidade_linha_de_base: number | null;
+  limiar_score: number | null;
+  versao_parametros: string;
+}
+
 export class FhirObservationMapper {
-  static diagnosticoToFhir(diagnostico: any, idDoente: string): FhirObservation[] {
+  static diagnosticoToFhir(diagnostico: DiagnosticoParaFhir, idDoente: string): FhirObservation[] {
     const observacoes = [
       ['tumour-laterality', 'Lateralidade tumoral', diagnostico.lateralidade],
       ['idh-status', 'Estatuto IDH', diagnostico.estatuto_idh],
@@ -24,7 +52,7 @@ export class FhirObservationMapper {
     }));
   }
 
-  static kpsToFhir(kps: any): FhirObservation {
+  static kpsToFhir(kps: AvaliacaoKpsParaFhir): FhirObservation {
     return FhirResourceBuilder.observation({
       id: kps.id_avaliacao_kps,
       status: 'final',
@@ -64,7 +92,7 @@ export class FhirObservationMapper {
     };
   }
 
-  static avaliacaoAlgoritmoToFhir(avaliacao: any): FhirObservation | null {
+  static avaliacaoAlgoritmoToFhir(avaliacao: AvaliacaoAlgoritmoParaFhir): FhirObservation | null {
     if (avaliacao.score === null) return null;
     const components = [
       ['coverage', 'Cobertura das respostas', avaliacao.cobertura],

@@ -17,6 +17,7 @@ const { MedicoService } = require('../services/medico.service') as typeof import
 const { AlertaService } = require('../services/alerta.service') as typeof import('../services/alerta.service');
 const { avaliarSubmissaoV2, calcularScore, PESOS } = require('../services/motor-alertas-v2') as typeof import('../services/motor-alertas-v2');
 const { FhirService } = require('../services/fhir.service') as typeof import('../services/fhir.service');
+const { FhirResourceBuilder } = require('../mappers/fhir-resource.builder') as typeof import('../mappers/fhir-resource.builder');
 
 const idDoente = 'user-doente-001';
 const idCuidador = 'user-cuidador-001';
@@ -91,6 +92,10 @@ test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle colle
 
   const patient = obterRecursoFhir(bundle, 'Patient');
   assert.equal(patient.id, idDoente);
+  assert.equal(patient.identifier[0].system, 'https://chsj.min-saude.pt/processo');
+  assert.ok(patient.identifier[0].value);
+  assert.ok(patient.name[0].text);
+  assert.match(patient.birthDate, /^\d{4}-\d{2}-\d{2}$/);
   assert.ok(['male', 'female', 'other'].includes(patient.gender));
 
   const condition = obterRecursoFhir(bundle, 'Condition');
@@ -99,6 +104,11 @@ test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle colle
     'http://terminology.hl7.org/CodeSystem/condition-clinical');
   assert.equal(condition.clinicalStatus.coding[0].code, 'active');
   assert.ok(condition.code.coding.length > 0);
+  assert.ok(condition.code.coding.some((coding: any) => coding.system === 'http://snomed.info/sct'));
+  assert.ok(condition.code.coding.some((coding: any) => coding.system === 'http://hl7.org/fhir/sid/icd-10-cm'));
+  assert.ok(condition.recordedDate);
+  assert.ok(condition.bodySite[0].text);
+  assert.ok(condition.stage[0].summary.text);
 
   const observations = bundle.entry
     .filter((entry: any) => entry.resource.resourceType === 'Observation')
@@ -110,8 +120,23 @@ test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle colle
     assert.equal(observation.subject.reference, `Patient/${idDoente}`);
   }
   for (const code of ['tumour-laterality', 'idh-status', 'mgmt-methylation']) {
-    assert.ok(observations.some(observation => observation.code.coding?.[0]?.code === code));
+    const observation = observations.find(item => item.code.coding?.[0]?.code === code);
+    assert.ok(observation);
+    assert.equal(observation.effectiveDateTime, condition.recordedDate);
+    assert.ok(observation.valueString);
   }
+
+  const kps = observations.find(observation => observation.code.coding?.[0]?.code === '89243-0');
+  assert.ok(kps);
+  assert.equal(kps.valueInteger >= 0 && kps.valueInteger <= 100, true);
+  assert.match(kps.performer[0].reference, /^Practitioner\/[A-Za-z0-9.-]{1,64}$/);
+
+  assert.throws(() => FhirResourceBuilder.observation({
+    status: 'final',
+    code: { text: 'Teste' },
+    subject: { reference: `Patient/${idDoente}` },
+    effectiveDateTime: '2025-02-30'
+  }), /effectiveDateTime/);
 });
 
 test('aceita registos parciais e distingue impossível avaliar de ausência e omissão', () => {

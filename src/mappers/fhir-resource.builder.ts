@@ -83,6 +83,18 @@ function validarData(data: string, campo: string): void {
   }
 }
 
+function validarDataHora(dataHora: string, campo: string): void {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dataHora)) {
+    validarData(dataHora, campo);
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(dataHora) ||
+      Number.isNaN(Date.parse(dataHora))) {
+    throw new Error(`A data ${campo} não é válida para FHIR.`);
+  }
+  validarData(dataHora.slice(0, 10), campo);
+}
+
 export class FhirResourceBuilder {
   static patient(input: {
     id: string;
@@ -164,6 +176,12 @@ export class FhirResourceBuilder {
     if (!input.subject?.reference) throw new Error('Observation FHIR requer subject.');
     validarReferencia(input.subject.reference, 'Patient');
     if (input.id !== undefined) validarId(input.id, 'Observation');
+    if (input.effectiveDateTime !== undefined) {
+      if (typeof input.effectiveDateTime !== 'string') {
+        throw new Error('A data effectiveDateTime não é válida para FHIR.');
+      }
+      validarDataHora(input.effectiveDateTime, 'effectiveDateTime');
+    }
     return { ...input, resourceType: 'Observation' };
   }
 
