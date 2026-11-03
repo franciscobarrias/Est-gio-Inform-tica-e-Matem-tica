@@ -1,7 +1,31 @@
+import { FhirResourceBuilder, FhirObservation } from './fhir-resource.builder';
+
 export class FhirObservationMapper {
-  static kpsToFhir(kps: any) {
-    return {
-      resourceType: 'Observation',
+  static diagnosticoToFhir(diagnostico: any, idDoente: string): FhirObservation[] {
+    const observacoes = [
+      ['tumour-laterality', 'Lateralidade tumoral', diagnostico.lateralidade],
+      ['idh-status', 'Estatuto IDH', diagnostico.estatuto_idh],
+      ['mgmt-methylation', 'Metilação do promotor MGMT', diagnostico.metilacao_mgmt]
+    ] as const;
+
+    return observacoes.map(([code, display, value]) => FhirResourceBuilder.observation({
+      id: `${diagnostico.id_diagnostico}-${code}`,
+      status: 'final',
+      code: {
+        coding: [{
+          system: 'https://chsj.min-saude.pt/fhir/CodeSystem/diagnostico-gbm',
+          code,
+          display
+        }]
+      },
+      subject: { reference: `Patient/${idDoente}` },
+      effectiveDateTime: diagnostico.data_diagnostico,
+      valueString: value
+    }));
+  }
+
+  static kpsToFhir(kps: any): FhirObservation {
+    return FhirResourceBuilder.observation({
       id: kps.id_avaliacao_kps,
       status: 'final',
       code: { coding: [{ system: 'http://loinc.org', code: '89243-0', display: 'Karnofsky Performance Status score' }] },
@@ -9,7 +33,7 @@ export class FhirObservationMapper {
       performer: [{ reference: `Practitioner/${kps.id_medico}` }],
       effectiveDateTime: kps.data_avaliacao,
       valueInteger: kps.score_kps
-    };
+    });
   }
 
   static submissaoToFhirQuestionnaireResponse(sub: any) {
@@ -40,7 +64,7 @@ export class FhirObservationMapper {
     };
   }
 
-  static avaliacaoAlgoritmoToFhir(avaliacao: any) {
+  static avaliacaoAlgoritmoToFhir(avaliacao: any): FhirObservation | null {
     if (avaliacao.score === null) return null;
     const components = [
       ['coverage', 'Cobertura das respostas', avaliacao.cobertura],
@@ -53,8 +77,7 @@ export class FhirObservationMapper {
         valueDecimal: value
       }];
     });
-    return {
-      resourceType: 'Observation',
+    return FhirResourceBuilder.observation({
       id: `score-${avaliacao.id_submissao}`,
       status: 'final',
       code: { coding: [{ system: 'https://chsj.min-saude.pt/fhir/CodeSystem/gbm-score', code: 'symptom-burden', display: 'Score de carga sintomática GBM' }] },
@@ -63,6 +86,6 @@ export class FhirObservationMapper {
       valueQuantity: { value: avaliacao.score, unit: '%', system: 'http://unitsofmeasure.org', code: '%' },
       component: components,
       method: { text: `Versão de parâmetros ${avaliacao.versao_parametros}` }
-    };
+    });
   }
 }

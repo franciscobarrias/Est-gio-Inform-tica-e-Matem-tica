@@ -238,7 +238,7 @@ export class ApiController {
         return;
       }
       registarAuditoria(req.user!.id_utilizador, 'EXPORTACAO_FHIR', `Exportação do processo ${req.params.idDoente}`);
-      res.json(FhirService.exportarBundleFhir(req.params.idDoente));
+      res.type('application/fhir+json').json(FhirService.exportarBundleFhir(req.params.idDoente));
     } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
 }

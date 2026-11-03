@@ -22,6 +22,12 @@ const idDoente = 'user-doente-001';
 const idCuidador = 'user-cuidador-001';
 const idMedico = 'user-medico-001';
 
+function obterRecursoFhir(bundle: ReturnType<typeof FhirService.exportarBundleFhir>, resourceType: string) {
+  const entry = bundle.entry.find(item => item.resource.resourceType === resourceType);
+  assert.ok(entry, `Recurso ${resourceType} esperado no Bundle.`);
+  return entry.resource as Record<string, any>;
+}
+
 after(() => {
   db.close();
   fs.rmSync(diretorioTemporario, { recursive: true, force: true });
@@ -77,6 +83,37 @@ test('autoriza apenas o doente, cuidador associado e médico responsável', () =
   assert.equal(AuthService.podeAcederDoente(medico, 'outro-doente'), false);
 });
 
+test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle collection', () => {
+  const bundle = FhirService.exportarBundleFhir(idDoente);
+  assert.equal(bundle.resourceType, 'Bundle');
+  assert.equal(bundle.type, 'collection');
+  assert.ok(bundle.entry.length > 0);
+
+  const patient = obterRecursoFhir(bundle, 'Patient');
+  assert.equal(patient.id, idDoente);
+  assert.ok(['male', 'female', 'other'].includes(patient.gender));
+
+  const condition = obterRecursoFhir(bundle, 'Condition');
+  assert.equal(condition.subject.reference, `Patient/${idDoente}`);
+  assert.equal(condition.clinicalStatus.coding[0].system,
+    'http://terminology.hl7.org/CodeSystem/condition-clinical');
+  assert.equal(condition.clinicalStatus.coding[0].code, 'active');
+  assert.ok(condition.code.coding.length > 0);
+
+  const observations = bundle.entry
+    .filter((entry: any) => entry.resource.resourceType === 'Observation')
+    .map(entry => entry.resource as Record<string, any>);
+  assert.ok(observations.length > 0);
+  for (const observation of observations) {
+    assert.ok(observation.status);
+    assert.ok(observation.code.coding?.length || observation.code.text);
+    assert.equal(observation.subject.reference, `Patient/${idDoente}`);
+  }
+  for (const code of ['tumour-laterality', 'idh-status', 'mgmt-methylation']) {
+    assert.ok(observations.some(observation => observation.code.coding?.[0]?.code === code));
+  }
+});
+
 test('aceita registos parciais e distingue impossível avaliar de ausência e omissão', () => {
   const formulario = SintomaService.obterFormularioAtivo();
   const pergunta = formulario.perguntas.find((item: any) => item.id_pergunta === 'v2-b1-cefaleia');
@@ -108,10 +145,12 @@ test('aceita registos parciais e distingue impossível avaliar de ausência e om
 
   const fhir = FhirService.exportarBundleFhir(idDoente);
   const respostaFhir = fhir.entry.find((entrada: any) => entrada.resource.id === submissao.id_submissao);
-  assert.equal(respostaFhir.resource.status, 'completed');
-  assert.equal(respostaFhir.resource.item.length, 1);
-  assert.equal(respostaFhir.resource.item[0].linkId, 'B1');
-  assert.equal(respostaFhir.resource.item[0].answer[0].valueCoding.system,
+  assert.ok(respostaFhir);
+  const recursoResposta = respostaFhir.resource as Record<string, any>;
+  assert.equal(recursoResposta.status, 'completed');
+  assert.equal(recursoResposta.item.length, 1);
+  assert.equal(recursoResposta.item[0].linkId, 'B1');
+  assert.equal(recursoResposta.item[0].answer[0].valueCoding.system,
     'https://chsj.min-saude.pt/fhir/CodeSystem/resposta-gbm');
   assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire'));
   const valorPersistido = db.prepare(`SELECT valor_numerico FROM RespostaMonitorizacao
@@ -140,7 +179,9 @@ test('regista frequência opcional sem a confundir com intensidade', () => {
     .get(submissao.id_submissao) as { valor_numerico: number; frequencia: string };
   assert.deepEqual(resposta, { valor_numerico: 2, frequencia: 'DIARIA' });
   const bundle = FhirService.exportarBundleFhir(idDoente);
-  const recurso = bundle.entry.find((entrada: any) => entrada.resource.id === submissao.id_submissao).resource;
+  const entrada = bundle.entry.find((item: any) => item.resource.id === submissao.id_submissao);
+  assert.ok(entrada);
+  const recurso = entrada.resource as Record<string, any>;
   assert.equal(recurso.item[0].answer[0].extension[0].valueCode, 'DIARIA');
 });
 
@@ -415,7 +456,8 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire' &&
     entrada.resource.id === formulario.id_formulario));
   assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'DetectedIssue'));
-  const detectedIssue = bundle.entry.find((entrada: any) => entrada.resource.resourceType === 'DetectedIssue')?.resource;
+  const detectedIssue = bundle.entry.find((entrada: any) => entrada.resource.resourceType === 'DetectedIssue')?.resource as Record<string, any> | undefined;
+  assert.ok(detectedIssue);
   assert.ok(detectedIssue.evidence.length > 0);
 });
 
