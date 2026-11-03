@@ -8,7 +8,7 @@ Requer Node.js 22 e npm. Na pasta do projeto:
 
 ```powershell
 npm install
-npm run seed   # apenas na primeira execução; cria dados de demonstração
+npm run seed   # cria (ou recria) a base de dados com os dados de demonstração
 npm run dev
 ```
 
@@ -34,7 +34,7 @@ $env:DATABASE_PATH = "C:\temp\gbm-dev.db"
 npm run dev
 ```
 
-**Atenção:** `npm run seed` apaga e recria os registos da base de dados indicada em `DATABASE_PATH` (ou `data.db`, se não for indicada), usando dados sintéticos. Execute-o apenas na primeira configuração ou numa base descartável; não o execute numa base de dados que pretenda conservar.
+**Atenção:** `npm run seed` apaga o ficheiro da base de dados (`data.db`, ou o indicado em `DATABASE_PATH` ou `--database`) e cria-o de novo com dados sintéticos. Pare o servidor antes de o correr. Não o use numa base de dados que pretenda conservar.
 
 Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Os profissionais aparecem como «Médico 1», «Enfermeiro 1», etc., para não coincidirem com profissionais reais. Contas principais: `medico1@chsj.min-saude.pt` (Médico 1), `enfermeiro1@chsj.min-saude.pt` (Enfermeiro 1), `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os endereços `medico@chsj.pt` e `enfermeiro@chsj.pt` também são aceites para compatibilidade com bases já existentes. Os restantes doentes entram com endereços de demonstração `@example.invalid`.
 
@@ -89,7 +89,7 @@ A interface está dividida por perfil. Todas as páginas usam os mesmos estilos 
 | `js/clinico.js` | Lista de alertas e resumo clínico, partilhados pelo médico e pela enfermagem |
 | `css/estilos.css` | Estilos comuns |
 
-As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. As alterações ao esquema são aplicadas por migrações versionadas em `src/database/migrations.ts`, incluindo a migração v4 em `src/database/migracao_v4_delta.sql`; ao arrancar, o formulário v2 passa a ser o ativo (o v1 fica inativo). `npm run seed` cria `gbm-seed.db`, sem apagar uma base existente. Pode escolher outro ficheiro e uma data de referência com `npm run seed -- --database=C:\dados\demo.db --date=2026-11-02`.
+As perguntas, opções e pesos do questionário v2 estão em `src/database/formulario-v2.ts` e `src/services/motor-alertas-v2.ts`. O esquema completo da base de dados está em `src/database/dados-locais.ts` (sem migrações: como os dados são sintéticos, quando a estrutura muda recria-se a base com `npm run seed`; se a aplicação encontrar uma base antiga, diz que é preciso recriá-la). Ao arrancar, o formulário v2 passa a ser o ativo (o v1 fica inativo). Pode escolher outro ficheiro e uma data de referência com `npm run seed -- --database=C:\dados\demo.db --date=2026-11-02`.
 
 O score usa os pesos 3/2/1 como importância relativa proposta (função/autonomia, cognição/deglutição e restantes sintomas). A soma é uma aproximação de rastreio sobre respostas ordinais, não uma medida intervalar validada. O limiar adaptativo é `max(5, 0,1 × S₀, 2 × MAD)`, pelo que varia com o nível e a variabilidade basais. Sensibilidade no cenário de subida 0→2 em D1, C4 e B7: com pesos 3/2/1 a variação é 11,9 pontos (16/135); com pesos iguais é 7,9 (6/76). O B20 é texto livre para a equipa e não entra no score. A cobertura mínima de 60% e a regra de MAD também são parâmetros exploratórios, sem validação clínica. O script e as hipóteses da comparação sintética estão em [docs/metodos-e-simulacao.md](./docs/metodos-e-simulacao.md).
 

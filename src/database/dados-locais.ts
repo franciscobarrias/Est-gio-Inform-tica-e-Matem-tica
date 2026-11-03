@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
 import { garantirFormularioV2 } from './formulario-v2';
-import { executarMigracoes } from './migrations';
 
 const dbPath = path.resolve(process.env.DATABASE_PATH || path.resolve(__dirname, '../../data.db'));
 export const db = new Database(dbPath);
@@ -10,6 +9,8 @@ export const db = new Database(dbPath);
 db.pragma('foreign_keys = ON');
 db.pragma('journal_mode = WAL');
 
+// Esquema completo da base de dados. Num protótipo com dados sintéticos não há migrações:
+// quando a estrutura muda, apaga-se a base e volta-se a criar com `npm run seed`.
 export function inicializarBaseDados(): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS Utilizador (
@@ -126,7 +127,12 @@ export function inicializarBaseDados(): void {
       obrigatoria INTEGER NOT NULL DEFAULT 1,
       ordem INTEGER NOT NULL,
       ativa INTEGER NOT NULL DEFAULT 1,
-      FOREIGN KEY (id_formulario) REFERENCES Formulario(id_formulario)
+      codigo TEXT,                      -- A1, B3, ... (usado pelo motor de alertas)
+      id_pergunta_pai TEXT,             -- perguntas de detalhe: ligam-se à pergunta principal
+      valor_minimo_pai INTEGER,         -- e só aparecem a partir deste valor da principal
+      enunciado_cuidador TEXT,          -- texto na 3.ª pessoa quando responde o cuidador
+      FOREIGN KEY (id_formulario) REFERENCES Formulario(id_formulario),
+      FOREIGN KEY (id_pergunta_pai) REFERENCES PerguntaFormulario(id_pergunta)
     );
 
     CREATE TABLE IF NOT EXISTS OpcaoResposta (
@@ -135,6 +141,8 @@ export function inicializarBaseDados(): void {
       rotulo TEXT NOT NULL,
       valor_codificado TEXT NOT NULL,
       ordem INTEGER NOT NULL,
+      valor_numerico INTEGER,           -- 0 a 3; vazio nas opções «Não consigo avaliar»
+      rotulo_cuidador TEXT,
       FOREIGN KEY (id_pergunta) REFERENCES PerguntaFormulario(id_pergunta)
     );
 
@@ -161,6 +169,8 @@ export function inicializarBaseDados(): void {
       valor_numerico INTEGER,
       motivo_nao_avaliavel INTEGER NOT NULL DEFAULT 0,
       frequencia TEXT,
+      novo_ou_pior INTEGER,             -- 1 sim, 0 não, vazio sem resposta
+      texto TEXT,                       -- mensagem livre para a equipa (B20)
       FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao),
       FOREIGN KEY (id_pergunta) REFERENCES PerguntaFormulario(id_pergunta),
       FOREIGN KEY (id_opcao) REFERENCES OpcaoResposta(id_opcao)
@@ -169,6 +179,8 @@ export function inicializarBaseDados(): void {
       ON RespostaMonitorizacao(id_submissao, id_pergunta);
     CREATE INDEX IF NOT EXISTS idx_submissao_doente_data
       ON SubmissaoMonitorizacao(id_doente, data_hora_submissao);
+    CREATE INDEX IF NOT EXISTS idx_submissao_doente_referencia
+      ON SubmissaoMonitorizacao(id_doente, id_formulario, data_referencia_sintomas, data_hora_submissao);
 
     CREATE TABLE IF NOT EXISTS RegraAlerta (
       id_regra TEXT PRIMARY KEY,
@@ -188,10 +200,24 @@ export function inicializarBaseDados(): void {
       data_hora_geracao TEXT NOT NULL,
       origem_gatilho TEXT NOT NULL,
       prioridade TEXT NOT NULL CHECK(prioridade IN ('Baixa', 'Média', 'Alta', 'Crítica')),
+      prioridade_algoritmo TEXT,        -- a que o algoritmo deu (a enfermagem pode ajustar a prioridade)
       estado_atual TEXT NOT NULL CHECK(estado_atual IN ('Pendente', 'Em análise', 'Encaminhado', 'Concluído')),
       resumo_agravamento TEXT NOT NULL,
+      id_alerta_anterior TEXT,          -- alerta aberto anterior, quando este o escalona ou traz um motivo novo
       FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao),
-      FOREIGN KEY (id_regra) REFERENCES RegraAlerta(id_regra)
+      FOREIGN KEY (id_regra) REFERENCES RegraAlerta(id_regra),
+      FOREIGN KEY (id_alerta_anterior) REFERENCES AlertaClinico(id_alerta)
+    );
+
+    -- Submissões ligadas a cada alerta (a original e as que repetem ou agravam o mesmo motivo).
+    CREATE TABLE IF NOT EXISTS AlertaSubmissao (
+      id_alerta TEXT NOT NULL,
+      id_submissao TEXT NOT NULL,
+      tipo_associacao TEXT NOT NULL DEFAULT 'ORIGINAL'
+        CHECK (tipo_associacao IN ('ORIGINAL', 'MOTIVO_REPETIDO', 'MOTIVO_NOVO', 'ESCALONAMENTO')),
+      PRIMARY KEY (id_alerta, id_submissao),
+      FOREIGN KEY (id_alerta) REFERENCES AlertaClinico(id_alerta) ON DELETE CASCADE,
+      FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS HistoricoAcaoAlerta (
@@ -202,6 +228,8 @@ export function inicializarBaseDados(): void {
       tipo_acao TEXT NOT NULL,
       estado_anterior TEXT NOT NULL,
       estado_novo TEXT NOT NULL,
+      prioridade_anterior TEXT,
+      prioridade_nova TEXT,
       nota_triagem TEXT NOT NULL,
       FOREIGN KEY (id_alerta) REFERENCES AlertaClinico(id_alerta),
       FOREIGN KEY (id_utilizador) REFERENCES Utilizador(id_utilizador)
@@ -239,6 +267,77 @@ export function inicializarBaseDados(): void {
       FOREIGN KEY (id_alerta) REFERENCES AlertaClinico(id_alerta)
     );
 
+    -- Resultado do algoritmo para cada registo (score, linha de base, limiar, motivos), por versão dos parâmetros.
+    -- Não se altera nem se apaga: é a prova do que o algoritmo decidiu, separada da decisão humana.
+    CREATE TABLE IF NOT EXISTS AvaliacaoAlgoritmo (
+      id_submissao TEXT NOT NULL,
+      versao_parametros TEXT NOT NULL,
+      score REAL,
+      cobertura REAL,
+      linha_de_base REAL,
+      variabilidade_linha_de_base REAL,
+      limiar_score REAL,
+      dados_nao_avaliaveis TEXT NOT NULL DEFAULT '[]',
+      motivos_json TEXT NOT NULL DEFAULT '[]',
+      prioridade_algoritmo TEXT,
+      tipo_regra TEXT,
+      contexto_linha_base TEXT NOT NULL DEFAULT '{}',
+      data_hora_avaliacao TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'CONCLUIDA' CHECK (estado IN ('CONCLUIDA', 'ERRO')),
+      erro TEXT,
+      PRIMARY KEY (id_submissao, versao_parametros),
+      FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao)
+    );
+    CREATE INDEX IF NOT EXISTS idx_avaliacao_contexto
+      ON AvaliacaoAlgoritmo(contexto_linha_base, id_submissao, versao_parametros);
+
+    -- Motivos de cada avaliação, um por linha.
+    CREATE TABLE IF NOT EXISTS MotivoEvidencia (
+      id_submissao TEXT NOT NULL,
+      versao_parametros TEXT NOT NULL,
+      ordem INTEGER NOT NULL,
+      texto TEXT NOT NULL,
+      prioridade TEXT NOT NULL,
+      tipo TEXT NOT NULL,
+      codigos_json TEXT NOT NULL,
+      PRIMARY KEY (id_submissao, versao_parametros, ordem),
+      FOREIGN KEY (id_submissao, versao_parametros) REFERENCES AvaliacaoAlgoritmo(id_submissao, versao_parametros)
+    );
+
+    -- Instruções mostradas ao doente (ligar 112, contactar já, contactar hoje).
+    CREATE TABLE IF NOT EXISTS InstrucaoEmitida (
+      id_submissao TEXT NOT NULL,
+      versao_parametros TEXT NOT NULL,
+      ordem INTEGER NOT NULL,
+      codigo TEXT NOT NULL CHECK (codigo IN ('LIGAR_112', 'CONTACTAR_JA', 'CONTACTAR_HOJE')),
+      PRIMARY KEY (id_submissao, versao_parametros, ordem),
+      FOREIGN KEY (id_submissao, versao_parametros) REFERENCES AvaliacaoAlgoritmo(id_submissao, versao_parametros)
+    );
+
+    -- As três tabelas anteriores não se podem alterar nem apagar.
+    CREATE TRIGGER IF NOT EXISTS trg_avaliacao_algoritmo_sem_update BEFORE UPDATE ON AvaliacaoAlgoritmo
+    BEGIN SELECT RAISE(ABORT, 'AvaliacaoAlgoritmo é imutável.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_avaliacao_algoritmo_sem_delete BEFORE DELETE ON AvaliacaoAlgoritmo
+    BEGIN SELECT RAISE(ABORT, 'AvaliacaoAlgoritmo é imutável.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_motivo_evidencia_sem_update BEFORE UPDATE ON MotivoEvidencia
+    BEGIN SELECT RAISE(ABORT, 'MotivoEvidencia é imutável.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_motivo_evidencia_sem_delete BEFORE DELETE ON MotivoEvidencia
+    BEGIN SELECT RAISE(ABORT, 'MotivoEvidencia é imutável.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_instrucao_emitida_sem_update BEFORE UPDATE ON InstrucaoEmitida
+    BEGIN SELECT RAISE(ABORT, 'InstrucaoEmitida é imutável.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_instrucao_emitida_sem_delete BEFORE DELETE ON InstrucaoEmitida
+    BEGIN SELECT RAISE(ABORT, 'InstrucaoEmitida é imutável.'); END;
+
+    -- Fase clínica de cada doente ao longo do tempo (usada para reiniciar a linha de base).
+    CREATE TABLE IF NOT EXISTS FaseClinica (
+      id_fase_clinica TEXT PRIMARY KEY,
+      id_doente TEXT NOT NULL,
+      fase_clinica TEXT NOT NULL,
+      data_inicio TEXT NOT NULL,
+      FOREIGN KEY (id_doente) REFERENCES Doente(id_doente)
+    );
+    CREATE INDEX IF NOT EXISTS idx_fase_clinica_data ON FaseClinica(id_doente, data_inicio, id_fase_clinica);
+
     CREATE TABLE IF NOT EXISTS RegistoAuditoria (
       id_auditoria TEXT PRIMARY KEY,
       id_utilizador TEXT NOT NULL,
@@ -248,9 +347,35 @@ export function inicializarBaseDados(): void {
       FOREIGN KEY (id_utilizador) REFERENCES Utilizador(id_utilizador)
     );
   `);
-  executarMigracoes(db);
+  verificarEsquema();
   garantirPerguntasFormularioDemonstracao();
   garantirFormularioV2(db);
+}
+
+// Uma base criada com uma estrutura antiga não tem as colunas novas: em vez de a tentar atualizar,
+// pede-se que seja recriada (os dados são sintéticos).
+function verificarEsquema(): void {
+  const obrigatorias: Record<string, string[]> = {
+    PerguntaFormulario: ['codigo', 'id_pergunta_pai', 'enunciado_cuidador'],
+    OpcaoResposta: ['valor_numerico', 'rotulo_cuidador'],
+    RespostaMonitorizacao: ['novo_ou_pior', 'texto'],
+    AlertaClinico: ['prioridade_algoritmo', 'id_alerta_anterior'],
+    HistoricoAcaoAlerta: ['prioridade_anterior', 'prioridade_nova'],
+    AlertaSubmissao: ['tipo_associacao'],
+    AvaliacaoAlgoritmo: ['versao_parametros', 'estado', 'erro']
+  };
+  const emFalta = Object.entries(obrigatorias).flatMap(([tabela, colunas]) => {
+    const existentes = (db.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).map(c => c.name);
+    return colunas.filter(c => !existentes.includes(c)).map(c => `${tabela}.${c}`);
+  });
+  // Nas bases antigas a resposta «não consigo avaliar» guardava 0 em vez de vazio.
+  const valor = (db.prepare('PRAGMA table_info(RespostaMonitorizacao)').all() as Array<{ name: string; notnull: number }>)
+    .find(c => c.name === 'valor_numerico');
+  if (valor?.notnull) emFalta.push('RespostaMonitorizacao.valor_numerico (deve aceitar vazio)');
+  if (emFalta.length) {
+    throw new Error(`A base de dados ${dbPath} foi criada com uma estrutura antiga (falta: ${emFalta.join(', ')}). ` +
+      'Pare o servidor e corra «npm run seed» para a criar de novo.');
+  }
 }
 
 export function garantirPerguntasFormularioDemonstracao(): void {

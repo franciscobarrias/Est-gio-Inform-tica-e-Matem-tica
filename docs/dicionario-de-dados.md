@@ -2,7 +2,7 @@
 
 ## Âmbito e convenções
 
-Este documento descreve o esquema SQLite implementado pela aplicação Express/TypeScript. O esquema é criado em `src/database/dados-locais.ts` e evolui pelas migrações v1–v4 em `src/database/migrations.ts` e `src/database/migracao_v4_delta.sql`. A ligação usa `better-sqlite3` com chaves estrangeiras ativas.
+Este documento descreve o esquema SQLite implementado pela aplicação Express/TypeScript. O esquema completo é criado em `src/database/dados-locais.ts`. Não há migrações: como o protótipo só usa dados sintéticos, quando a estrutura muda a base é recriada com `npm run seed`. A ligação usa `better-sqlite3` com chaves estrangeiras ativas.
 
 O modelo canónico tem **27 tabelas**. Os nomes de tabela e coluna são os nomes físicos, em `PascalCase` e `snake_case`, respetivamente. Os tipos SQLite (`TEXT`, `INTEGER`, `REAL`) são afinidades: datas, horas, enumerações e JSON também são armazenados como texto. Salvo indicação, não existe validação SQL de formato para estes textos.
 
@@ -417,21 +417,12 @@ Registo de eventos de auditoria da aplicação. Os detalhes são texto descritiv
 | `detalhes` | TEXT, NN | Descrição contextual. |
 | `data_hora` | TEXT, NN | Instante do evento. |
 
-### `SchemaMigracao`
-
-Controlo interno das migrações aplicadas; não contém dados clínicos.
-
-| Campo | Tipo e restrições | Significado |
-|---|---|---|
-| `versao` | INTEGER, PK | Número sequencial da migração aplicada. |
-| `aplicada_em` | TEXT, NN | Instante em que a migração foi registada. |
-
 ## Integridade, índices e imutabilidade
 
 * As FKs são verificadas pelo SQLite (`foreign_keys = ON`). Salvo `AlertaSubmissao`, não há cascatas de eliminação declaradas no esquema canónico. A remoção de entidades referenciadas é, por omissão, recusada (`NO ACTION`).
 * O diagnóstico impõe unicidade de `id_doente`; o email e o número de processo também são únicos.
 * Índices funcionais: `(id_submissao, id_pergunta)` único em `RespostaMonitorizacao`; `(id_doente, data_hora_submissao)` em `SubmissaoMonitorizacao`; `(id_doente, id_formulario, data_referencia_sintomas, data_hora_submissao)` para comparação temporal; `(contexto_linha_base, id_submissao, versao_parametros)` para avaliações; e `(id_doente, data_inicio, id_fase_clinica)` para fases.
-* Seis triggers da migração v4 rejeitam `UPDATE` e `DELETE` em `AvaliacaoAlgoritmo`, `MotivoEvidencia` e `InstrucaoEmitida`. Estes resultados são append-only; uma nova versão dos parâmetros cria uma nova avaliação.
+* Seis triggers rejeitam `UPDATE` e `DELETE` em `AvaliacaoAlgoritmo`, `MotivoEvidencia` e `InstrucaoEmitida`. Estes resultados são append-only; uma nova versão dos parâmetros cria uma nova avaliação.
 * Não há uma tabela física de linha de base: score, linha de base, cobertura e contexto são resultados derivados e persistidos por execução em `AvaliacaoAlgoritmo`.
 
 ## Semântica dos nulos e ausências
@@ -460,7 +451,7 @@ Controlo interno das migrações aplicadas; não contém dados clínicos.
 
 ## Artefactos locais fora do esquema canónico
 
-Foi observada no ficheiro local `data.db` a existência das tabelas `FhirPatientSync` e `FhirSyncState`. Não estão declaradas em `src/database`, não são referenciadas pelo código atual e não são criadas pelas migrações versionadas; podem ser resíduos de uma experiência anterior. São listadas para explicar a diferença entre uma base local existente e uma base criada apenas pelo código atual, mas **não fazem parte do modelo suportado**:
+Foi observada no ficheiro local `data.db` a existência das tabelas `FhirPatientSync` e `FhirSyncState`. Não estão declaradas em `src/database`, não são referenciadas pelo código atual e não são criadas pelo código; podem ser resíduos de uma experiência anterior. São listadas para explicar a diferença entre uma base local existente e uma base criada apenas pelo código atual, mas **não fazem parte do modelo suportado**:
 
 | Tabela | Campos observados na base local | Observação |
 |---|---|---|

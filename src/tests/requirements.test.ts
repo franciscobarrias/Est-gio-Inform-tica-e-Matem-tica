@@ -17,7 +17,6 @@ const { MedicoService } = require('../services/medico.service') as typeof import
 const { AlertaService } = require('../services/alerta.service') as typeof import('../services/alerta.service');
 const { avaliarSubmissaoV2, calcularScore, PESOS } = require('../services/motor-alertas-v2') as typeof import('../services/motor-alertas-v2');
 const { FhirService } = require('../services/fhir.service') as typeof import('../services/fhir.service');
-const { executarMigracoes } = require('../database/migrations') as typeof import('../database/migrations');
 
 const idDoente = 'user-doente-001';
 const idCuidador = 'user-cuidador-001';
@@ -28,57 +27,26 @@ after(() => {
   fs.rmSync(diretorioTemporario, { recursive: true, force: true });
 });
 
-test('migração versionada converte «não avaliável» de zero para NULL', () => {
-  const legado = new Database(':memory:');
-  try {
-    legado.exec(`
-      CREATE TABLE SubmissaoMonitorizacao (
-        id_submissao TEXT PRIMARY KEY, id_doente TEXT, id_formulario TEXT,
-        data_referencia_sintomas TEXT, data_hora_submissao TEXT
-      );
-      CREATE TABLE Doente (id_doente TEXT PRIMARY KEY);
-      CREATE TABLE PerguntaFormulario (id_pergunta TEXT PRIMARY KEY);
-      CREATE TABLE OpcaoResposta (id_opcao TEXT PRIMARY KEY);
-      CREATE TABLE DiagnosticoGB (
-        id_diagnostico TEXT PRIMARY KEY, id_doente TEXT, data_diagnostico TEXT,
-        fase_clinica_atual TEXT
-      );
-      CREATE TABLE RespostaMonitorizacao (
-        id_resposta TEXT PRIMARY KEY, id_submissao TEXT NOT NULL, id_pergunta TEXT NOT NULL, id_opcao TEXT,
-        valor_numerico INTEGER NOT NULL DEFAULT 0, motivo_nao_avaliavel INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY (id_submissao) REFERENCES SubmissaoMonitorizacao(id_submissao),
-        FOREIGN KEY (id_pergunta) REFERENCES PerguntaFormulario(id_pergunta),
-        FOREIGN KEY (id_opcao) REFERENCES OpcaoResposta(id_opcao)
-      );
-      CREATE TABLE AlertaClinico (id_alerta TEXT PRIMARY KEY);
-      CREATE TABLE HistoricoAcaoAlerta (id_acao TEXT PRIMARY KEY);
-      INSERT INTO SubmissaoMonitorizacao (id_submissao) VALUES ('sub');
-      INSERT INTO PerguntaFormulario VALUES ('pergunta');
-      INSERT INTO OpcaoResposta VALUES ('opcao');
-      INSERT INTO RespostaMonitorizacao VALUES ('resposta', 'sub', 'pergunta', 'opcao', 0, 1);
-    `);
-    executarMigracoes(legado);
-    const resposta = legado.prepare('SELECT valor_numerico, motivo_nao_avaliavel FROM RespostaMonitorizacao')
-      .get() as { valor_numerico: number | null; motivo_nao_avaliavel: number };
-    assert.deepEqual(resposta, { valor_numerico: null, motivo_nao_avaliavel: 1 });
-    const coluna = (legado.prepare('PRAGMA table_info(RespostaMonitorizacao)').all() as Array<{
-      name: string; notnull: number; dflt_value: string | null;
-    }>).find(item => item.name === 'valor_numerico');
-    assert.equal(coluna?.notnull, 0);
-    assert.equal(coluna?.dflt_value, null);
-    const versoes = legado.prepare('SELECT COUNT(*) AS total FROM SchemaMigracao').get() as { total: number };
-    assert.equal(versoes.total, 4);
-    const chaveAvaliacao = legado.prepare('PRAGMA table_info(AvaliacaoAlgoritmo)').all() as Array<{ name: string; pk: number }>;
-    assert.equal(chaveAvaliacao.find(coluna => coluna.name === 'id_submissao')?.pk, 1);
-    assert.equal(chaveAvaliacao.find(coluna => coluna.name === 'versao_parametros')?.pk, 2);
-    const foreignKeys = legado.prepare('PRAGMA foreign_key_list(AvaliacaoAlgoritmo)').all() as Array<{ on_delete: string }>;
-    assert.ok(foreignKeys.every(chave => chave.on_delete === 'NO ACTION'));
-    const totalTriggers = legado.prepare(`SELECT COUNT(*) AS total FROM sqlite_master
-      WHERE type = 'trigger' AND name LIKE 'trg_%'`).get() as { total: number };
-    assert.equal(totalTriggers.total, 6);
-  } finally {
-    legado.close();
+test('o esquema tem as tabelas do algoritmo, a imutabilidade e «não avaliável» como vazio', () => {
+  const coluna = (db.prepare('PRAGMA table_info(RespostaMonitorizacao)').all() as Array<{
+    name: string; notnull: number; dflt_value: string | null;
+  }>).find(item => item.name === 'valor_numerico');
+  assert.equal(coluna?.notnull, 0);
+  assert.equal(coluna?.dflt_value, null);
+  const chaveAvaliacao = db.prepare('PRAGMA table_info(AvaliacaoAlgoritmo)').all() as Array<{ name: string; pk: number }>;
+  assert.equal(chaveAvaliacao.find(c => c.name === 'id_submissao')?.pk, 1);
+  assert.equal(chaveAvaliacao.find(c => c.name === 'versao_parametros')?.pk, 2);
+  const foreignKeys = db.prepare('PRAGMA foreign_key_list(AvaliacaoAlgoritmo)').all() as Array<{ on_delete: string }>;
+  assert.ok(foreignKeys.every(chave => chave.on_delete === 'NO ACTION'));
+  const totalTriggers = db.prepare(`SELECT COUNT(*) AS total FROM sqlite_master
+    WHERE type = 'trigger' AND name LIKE 'trg_%'`).get() as { total: number };
+  assert.equal(totalTriggers.total, 6);
+  for (const tabela of ['MotivoEvidencia', 'InstrucaoEmitida', 'FaseClinica', 'AlertaSubmissao']) {
+    assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela), tabela);
   }
+  // A avaliação do algoritmo não se pode apagar.
+  const avaliacao = db.prepare('SELECT id_submissao FROM AvaliacaoAlgoritmo LIMIT 1').get() as { id_submissao: string } | undefined;
+  if (avaliacao) assert.throws(() => db.prepare('DELETE FROM AvaliacaoAlgoritmo WHERE id_submissao = ?').run(avaliacao.id_submissao), /imutável/);
 });
 
 test('guarda hashes individuais e migra credenciais antigas após autenticação', () => {
