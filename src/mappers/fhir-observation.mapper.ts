@@ -64,34 +64,6 @@ export class FhirObservationMapper {
     });
   }
 
-  static submissaoToFhirQuestionnaireResponse(sub: any) {
-    return {
-      resourceType: 'QuestionnaireResponse',
-      id: sub.id_submissao,
-      questionnaire: `Questionnaire/${sub.id_formulario}`,
-      status: 'completed',
-      subject: { reference: `Patient/${sub.id_doente}` },
-      authored: sub.data_hora_submissao,
-      extension: [{
-        url: 'https://chsj.min-saude.pt/fhir/StructureDefinition/symptom-reference-date',
-        valueDate: sub.data_referencia_sintomas
-      }],
-      item: sub.respostas.map((r: any) => ({
-        linkId: r.codigo || r.id_pergunta,
-        text: `[${r.categoria}] ${r.enunciado}`,
-        // Texto livre (B20): a resposta é um valueString, não uma opção codificada.
-        answer: r.tipo_resposta === 'TEXTO_LIVRE' ? [{ valueString: r.texto }] : [{
-          valueCoding: {
-            system: 'https://chsj.min-saude.pt/fhir/CodeSystem/resposta-gbm',
-            code: r.valor_codificado,
-            display: r.rotulo
-          },
-          ...(r.frequencia ? { extension: [{ url: 'https://chsj.min-saude.pt/fhir/StructureDefinition/symptom-frequency', valueCode: r.frequencia }] } : {})
-        }]
-      }))
-    };
-  }
-
   static avaliacaoAlgoritmoToFhir(avaliacao: AvaliacaoAlgoritmoParaFhir): FhirObservation | null {
     if (avaliacao.score === null) return null;
     const components = [
@@ -102,7 +74,12 @@ export class FhirObservationMapper {
     ].flatMap(([code, display, value]) => {
       return value === null ? [] : [{
         code: { coding: [{ system: 'https://chsj.min-saude.pt/fhir/CodeSystem/gbm-score', code, display }] },
-        valueDecimal: value
+        valueQuantity: {
+          value,
+          unit: code === 'coverage' ? '1' : '%',
+          system: 'http://unitsofmeasure.org',
+          code: code === 'coverage' ? '1' : '%'
+        }
       }];
     });
     return FhirResourceBuilder.observation({

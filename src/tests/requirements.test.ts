@@ -89,6 +89,12 @@ test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle colle
   assert.equal(bundle.resourceType, 'Bundle');
   assert.equal(bundle.type, 'collection');
   assert.ok(bundle.entry.length > 0);
+  assert.ok(bundle.entry.every(entry =>
+    ['Patient', 'Condition', 'Observation'].includes(entry.resource.resourceType)
+  ));
+  assert.ok(bundle.entry.every(entry =>
+    entry.fullUrl === `https://chsj.min-saude.pt/fhir/${entry.resource.resourceType}/${entry.resource.id}`
+  ));
 
   const patient = obterRecursoFhir(bundle, 'Patient');
   assert.equal(patient.id, idDoente);
@@ -106,6 +112,10 @@ test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle colle
   assert.ok(condition.code.coding.length > 0);
   assert.ok(condition.code.coding.some((coding: any) => coding.system === 'http://snomed.info/sct'));
   assert.ok(condition.code.coding.some((coding: any) => coding.system === 'http://hl7.org/fhir/sid/icd-10-cm'));
+  assert.equal(condition.code.coding.find((coding: any) => coding.system === 'http://snomed.info/sct').display,
+    'Glioblastoma multiforme (disorder)');
+  assert.equal(condition.code.coding.find((coding: any) => coding.system === 'http://hl7.org/fhir/sid/icd-10-cm').display,
+    undefined);
   assert.ok(condition.recordedDate);
   assert.ok(condition.bodySite[0].text);
   assert.ok(condition.stage[0].summary.text);
@@ -131,12 +141,36 @@ test('exporta recursos FHIR R4 Patient, Condition e Observation num Bundle colle
   assert.equal(kps.valueInteger >= 0 && kps.valueInteger <= 100, true);
   assert.match(kps.performer[0].reference, /^Practitioner\/[A-Za-z0-9.-]{1,64}$/);
 
+  const score = observations.find(observation => observation.code.coding?.[0]?.code === 'symptom-burden');
+  assert.ok(score);
+  assert.ok(score.component.every((component: any) =>
+    component.valueQuantity &&
+    typeof component.valueQuantity.value === 'number' &&
+    component.valueQuantity.system === 'http://unitsofmeasure.org'
+  ));
+
   assert.throws(() => FhirResourceBuilder.observation({
     status: 'final',
     code: { text: 'Teste' },
     subject: { reference: `Patient/${idDoente}` },
     effectiveDateTime: '2025-02-30'
   }), /effectiveDateTime/);
+});
+
+test('exporta todos os doentes de demonstração como Patient, Condition e Observation', () => {
+  const doentes = db.prepare('SELECT id_doente FROM Doente ORDER BY id_doente').all() as Array<{ id_doente: string }>;
+  assert.ok(doentes.length > 0);
+
+  for (const doente of doentes) {
+    const bundle = FhirService.exportarBundleFhir(doente.id_doente);
+    const paciente = bundle.entry.find(entry => entry.resource.resourceType === 'Patient');
+    assert.ok(paciente, `Patient em falta para ${doente.id_doente}`);
+    assert.equal(paciente.resource.id, doente.id_doente);
+    assert.ok(bundle.entry.every(entry =>
+      ['Patient', 'Condition', 'Observation'].includes(entry.resource.resourceType)
+    ));
+    assert.ok(bundle.entry.every(entry => Boolean(entry.fullUrl)));
+  }
 });
 
 test('aceita registos parciais e distingue impossível avaliar de ausência e omissão', () => {
@@ -169,19 +203,12 @@ test('aceita registos parciais e distingue impossível avaliar de ausência e om
   assert.equal(submissao.alertasGerados.length, 0);
 
   const fhir = FhirService.exportarBundleFhir(idDoente);
-  const respostaFhir = fhir.entry.find((entrada: any) => entrada.resource.id === submissao.id_submissao);
-  assert.ok(respostaFhir);
-  const recursoResposta = respostaFhir.resource as Record<string, any>;
-  assert.equal(recursoResposta.status, 'completed');
-  assert.equal(recursoResposta.item.length, 1);
-  assert.equal(recursoResposta.item[0].linkId, 'B1');
-  assert.equal(recursoResposta.item[0].answer[0].valueCoding.system,
-    'https://chsj.min-saude.pt/fhir/CodeSystem/resposta-gbm');
-  assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire'));
+  assert.ok(fhir.entry.every((entrada: any) =>
+    ['Patient', 'Condition', 'Observation'].includes(entrada.resource.resourceType)
+  ));
   const valorPersistido = db.prepare(`SELECT valor_numerico FROM RespostaMonitorizacao
     WHERE id_submissao = ?`).get(submissao.id_submissao) as { valor_numerico: number | null };
   assert.equal(valorPersistido.valor_numerico, null);
-  assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'DetectedIssue'));
   assert.ok(fhir.entry.some((entrada: any) => entrada.resource.resourceType === 'Observation' &&
     entrada.resource.code?.coding?.[0]?.code === 'symptom-burden'));
   assert.throws(() => SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
@@ -204,10 +231,9 @@ test('regista frequência opcional sem a confundir com intensidade', () => {
     .get(submissao.id_submissao) as { valor_numerico: number; frequencia: string };
   assert.deepEqual(resposta, { valor_numerico: 2, frequencia: 'DIARIA' });
   const bundle = FhirService.exportarBundleFhir(idDoente);
-  const entrada = bundle.entry.find((item: any) => item.resource.id === submissao.id_submissao);
-  assert.ok(entrada);
-  const recurso = entrada.resource as Record<string, any>;
-  assert.equal(recurso.item[0].answer[0].extension[0].valueCode, 'DIARIA');
+  assert.ok(bundle.entry.every((entrada: any) =>
+    ['Patient', 'Condition', 'Observation'].includes(entrada.resource.resourceType)
+  ));
 });
 
 test('gera e audita alerta determinístico após resposta grave', () => {
@@ -478,12 +504,9 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.ok(alertaListado && alertaListado.submissoes_associadas.length >= 1);
 
   const bundle = FhirService.exportarBundleFhir(idDoente);
-  assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'Questionnaire' &&
-    entrada.resource.id === formulario.id_formulario));
-  assert.ok(bundle.entry.some((entrada: any) => entrada.resource.resourceType === 'DetectedIssue'));
-  const detectedIssue = bundle.entry.find((entrada: any) => entrada.resource.resourceType === 'DetectedIssue')?.resource as Record<string, any> | undefined;
-  assert.ok(detectedIssue);
-  assert.ok(detectedIssue.evidence.length > 0);
+  assert.ok(bundle.entry.every((entrada: any) =>
+    ['Patient', 'Condition', 'Observation'].includes(entrada.resource.resourceType)
+  ));
 });
 
 test('uma falha do motor não reverte a submissão e fica registada como avaliação com erro', () => {
@@ -512,7 +535,7 @@ test('uma falha do motor não reverte a submissão e fica registada como avalia�
 
 // ---------- Medicação ----------
 
-test('regista, suspende e termina medicação, validando os dados', () => {
+test('regista, suspende e termina medicação sem a incluir na exportação FHIR limitada', () => {
   const hoje = new Date().toISOString().slice(0, 10);
   assert.throws(() => MedicoService.registarMedicacao(idDoente, idMedico, {
     codigo_atc: '', dose: '4 mg', via: 'ORAL', posologia: 'De manhã', data_inicio: hoje
@@ -544,12 +567,10 @@ test('regista, suspende e termina medicação, validando os dados', () => {
   assert.throws(() => MedicoService.alterarEstadoMedicacao('user-doente-002', med.id_medicacao, idMedico, 'TERMINADA'), /não pertence/);
   const processo = MedicoService.obterProcessoLongitudinal(idDoente) as any;
   assert.ok(processo.medicacoes.some((m: any) => m.id_medicacao === med.id_medicacao));
-  // Na exportação FHIR a medicação sai com o código ATC e o diagnóstico com o código CID-10.
+  // A exportação FHIR inclui apenas Patient, Condition e Observation.
   const fhir = FhirService.exportarBundleFhir(idDoente);
-  const declaracao = fhir.entry.find(e => e.resource.id === med.id_medicacao)?.resource as Record<string, any> | undefined;
-  assert.ok(declaracao);
-  assert.equal(declaracao.resourceType, 'MedicationStatement');
-  assert.deepEqual(declaracao.medicationCodeableConcept.coding[0], { system: 'http://www.whocc.no/atc', code: 'A03FA01', display: 'Metoclopramida' });
+  assert.ok(fhir.entry.every(e => ['Patient', 'Condition', 'Observation'].includes(e.resource.resourceType)));
+  assert.ok(!fhir.entry.some(e => e.resource.id === med.id_medicacao));
   const condicao = obterRecursoFhir(fhir, 'Condition');
   assert.ok(condicao.code.coding.some((c: any) => c.system === 'http://hl7.org/fhir/sid/icd-10-cm'));
   assert.equal(processo.medicacoes[0].estado, 'ATIVA');

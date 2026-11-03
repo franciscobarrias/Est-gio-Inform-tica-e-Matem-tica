@@ -473,7 +473,7 @@ Registo de eventos de auditoria da aplicação. Os detalhes são texto descritiv
 * Idade, KPS vigente/expirado, cobertura do plano e linha de base são calculados pela aplicação; não são colunas próprias de `Doente`.
 * A linha de base é a mediana dos primeiros três scores elegíveis e comparáveis do contexto. O limiar atual é `max(5, 0,1 × S₀, 2 × MAD)` com MAD não escalada e cobertura mínima de 60%. Estes são parâmetros demonstrativos, não validados clinicamente.
 * A fase clínica histórica está em `FaseClinica`; a fase aplicável ao registo é determinada pela data de referência. Contexto de score também considera cirurgia e alterações KPS relevantes, sem uma coluna física dedicada a «linha de base».
-* A exportação FHIR constrói recursos a partir dos dados atuais (por exemplo, `Patient`, `Condition`, `Observation`, `Questionnaire`, `QuestionnaireResponse` e `DetectedIssue`). Estes recursos não são tabelas persistidas pelo esquema canónico.
+* A exportação FHIR constrói `Patient`, `Condition` e `Observation` a partir dos dados atuais. Estes recursos não são tabelas persistidas pelo esquema canónico.
 
 ## Artefactos locais fora do esquema canónico
 

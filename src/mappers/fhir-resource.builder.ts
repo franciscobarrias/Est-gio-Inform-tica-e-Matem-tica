@@ -54,9 +54,10 @@ export interface FhirBundle extends FhirResource {
   resourceType: 'Bundle';
   type: 'collection';
   timestamp: string;
-  entry: Array<{ resource: FhirResource }>;
+  entry: Array<{ fullUrl: string; resource: FhirResource }>;
 }
 
+const BASE_URL_FHIR = 'https://chsj.min-saude.pt/fhir';
 const SYSTEM_ESTADO_CLINICO = 'http://terminology.hl7.org/CodeSystem/condition-clinical';
 const SYSTEM_ESTADO_VERIFICACAO = 'http://terminology.hl7.org/CodeSystem/condition-ver-status';
 const ESTADOS_OBSERVATION = [
@@ -148,8 +149,8 @@ export class FhirResourceBuilder {
       },
       code: {
         coding: [
-          { system: 'http://snomed.info/sct', code: '393563007', display: 'Glioblastoma' },
-          { system: SISTEMA_CID10, code: input.codigoCid10, display: input.designacaoCid10 }
+          { system: 'http://snomed.info/sct', code: '393563007', display: 'Glioblastoma multiforme (disorder)' },
+          { system: SISTEMA_CID10, code: input.codigoCid10 }
         ],
         text: `Glioblastoma: ${input.designacaoCid10}`
       },
@@ -189,6 +190,15 @@ export class FhirResourceBuilder {
     if (resources.some(resource => !resource || typeof resource.resourceType !== 'string')) {
       throw new Error('Todos os recursos do Bundle FHIR têm de indicar resourceType.');
     }
+    const fullUrls = new Set<string>();
+    const entries = resources.map(resource => {
+      if (!resource.id) throw new Error(`O recurso FHIR ${resource.resourceType} tem de ter id para entrar no Bundle.`);
+      validarId(resource.id, resource.resourceType);
+      const fullUrl = `${BASE_URL_FHIR}/${resource.resourceType}/${resource.id}`;
+      if (fullUrls.has(fullUrl)) throw new Error(`O Bundle FHIR contém o recurso duplicado ${fullUrl}.`);
+      fullUrls.add(fullUrl);
+      return { fullUrl, resource };
+    });
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(timestamp) ||
         Number.isNaN(Date.parse(timestamp))) {
       throw new Error('Timestamp inválido para o Bundle FHIR.');
@@ -197,7 +207,7 @@ export class FhirResourceBuilder {
       resourceType: 'Bundle',
       type: 'collection',
       timestamp,
-      entry: resources.map(resource => ({ resource }))
+      entry: entries
     };
   }
 }
