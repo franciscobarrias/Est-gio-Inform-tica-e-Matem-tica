@@ -1,36 +1,34 @@
 import { MedicoService } from './medico.service';
 import { FhirObservationMapper } from '../mappers/fhir-observation.mapper';
+import { FhirResource, FhirResourceBuilder } from '../mappers/fhir-resource.builder';
 import { db } from '../database/dados-locais';
 import { ID_FORMULARIO_V2 } from '../database/formulario-v2';
 
 export class FhirService {
   static exportarBundleFhir(idDoente: string) {
     const proc = MedicoService.obterProcessoLongitudinal(idDoente);
-    const entries: any[] = [];
-    entries.push({
-      resource: {
-        resourceType: 'Patient',
-        id: proc.doente.id_doente,
-        identifier: [{ system: 'https://chsj.min-saude.pt/processo', value: proc.doente.numero_processo_clinico }],
-        name: [{ text: proc.doente.nome }],
-        birthDate: proc.doente.data_nascimento
-      }
-    });
+    const resources: FhirResource[] = [];
+    resources.push(FhirResourceBuilder.patient({
+      id: proc.doente.id_doente,
+      numeroProcesso: proc.doente.numero_processo_clinico,
+      nome: proc.doente.nome,
+      dataNascimento: proc.doente.data_nascimento,
+      sexo: proc.doente.sexo
+    }));
 
     if (proc.diagnostico) {
       const d: any = proc.diagnostico;
-      entries.push({
-        resource: {
-          resourceType: 'Condition',
-          id: d.id_diagnostico,
-          subject: { reference: `Patient/${idDoente}` },
-          recordedDate: d.data_diagnostico,
-          code: { coding: [{ system: 'http://snomed.info/sct', code: '393563007', display: 'Glioblastoma' }], text: `GBM (${d.localizacao_tumoral})` }
-        }
-      });
+      resources.push(FhirResourceBuilder.condition({
+        id: d.id_diagnostico,
+        idDoente,
+        dataDiagnostico: d.data_diagnostico,
+        localizacaoTumoral: d.localizacao_tumoral,
+        faseClinica: d.fase_clinica_atual
+      }));
+      resources.push(...FhirObservationMapper.diagnosticoToFhir(d, idDoente));
     }
 
-    for (const k of proc.avaliacoesKps) entries.push({ resource: FhirObservationMapper.kpsToFhir(k) });
+    for (const k of proc.avaliacoesKps) resources.push(FhirObservationMapper.kpsToFhir(k));
     const formularios = new Set<string>([ID_FORMULARIO_V2, ...(proc.submissoes as any[]).map(s => s.id_formulario)]);
     for (const idFormulario of formularios) {
       const formulario = db.prepare('SELECT nome, versao FROM Formulario WHERE id_formulario = ?')
@@ -39,8 +37,7 @@ export class FhirService {
       const perguntas = db.prepare(`SELECT id_pergunta, codigo, enunciado, tipo_resposta, ordem
         FROM PerguntaFormulario WHERE id_formulario = ? ORDER BY ordem ASC`)
         .all(idFormulario) as Array<{ id_pergunta: string; codigo: string | null; enunciado: string; tipo_resposta: string; ordem: number }>;
-      entries.push({
-        resource: {
+      resources.push({
           resourceType: 'Questionnaire',
           id: idFormulario,
           status: 'active',
@@ -61,13 +58,12 @@ export class FhirService {
                 }
               })) })
           }))
-        }
       });
     }
-    for (const s of proc.submissoes as any[]) entries.push({ resource: FhirObservationMapper.submissaoToFhirQuestionnaireResponse(s) });
+    for (const s of proc.submissoes as any[]) resources.push(FhirObservationMapper.submissaoToFhirQuestionnaireResponse(s));
     for (const a of proc.avaliacoesAlgoritmo as any[]) {
       const avaliacao = FhirObservationMapper.avaliacaoAlgoritmoToFhir({ ...a, id_doente: idDoente });
-      if (avaliacao) entries.push({ resource: avaliacao });
+      if (avaliacao) resources.push(avaliacao);
     }
     for (const a of proc.alertas as any[]) {
       const nivel = a.prioridade === 'Crítica' || a.prioridade === 'Alta' ? 'high' :
@@ -79,8 +75,7 @@ export class FhirService {
         WHERE ls.id_alerta = ?
         ORDER BY m.id_submissao, m.ordem`)
         .all(a.id_alerta) as Array<{ id_submissao: string; texto: string; prioridade: string; tipo: string }>;
-      entries.push({
-        resource: {
+      resources.push({
           resourceType: 'DetectedIssue',
           id: a.id_alerta,
           status: 'final',
@@ -94,10 +89,9 @@ export class FhirService {
             detail: [{ reference: `QuestionnaireResponse/${motivo.id_submissao}` }]
           })),
           note: [{ text: `Estado: ${a.estado_atual}. Prioridade algorítmica: ${a.prioridade_algoritmo || a.prioridade}; prioridade atual após triagem: ${a.prioridade}.` }]
-        }
       });
     }
 
-    return { resourceType: 'Bundle', type: 'collection', timestamp: new Date().toISOString(), total: entries.length, entry: entries };
+    return FhirResourceBuilder.collection(resources);
   }
-}
+}
