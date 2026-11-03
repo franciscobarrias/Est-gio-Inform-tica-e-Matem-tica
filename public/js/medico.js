@@ -198,7 +198,7 @@ function ligarGestao() {
       $('conteudoFhir').textContent = JSON.stringify(bundle, null, 2);
       $('resultadoFhir').classList.remove('hidden');
       $('resultadoFhir').open = true;
-      mostrarMensagem(`Bundle FHIR gerado com ${bundle.total} recursos.`, 'success');
+      mostrarMensagem(`Bundle FHIR gerado com ${bundle.entry?.length ?? 0} recursos.`, 'success');
     } catch (erro) { mostrarMensagem(erro.message, 'error'); }
   });
   $('descarregarFhir').addEventListener('click', async () => {
