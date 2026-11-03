@@ -239,8 +239,10 @@ export class AlertaService {
              (SELECT ua.nome FROM HistoricoAcaoAlerta h JOIN Utilizador ua ON ua.id_utilizador = h.id_utilizador
                WHERE h.id_alerta = a.id_alerta ORDER BY h.data_hora_acao DESC LIMIT 1) as autor_ultima_nota,
              (SELECT r.texto FROM RespostaMonitorizacao r JOIN PerguntaFormulario p ON p.id_pergunta = r.id_pergunta
-               WHERE r.id_submissao = a.id_submissao AND p.tipo_resposta = 'TEXTO_LIVRE' LIMIT 1) as mensagem_doente
+               WHERE r.id_submissao = a.id_submissao AND p.tipo_resposta = 'TEXTO_LIVRE' LIMIT 1) as mensagem_doente,
+             ant.data_hora_geracao as anterior_data, ant.prioridade as anterior_prioridade, ant.estado_atual as anterior_estado
       FROM AlertaClinico a
+      LEFT JOIN AlertaClinico ant ON ant.id_alerta = a.id_alerta_anterior
       JOIN RegraAlerta r ON a.id_regra = r.id_regra
       JOIN SubmissaoMonitorizacao s ON a.id_submissao = s.id_submissao
       JOIN Doente d ON s.id_doente = d.id_doente

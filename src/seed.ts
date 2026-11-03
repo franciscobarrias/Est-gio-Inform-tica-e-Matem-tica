@@ -343,7 +343,7 @@ const criarDados = db.transaction(() => {
   `);
 
   const inserirMedicacao = db.prepare(`
-    INSERT INTO Medicacao (id_medicacao, id_doente, nome, dose, via, posologia, indicacao,
+    INSERT INTO Medicacao (id_medicacao, id_doente, codigo_atc, dose, via, posologia, indicacao,
       data_inicio, data_fim, estado, observacoes, id_medico_registo, data_hora_registo)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
@@ -411,7 +411,7 @@ const criarDados = db.transaction(() => {
       crypto.randomUUID(),
       doente,
       dataAtras(115),
-      c.n % 2 ? 'Lobo Frontal' : 'Lobo Temporal',
+      c.n % 2 ? 'C71.1' : 'C71.2', // CID-10: lobo frontal / lobo temporal
       c.n % 2 ? 'Direita' : 'Esquerda',
       'IDH-wildtype',
       c.n % 3 === 0
@@ -462,23 +462,23 @@ const criarDados = db.transaction(() => {
     // MEDICAÇÃO (registada pelo médico responsável)
 
     const emQuimio = c.n % 2 === 0 || c.n === 1;
-    const medicar = (nome: string, dose: string, via: string, posologia: string, indicacao: string,
+    const medicar = (codigoAtc: string, dose: string, via: string, posologia: string, indicacao: string,
       inicio: number, estado = 'ATIVA', fim: number | null = null) =>
-      inserirMedicacao.run(crypto.randomUUID(), doente, nome, dose, via, posologia, indicacao,
+      inserirMedicacao.run(crypto.randomUUID(), doente, codigoAtc, dose, via, posologia, indicacao,
         dataAtras(inicio), fim === null ? null : dataAtras(fim), estado, null, medico, diasAtras(inicio));
 
     // Corticoide: ativo nos cenários com agravamento, terminado nos outros.
     const comCorticoide = [1, 3, 4, 8, 9, 13].includes(c.n);
-    medicar('Dexametasona', comCorticoide ? '4 mg' : '2 mg', 'ORAL', 'Uma vez por dia, de manhã', 'Edema cerebral',
+    medicar('H02AB02', comCorticoide ? '4 mg' : '2 mg', 'ORAL', 'Uma vez por dia, de manhã', 'Edema cerebral',
       110, comCorticoide ? 'ATIVA' : 'TERMINADA', comCorticoide ? null : 60);
-    if (comCorticoide) medicar('Pantoprazol', '20 mg', 'ORAL', 'Uma vez por dia, em jejum', 'Proteção gástrica durante o corticoide', 110);
+    if (comCorticoide) medicar('A02BC02', '20 mg', 'ORAL', 'Uma vez por dia, em jejum', 'Proteção gástrica durante o corticoide', 110);
     // Antiepilético nos tumores frontais (cenários ímpares).
-    if (c.n % 2 === 1) medicar('Levetiracetam', '500 mg', 'ORAL', 'De 12 em 12 horas', 'Prevenção de convulsões', 105);
+    if (c.n % 2 === 1) medicar('N03AX14', '500 mg', 'ORAL', 'De 12 em 12 horas', 'Prevenção de convulsões', 105);
     if (emQuimio) {
-      medicar('Temozolomida', '150 mg/m²', 'ORAL', 'Dias 1 a 5 de cada ciclo de 28 dias, ao deitar', 'Quimioterapia adjuvante', 40);
-      medicar('Ondansetrom', '8 mg', 'ORAL', '30 minutos antes da temozolomida; se necessário até 2 vezes por dia', 'Náuseas e vómitos', 40);
+      medicar('L01AX03', '150 mg/m²', 'ORAL', 'Dias 1 a 5 de cada ciclo de 28 dias, ao deitar', 'Quimioterapia adjuvante', 40);
+      medicar('A04AA01', '8 mg', 'ORAL', '30 minutos antes da temozolomida; se necessário até 2 vezes por dia', 'Náuseas e vómitos', 40);
     }
-    if (c.n === 5) medicar('Paracetamol', '1 g', 'ORAL', 'Até 3 vezes por dia, se dor', 'Dor de cabeça', 30, 'SUSPENSA', 10);
+    if (c.n === 5) medicar('N02BE01', '1 g', 'ORAL', 'Até 3 vezes por dia, se dor', 'Dor de cabeça', 30, 'SUSPENSA', 10);
 
     // PRIMEIRA AVALIAÇÃO KPS
 

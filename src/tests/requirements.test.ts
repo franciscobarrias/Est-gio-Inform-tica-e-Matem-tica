@@ -178,14 +178,20 @@ test('exige registo explícito de autorização na associação de cuidador', ()
 
 test('valida e guarda o diagnóstico do médico responsável', () => {
   assert.throws(() => MedicoService.atualizarDiagnostico(idDoente, idMedico, {
-    data_diagnostico: '2026-02-31', localizacao_tumoral: 'Frontal', lateralidade: 'Direita',
+    data_diagnostico: '2026-02-31', codigo_cid10: 'C71.1', lateralidade: 'Direita',
     estatuto_idh: 'IDH-wildtype', metilacao_mgmt: 'Metilado', fase_clinica_atual: 'Seguimento'
   }), /formato AAAA-MM-DD/);
   const resultado = MedicoService.atualizarDiagnostico(idDoente, idMedico, {
-    data_diagnostico: '2026-02-28', localizacao_tumoral: 'Frontal', lateralidade: 'Direita',
+    data_diagnostico: '2026-02-28', codigo_cid10: 'C71.1', lateralidade: 'Direita',
     estatuto_idh: 'IDH-wildtype', metilacao_mgmt: 'Metilado', fase_clinica_atual: 'Seguimento'
-  }) as { localizacao_tumoral: string };
-  assert.equal(resultado.localizacao_tumoral, 'Frontal');
+  }) as { codigo_cid10: string; designacao_cid10: string };
+  assert.equal(resultado.codigo_cid10, 'C71.1');
+  assert.equal(resultado.designacao_cid10, 'Neoplasia maligna do lobo frontal');
+  // Só se aceitam códigos que existem no catálogo CID-10.
+  assert.throws(() => MedicoService.atualizarDiagnostico(idDoente, idMedico, {
+    data_diagnostico: '2026-02-28', codigo_cid10: 'Lobo frontal', lateralidade: 'Direita',
+    estatuto_idh: 'IDH-wildtype', metilacao_mgmt: 'Metilado', fase_clinica_atual: 'Seguimento'
+  }), /lista de códigos CID-10/);
 });
 test('não permite alterar um alerta já concluído', () => {
   const formulario = SintomaService.obterFormularioAtivo();
@@ -442,15 +448,26 @@ test('uma falha do motor não reverte a submissão e fica registada como avalia�
 test('regista, suspende e termina medicação, validando os dados', () => {
   const hoje = new Date().toISOString().slice(0, 10);
   assert.throws(() => MedicoService.registarMedicacao(idDoente, idMedico, {
-    nome: '', dose: '4 mg', via: 'ORAL', posologia: 'De manhã', data_inicio: hoje
-  }), /medicamento, a dose e a posologia/);
+    codigo_atc: '', dose: '4 mg', via: 'ORAL', posologia: 'De manhã', data_inicio: hoje
+  }), /medicamento e a dose/);
   assert.throws(() => MedicoService.registarMedicacao(idDoente, idMedico, {
-    nome: 'Dexametasona', dose: '4 mg', via: 'NASAL', posologia: 'De manhã', data_inicio: hoje
+    codigo_atc: 'XPTO', dose: '4 mg', via: 'ORAL', posologia: 'De manhã', data_inicio: hoje
+  }), /código ATC/);
+  // A posologia, a indicação e as observações são opcionais.
+  const semPosologia = MedicoService.registarMedicacao(idDoente, idMedico, {
+    codigo_atc: 'N02BE01', dose: '1 g', via: 'ORAL', data_inicio: hoje
+  }) as { posologia: string | null; nome: string };
+  assert.equal(semPosologia.posologia, null);
+  assert.equal(semPosologia.nome, 'Paracetamol');
+  assert.throws(() => MedicoService.registarMedicacao(idDoente, idMedico, {
+    codigo_atc: 'H02AB02', dose: '4 mg', via: 'NASAL', posologia: 'De manhã', data_inicio: hoje
   }), /Via de administração/);
   const med = MedicoService.registarMedicacao(idDoente, idMedico, {
-    nome: 'Metoclopramida', dose: '10 mg', via: 'ORAL', posologia: 'Até 3 vezes por dia', indicacao: 'Náuseas', data_inicio: hoje
-  }) as { id_medicacao: string; estado: string };
+    codigo_atc: 'A03FA01', dose: '10 mg', via: 'ORAL', posologia: 'Até 3 vezes por dia', indicacao: 'Náuseas', data_inicio: hoje
+  }) as { id_medicacao: string; estado: string; codigo_atc: string; nome: string };
   assert.equal(med.estado, 'ATIVA');
+  assert.equal(med.codigo_atc, 'A03FA01');
+  assert.equal(med.nome, 'Metoclopramida');
   const suspensa = MedicoService.alterarEstadoMedicacao(idDoente, med.id_medicacao, idMedico, 'SUSPENSA') as { estado: string; data_fim: string };
   assert.equal(suspensa.estado, 'SUSPENSA');
   assert.equal(suspensa.data_fim, hoje);
@@ -460,6 +477,13 @@ test('regista, suspende e termina medicação, validando os dados', () => {
   assert.throws(() => MedicoService.alterarEstadoMedicacao('user-doente-002', med.id_medicacao, idMedico, 'TERMINADA'), /não pertence/);
   const processo = MedicoService.obterProcessoLongitudinal(idDoente) as any;
   assert.ok(processo.medicacoes.some((m: any) => m.id_medicacao === med.id_medicacao));
+  // Na exportação FHIR a medicação sai com o código ATC e o diagnóstico com o código CID-10.
+  const fhir = FhirService.exportarBundleFhir(idDoente);
+  const declaracao = fhir.entry.find((e: any) => e.resource.id === med.id_medicacao).resource;
+  assert.equal(declaracao.resourceType, 'MedicationStatement');
+  assert.deepEqual(declaracao.medicationCodeableConcept.coding[0], { system: 'http://www.whocc.no/atc', code: 'A03FA01', display: 'Metoclopramida' });
+  const condicao = fhir.entry.find((e: any) => e.resource.resourceType === 'Condition');
+  if (condicao) assert.ok(condicao.resource.code.coding.some((c: any) => c.system === 'http://hl7.org/fhir/sid/icd-10-cm'));
   assert.equal(processo.medicacoes[0].estado, 'ATIVA');
 });
 

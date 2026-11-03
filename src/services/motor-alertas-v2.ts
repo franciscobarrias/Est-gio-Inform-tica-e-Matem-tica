@@ -141,7 +141,7 @@ export function avaliarSubmissaoV2(entrada: {
     ['A3', 'Sonolência ou confusão súbita, ou dificuldade em acordar', 'LIGAR_112'],
     ['A4', 'Défice neurológico súbito (fraqueza de um lado, boca ao lado ou sem falar)', 'LIGAR_112'],
     ['A5', 'Temperatura ≥ 38 °C ou < 36 °C', 'CONTACTAR_JA'],
-    ['A6', 'Falta de ar de novo ou dor no peito', 'LIGAR_112'],
+    ['A6', 'Falta de ar nova ou dor no peito', 'LIGAR_112'],
     ['A7', 'Perna inchada, quente ou dolorosa', 'CONTACTAR_HOJE'],
     ['A8', 'Sangramento ou nódoas negras sem razão', 'CONTACTAR_HOJE'],
     ['A9', 'Vómitos que não param com os antieméticos', 'CONTACTAR_JA']

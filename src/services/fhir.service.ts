@@ -2,6 +2,9 @@ import { MedicoService } from './medico.service';
 import { FhirObservationMapper } from '../mappers/fhir-observation.mapper';
 import { db } from '../database/dados-locais';
 import { ID_FORMULARIO_V2 } from '../database/formulario-v2';
+import { SISTEMA_ATC, SISTEMA_CID10 } from '../database/terminologias';
+
+const ESTADO_FHIR_MEDICACAO: Record<string, string> = { ATIVA: 'active', SUSPENSA: 'on-hold', TERMINADA: 'completed' };
 
 export class FhirService {
   static exportarBundleFhir(idDoente: string) {
@@ -25,7 +28,29 @@ export class FhirService {
           id: d.id_diagnostico,
           subject: { reference: `Patient/${idDoente}` },
           recordedDate: d.data_diagnostico,
-          code: { coding: [{ system: 'http://snomed.info/sct', code: '393563007', display: 'Glioblastoma' }], text: `GBM (${d.localizacao_tumoral})` }
+          code: {
+            coding: [
+              { system: 'http://snomed.info/sct', code: '393563007', display: 'Glioblastoma' },
+              { system: SISTEMA_CID10, code: d.codigo_cid10, display: d.designacao_cid10 }
+            ],
+            text: `Glioblastoma: ${d.designacao_cid10}`
+          }
+        }
+      });
+    }
+
+    for (const m of proc.medicacoes as any[]) {
+      entries.push({
+        resource: {
+          resourceType: 'MedicationStatement',
+          id: m.id_medicacao,
+          status: ESTADO_FHIR_MEDICACAO[m.estado] || 'unknown',
+          subject: { reference: `Patient/${idDoente}` },
+          medicationCodeableConcept: { coding: [{ system: SISTEMA_ATC, code: m.codigo_atc, display: m.nome }], text: m.nome },
+          effectivePeriod: { start: m.data_inicio, ...(m.data_fim ? { end: m.data_fim } : {}) },
+          dateAsserted: m.data_hora_registo,
+          ...(m.indicacao ? { reasonCode: [{ text: m.indicacao }] } : {}),
+          dosage: [{ text: m.posologia ? `${m.dose}, ${m.posologia}` : m.dose }]
         }
       });
     }

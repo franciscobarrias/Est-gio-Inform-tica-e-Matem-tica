@@ -17,10 +17,36 @@ O modelo canónico tem **27 tabelas**. Os nomes de tabela e coluna são os nomes
 | Domínio | Tabelas |
 |---|---|
 | Identidade e acesso | `Utilizador`, `Doente`, `Medico`, `Enfermeiro`, `Cuidador`, `DoenteCuidador` |
+| Códigos normalizados | `CodigoCID10`, `CodigoATC` |
 | Processo clínico | `DiagnosticoGB`, `FaseClinica`, `Tratamento`, `AvaliacaoKarnofsky`, `Medicacao`, `PlanoMonitorizacao`, `DecisaoAcompanhamento` |
 | Questionários | `Formulario`, `PerguntaFormulario`, `OpcaoResposta`, `SubmissaoMonitorizacao`, `RespostaMonitorizacao` |
 | Motor e alertas | `RegraAlerta`, `AvaliacaoAlgoritmo`, `MotivoEvidencia`, `InstrucaoEmitida`, `AlertaClinico`, `AlertaSubmissao`, `HistoricoAcaoAlerta` |
-| Operação e auditoria | `RegistoAuditoria`, `SchemaMigracao` |
+| Operação e auditoria | `RegistoAuditoria` |
+
+## Códigos normalizados
+
+Os registos clínicos guardam códigos de terminologias reconhecidas e não texto livre; a designação em português vem destes catálogos.
+Os catálogos são preenchidos a partir de `src/database/terminologias.ts` sempre que a base é inicializada. Na exportação FHIR,
+a `Condition` leva o código SNOMED CT do glioblastoma (`393563007`) e o código CID-10 da localização, e cada `MedicationStatement` leva o código ATC.
+
+### `CodigoCID10`
+
+Subconjunto da CID-10-CM (sistema FHIR `http://hl7.org/fhir/sid/icd-10-cm`) usado para a localização do glioblastoma (C71.0–C71.9).
+
+| Campo | Tipo e restrições | Significado |
+|---|---|---|
+| `codigo` | TEXT, PK | Código CID-10-CM, ex.: `C71.2`. |
+| `designacao` | TEXT, NN | Designação em português. |
+
+### `CodigoATC`
+
+Subconjunto da classificação ATC da OMS (sistema FHIR `http://www.whocc.no/atc`) com as substâncias usadas no seguimento do glioblastoma.
+O código identifica a substância ativa (DCI), não a marca nem a apresentação.
+
+| Campo | Tipo e restrições | Significado |
+|---|---|---|
+| `codigo` | TEXT, PK | Código ATC de 7 caracteres, ex.: `H02AB02`. |
+| `designacao` | TEXT, NN | Nome da substância em português. |
 
 ## Identidade e acesso
 
@@ -105,7 +131,7 @@ O modelo admite no máximo um diagnóstico por doente (`id_doente` é único). O
 | `id_diagnostico` | TEXT, PK | Identificador do diagnóstico. |
 | `id_doente` | TEXT, NN, UQ, FK → `Doente.id_doente` | Doente diagnosticado; UQ implementa a relação 1:1. |
 | `data_diagnostico` | TEXT, NN | Data do diagnóstico. |
-| `localizacao_tumoral` | TEXT, NN | Localização tumoral registada. |
+| `codigo_cid10` | TEXT, NN, FK → `CodigoCID10.codigo` | Localização tumoral codificada em CID-10-CM (categoria C71, ex.: `C71.1` lobo frontal). O ecrã mostra a designação em português. |
 | `lateralidade` | TEXT, NN | Lateralidade registada. |
 | `estatuto_idh` | TEXT, NN | Estatuto IDH registado. |
 | `metilacao_mgmt` | TEXT, NN | Estado de metilação MGMT registado. |
@@ -156,10 +182,10 @@ Medicação registada pelo médico. A alteração de estado mantém a linha hist
 |---|---|---|
 | `id_medicacao` | TEXT, PK | Identificador da medicação. |
 | `id_doente` | TEXT, NN, FK → `Doente.id_doente` | Doente a quem se destina. |
-| `nome` | TEXT, NN | Nome do medicamento. |
+| `codigo_atc` | TEXT, NN, FK → `CodigoATC.codigo` | Substância ativa codificada em ATC (OMS), ex.: `L01AX03` temozolomida. O nome mostrado vem do catálogo. |
 | `dose` | TEXT, NN | Dose prescrita, em texto. |
 | `via` | TEXT, NN, CHECK | `ORAL`, `ENDOVENOSA`, `SUBCUTANEA`, `INTRAMUSCULAR` ou `OUTRA`. |
-| `posologia` | TEXT, NN | Frequência/instruções de toma. |
+| `posologia` | TEXT, NULL | Frequência/instruções de toma, quando registadas. |
 | `indicacao` | TEXT, NULL | Indicação terapêutica, quando registada. |
 | `data_inicio` | TEXT, NN | Data de início. |
 | `data_fim` | TEXT, NULL | Data de fim, quando aplicável. |
@@ -285,7 +311,7 @@ A versão ativa tem o identificador `form-gbm-v2`, definido em `src/database/for
 | B2–B5 | Sintomas | Náuseas, vómitos, sonolência diurna e cansaço. |
 | B3a | Detalhe | Número de episódios de vómito nas últimas 24 horas. |
 | B6; B6a | Sintoma; detalhe | Visão turva/dupla; confirmação de visão dupla. |
-| B7–B14 | Sintomas | Memória/concentração, fala, compreensão, comportamento, tristeza, ansiedade, apetite e dormência/formigueiros. |
+| B7–B14 | Sintomas | Dificuldade de memória/concentração, fala, compreensão, comportamento, tristeza, ansiedade, apetite e dormência/formigueiros. |
 | B15; B15a | Sintoma; detalhe | Diarreia; dejeções acima do habitual por dia. |
 | B16–B19 | Sintomas | Obstipação, sono, deglutição/engasgamento e confusão/desorientação. |
 | B18a | Detalhe | Engasgamento com líquidos. |

@@ -5,6 +5,7 @@ import { autenticarJWT, exigirPerfis } from '../middleware/auth.middleware';
 export const router = Router();
 router.post('/auth/login', ApiController.login);
 router.get('/formularios/ativo', autenticarJWT, ApiController.obterFormularioAtivo);
+router.get('/codigos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.obterCatalogosCodigos);
 router.get('/doentes', autenticarJWT, ApiController.listarDoentes);
 router.post('/doentes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.criarDoente);
 router.get('/doentes/:idDoente/processo', autenticarJWT, ApiController.obterProcessoDoente);

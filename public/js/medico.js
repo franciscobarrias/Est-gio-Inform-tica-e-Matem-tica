@@ -89,7 +89,7 @@ function renderizarGestao() {
   $('planoAtualTexto').textContent = plano ? `Atualmente: um registo a cada ${plano.periodicidade_dias} dia(s), definido em ${dataCurta(plano.data_definicao)}.` : 'Sem plano definido.';
   if (plano) $('inputPeriodicidade').value = plano.periodicidade_dias;
   $('diagData').value = d.data_diagnostico || '';
-  $('diagLocalizacao').value = d.localizacao_tumoral || '';
+  $('diagLocalizacao').value = d.codigo_cid10 || '';
   definirValorSelect($('diagLateralidade'), d.lateralidade);
   definirValorSelect($('diagIdh'), d.estatuto_idh);
   definirValorSelect($('diagMgmt'), d.metilacao_mgmt);
@@ -103,6 +103,31 @@ function renderizarGestao() {
 }
 
 // ---------- Ações da gestão clínica ----------
+// Doses mais usadas por substância (código ATC), só como sugestão: o médico pode escrever outra.
+const DOSES_COMUNS = {
+  L01AX03: ['75 mg/m²', '150 mg/m²', '200 mg/m²'], L01AD02: ['90 mg/m²', '110 mg/m²', '130 mg/m²'],
+  L01AD01: ['150 mg/m²', '200 mg/m²'], L01XB01: ['60 mg/m²'], L01CA02: ['1,4 mg/m²'], L01FG01: ['5 mg/kg', '10 mg/kg'],
+  H02AB02: ['1 mg', '2 mg', '4 mg', '8 mg'], N03AX14: ['250 mg', '500 mg', '750 mg', '1000 mg'],
+  N03AX18: ['50 mg', '100 mg', '150 mg', '200 mg'], N03AG01: ['300 mg', '500 mg'], N03AX09: ['25 mg', '50 mg', '100 mg'],
+  N05BA09: ['10 mg'], N05BA06: ['1 mg', '2,5 mg'], A04AA01: ['4 mg', '8 mg'], A03FA01: ['10 mg'],
+  A02BC02: ['20 mg', '40 mg'], A02BC01: ['20 mg', '40 mg'], N02BE01: ['500 mg', '1 g'], N02AA01: ['5 mg', '10 mg'],
+  A06AD11: ['10 ml', '15 ml'], J01EE01: ['400 mg + 80 mg', '800 mg + 160 mg'], B01AB05: ['40 mg', '60 mg']
+};
+
+// Listas de códigos normalizados: o médico escolhe pela designação e a base de dados guarda o código.
+async function carregarCatalogosCodigos() {
+  const { cid10, atc } = await pedidoApi('/api/codigos');
+  const opcao = (codigo, texto) => `<option value="${escapar(codigo)}">${escapar(texto)}</option>`;
+  $('diagLocalizacao').innerHTML = '<option value="">Selecionar</option>' + cid10.map(c => opcao(c.codigo, `${c.codigo} · ${c.designacao}`)).join('');
+  $('medNome').innerHTML = '<option value="">Selecionar</option>' + atc.map(c => opcao(c.codigo, `${c.designacao} (${c.codigo})`)).join('');
+  if (processoAtual?.diagnostico) $('diagLocalizacao').value = processoAtual.diagnostico.codigo_cid10 || '';
+  tornarPesquisavel($('diagLocalizacao'), { placeholder: 'Ex.: frontal, C71.1…' });
+  tornarPesquisavel($('medNome'), { placeholder: 'Escreva o nome ou o código ATC…' });
+  sugerirEnquantoEscreve($('medDose'), () => DOSES_COMUNS[$('medNome').value] || [...new Set(Object.values(DOSES_COMUNS).flat())]);
+  sugerirEnquantoEscreve($('diagFase'), sugestoesDaDatalist('listaFases'));
+  sugerirEnquantoEscreve($('grauParentesco'), sugestoesDaDatalist('listaParentesco'));
+}
+
 function ligarGestao() {
   $('inputKps').innerHTML = '<option value="">Não registar avaliação</option>' +
     KPS.map(([v, d]) => `<option value="${v}">${v} — ${d}</option>`).join('');
@@ -120,7 +145,7 @@ function ligarGestao() {
 
   $('guardarDiagnostico').addEventListener('click', () => executarAcao(
     () => pedidoApi(urlDoente('diagnostico'), { method: 'PUT', body: JSON.stringify({
-      data_diagnostico: $('diagData').value, localizacao_tumoral: $('diagLocalizacao').value, lateralidade: $('diagLateralidade').value,
+      data_diagnostico: $('diagData').value, codigo_cid10: $('diagLocalizacao').value, lateralidade: $('diagLateralidade').value,
       estatuto_idh: $('diagIdh').value, metilacao_mgmt: $('diagMgmt').value, fase_clinica_atual: $('diagFase').value
     }) }),
     'Diagnóstico atualizado.', atualizarTudo));
@@ -136,7 +161,7 @@ function ligarGestao() {
   $('medInicio').value = new Date().toISOString().slice(0, 10);
   $('guardarMedicacao').addEventListener('click', () => executarAcao(async () => {
     await pedidoApi(urlDoente('medicacoes'), { method: 'POST', body: JSON.stringify({
-      nome: $('medNome').value, dose: $('medDose').value, via: $('medVia').value, posologia: $('medPosologia').value,
+      codigo_atc: $('medNome').value, dose: $('medDose').value, via: $('medVia').value, posologia: $('medPosologia').value || undefined,
       indicacao: $('medIndicacao').value || undefined, data_inicio: $('medInicio').value, observacoes: $('medObs').value || undefined
     }) });
     ['medNome', 'medDose', 'medPosologia', 'medIndicacao', 'medObs'].forEach(id => { $(id).value = ''; });
@@ -233,6 +258,7 @@ iniciarPagina({
     ligarListaDoentes();
     ligarNovoDoente();
     ligarGestao();
+    await carregarCatalogosCodigos();
     await carregarAlertas();
   }
 });

@@ -89,13 +89,13 @@
           <summary>Editar diagnóstico</summary>
           <div class="linha-campos">
             <div><label for="diagData">Data do diagnóstico</label><input id="diagData" type="date" /></div>
-            <div><label for="diagLocalizacao">Localização tumoral</label><input id="diagLocalizacao" type="text" maxlength="120" list="listaLocalizacoes" /></div>
+            <div class="campo-largo"><label for="diagLocalizacao">Localização tumoral (código CID-10)</label><select id="diagLocalizacao"><option value="">Selecionar</option></select></div>
             <div><label for="diagLateralidade">Lateralidade</label><select id="diagLateralidade"><option value="">Selecionar</option><option>Esquerda</option><option>Direita</option><option>Bilateral</option><option>Linha média</option></select></div>
-            <div><label for="diagIdh">Estatuto IDH</label><select id="diagIdh"><option value="">Selecionar</option><option>IDH-wildtype</option><option>IDH-mutante</option><option>Não determinado</option></select></div>
+            <div class="campo-largo"><label for="diagIdh">Tipo de tumor (mutação IDH)</label><select id="diagIdh" aria-describedby="ajudaIdh"><option value="">Selecionar</option><option value="IDH-wildtype">IDH-wildtype (glioblastoma)</option><option value="IDH-mutante">IDH-mutante (astrocitoma grau 4)</option><option value="Não determinado">Não determinado</option></select></div>
             <div><label for="diagMgmt">Metilação MGMT</label><select id="diagMgmt"><option value="">Selecionar</option><option>MGMT Metilado</option><option>MGMT Não metilado</option><option>Não determinado</option></select></div>
             <div><label for="diagFase">Fase clínica atual</label><input id="diagFase" type="text" maxlength="120" list="listaFases" /></div>
           </div>
-          <datalist id="listaLocalizacoes"><option>Lobo Frontal</option><option>Lobo Temporal</option><option>Lobo Parietal</option><option>Lobo Occipital</option><option>Corpo caloso</option><option>Tronco cerebral</option><option>Multifocal</option></datalist>
+          <p id="ajudaIdh" class="muted pequeno">Segundo a classificação da OMS de 2021 (CNS5), o glioblastoma é por definição IDH-wildtype e de grau 4. Um tumor de grau 4 com mutação IDH chama-se astrocitoma IDH-mutante, grau 4.</p>
           <datalist id="listaFases"><option>Pós-operatório</option><option>Radioterapia</option><option>Quimioterapia Adjuvante</option><option>Seguimento</option><option>Recidiva</option><option>Cuidados paliativos</option></datalist>
           <button id="guardarDiagnostico" type="button">Guardar diagnóstico</button>
         </details>
@@ -123,15 +123,14 @@
         <details class="formulario-medico">
           <summary>+ Registar medicação</summary>
           <div class="linha-campos">
-            <div><label for="medNome">Medicamento</label><input id="medNome" type="text" maxlength="120" list="listaMedicamentos" /></div>
+            <div class="campo-largo"><label for="medNome">Medicamento (substância, código ATC)</label><select id="medNome"><option value="">Selecionar</option></select></div>
             <div><label for="medDose">Dose</label><input id="medDose" type="text" maxlength="60" placeholder="Ex.: 4 mg" /></div>
             <div><label for="medVia">Via</label><select id="medVia"><option value="ORAL">Oral</option><option value="ENDOVENOSA">Endovenosa</option><option value="SUBCUTANEA">Subcutânea</option><option value="INTRAMUSCULAR">Intramuscular</option><option value="OUTRA">Outra</option></select></div>
             <div><label for="medInicio">Data de início</label><input id="medInicio" type="date" /></div>
           </div>
-          <label for="medPosologia">Como tomar (posologia)</label><input id="medPosologia" type="text" maxlength="160" placeholder="Ex.: uma vez por dia, de manhã" />
-          <label for="medIndicacao">Para quê (indicação)</label><input id="medIndicacao" type="text" maxlength="160" placeholder="Ex.: edema cerebral" />
+          <label for="medPosologia">Como tomar (posologia, opcional)</label><input id="medPosologia" type="text" maxlength="160" placeholder="Ex.: uma vez por dia, de manhã" />
+          <label for="medIndicacao">Para quê (indicação, opcional)</label><input id="medIndicacao" type="text" maxlength="160" placeholder="Ex.: edema cerebral" />
           <label for="medObs">Observações (opcional)</label><input id="medObs" type="text" maxlength="500" />
-          <datalist id="listaMedicamentos"><option>Temozolomida</option><option>Dexametasona</option><option>Levetiracetam</option><option>Ondansetrom</option><option>Metoclopramida</option><option>Pantoprazol</option><option>Paracetamol</option><option>Lomustina</option><option>Bevacizumab</option><option>Cotrimoxazol</option></datalist>
           <button id="guardarMedicacao" type="button">Registar medicação</button>
         </details>
       </section>
@@ -154,7 +153,12 @@
       </div>
       <section class="card" style="margin-top:1rem" aria-labelledby="tScore">
         <h2 id="tScore">Score de evolução calculado pelo algoritmo</h2>
-        <p class="muted pequeno">Score ponderado de 0 a 100 de cada registo, comparado com a linha de base do doente. Acima da linha do limiar, o algoritmo assinala «agravamento global». Os registos com menos de 60% das perguntas respondidas não têm score. Limiares demonstrativos, ainda não validados clinicamente.</p>
+        <p class="muted pequeno">Score ponderado de 0 a 100 de cada registo, comparado com a linha de base do doente. Acima da linha do limiar, o algoritmo assinala «agravamento global». Os registos com menos de 60% das perguntas respondidas não têm score.</p>
+        <aside class="nota-metodo pequeno" aria-label="Sobre este score">
+          <strong>Sobre este score.</strong> É um indicador desenvolvido neste projeto para apoiar a triagem. Combina as respostas ao questionário de sintomas
+          e compara cada registo com o histórico do próprio doente, segundo regras documentadas e testadas em simulação. Como ainda não passou
+          por um estudo de validação clínica, serve para chamar a atenção para mudanças ao longo do tempo e deve ser lido em conjunto com a avaliação do profissional.
+        </aside>
         <div id="chartScore"></div>
       </section>
       <section class="card" style="margin-top:1rem">
@@ -244,6 +248,7 @@
   <footer class="rodape">Protótipo académico com dados fictícios · Serviço de Neurocirurgia, ULS São João · Projeto RISE-Health</footer>
 
   <script src="js/comum.js"></script>
+  <script src="js/pesquisa.js"></script>
   <script src="js/clinico.js"></script>
   <script src="js/medico.js"></script>
 </body>

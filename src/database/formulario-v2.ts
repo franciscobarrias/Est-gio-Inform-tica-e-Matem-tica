@@ -28,15 +28,15 @@ const INTENSIDADE: Opcao[] = [
   ['ausente', 'Não tive', 'AUSENTE', 0],
   ['ligeira', 'Ligeira — notei, mas não me impediu de fazer nada', 'LIGEIRA', 1],
   ['moderada', 'Moderada — atrapalhou algumas das minhas atividades', 'MODERADA', 2],
-  ['grave', 'Grave — impediu-me de fazer as atividades normais ou tive de ficar deitado', 'GRAVE', 3],
+  ['grave', 'Grave — impediu-me de fazer as atividades normais ou tive de ficar na cama', 'GRAVE', 3],
   NAO_CONSIGO
 ];
 // Rótulos das opções quando responde o cuidador (por valor codificado). As restantes opções são iguais.
 export const ROTULOS_CUIDADOR: Record<string, string> = {
   AUSENTE: 'Não teve',
-  LIGEIRA: 'Ligeira — notou-se, mas não o impediu de fazer nada',
-  MODERADA: 'Moderada — atrapalhou algumas das atividades dele',
-  GRAVE: 'Grave — impediu-o de fazer as atividades normais ou teve de ficar deitado'
+  LIGEIRA: 'Ligeira — notou-se, mas não impediu nenhuma atividade',
+  MODERADA: 'Moderada — atrapalhou algumas atividades do dia a dia',
+  GRAVE: 'Grave — impediu as atividades normais ou teve de ficar na cama'
 };
 const niveis = (n0: string, n1: string, n2: string, n3?: string): Opcao[] => [
   ['n0', n0, 'AUSENTE', 0], ['n1', n1, 'LIGEIRA', 1], ['n2', n2, 'MODERADA', 2],
@@ -68,18 +68,18 @@ export const PERGUNTAS_V2: PerguntaV2[] = [
     textoCuidador: 'O doente recuperou (voltou ao normal) depois da convulsão, ou entre elas se foram várias?',
     opcoes: [['sim', 'Sim, recuperou', 'RECUPEROU', 0], ['nao', 'Não recuperou', 'NAO_RECUPEROU', 1], NAO_CONSIGO] },
   { codigo: 'A2', id: 'v2-a2-cefaleia-subita', categoria: 'ALARME', texto: 'Teve uma dor de cabeça súbita, a pior da sua vida?', textoCuidador: 'O doente queixou-se de uma dor de cabeça súbita, a pior da vida dele?', opcoes: SIM_NAO },
-  { codigo: 'A3', id: 'v2-a3-sonolencia-subita', categoria: 'ALARME', texto: 'Sente-se muito mais sonolento ou confuso de repente, ou custa-lhe muito acordar?', textoCuidador: 'O doente está muito mais sonolento ou confuso de repente, ou é difícil acordá-lo?', opcoes: SIM_NAO },
+  { codigo: 'A3', id: 'v2-a3-sonolencia-subita', categoria: 'ALARME', texto: 'De repente, está com muito mais sono ou mais confusão do que o normal, ou custa-lhe muito acordar?', textoCuidador: 'O doente está muito mais sonolento ou confuso de repente, ou é difícil acordá-lo?', opcoes: SIM_NAO },
   { codigo: 'A4', id: 'v2-a4-defice-subito', categoria: 'ALARME', texto: 'Ficou de repente com fraqueza de um lado do corpo, a boca ao lado ou sem conseguir falar?', textoCuidador: 'O doente ficou de repente com fraqueza de um lado do corpo, a boca ao lado ou sem conseguir falar?', opcoes: SIM_NAO },
   { codigo: 'A5', id: 'v2-a5-temperatura', categoria: 'ALARME', texto: 'Mediu a temperatura e teve 38 °C ou mais, ou menos de 36 °C?', textoCuidador: 'Mediu a temperatura ao doente e teve 38 °C ou mais, ou menos de 36 °C?', opcoes: SIM_NAO },
-  { codigo: 'A6', id: 'v2-a6-falta-ar', categoria: 'ALARME', texto: 'Tem falta de ar de novo ou dor no peito?', textoCuidador: 'O doente tem falta de ar de novo ou dor no peito?', opcoes: SIM_NAO },
+  { codigo: 'A6', id: 'v2-a6-falta-ar', categoria: 'ALARME', texto: 'Tem falta de ar que não tinha antes, ou dor no peito?', textoCuidador: 'O doente tem falta de ar que não tinha antes, ou dor no peito?', opcoes: SIM_NAO },
   { codigo: 'A7', id: 'v2-a7-perna', categoria: 'ALARME', texto: 'Tem uma perna inchada, quente ou dolorosa?', textoCuidador: 'O doente tem uma perna inchada, quente ou dolorosa?', opcoes: SIM_NAO },
   { codigo: 'A8', id: 'v2-a8-sangramento', categoria: 'ALARME', texto: 'Tem sangramento (nariz, gengivas) ou nódoas negras sem razão?', textoCuidador: 'O doente tem sangramento (nariz, gengivas) ou nódoas negras sem razão?', opcoes: SIM_NAO },
   { codigo: 'A9', id: 'v2-a9-vomitos', categoria: 'ALARME', texto: 'Continua a vomitar mesmo com os medicamentos para os enjoos?', textoCuidador: 'O doente continua a vomitar mesmo com os medicamentos para os enjoos?', opcoes: SIM_NAO },
 
   // ---------- Bloco B — Sintomas ----------
   { codigo: 'B1', id: 'v2-b1-cefaleia', categoria: 'SINTOMA', texto: 'Dor de cabeça', opcoes: INTENSIDADE },
-  { codigo: 'B1a', id: 'v2-b1-manha', categoria: 'DETALHE', pai: 'B1', valorMinimoPai: 1, texto: 'É pior de manhã ou acorda-o à noite?', textoCuidador: 'A dor é pior de manhã ou acorda o doente à noite?', opcoes: SIM_NAO },
-  { codigo: 'B1b', id: 'v2-b1-analgesico', categoria: 'DETALHE', pai: 'B1', valorMinimoPai: 1, texto: 'Não alivia com o analgésico habitual?', opcoes: SIM_NAO },
+  { codigo: 'B1a', id: 'v2-b1-manha', categoria: 'DETALHE', pai: 'B1', valorMinimoPai: 1, texto: 'É pior de manhã, ou acorda durante a noite por causa da dor?', textoCuidador: 'A dor é pior de manhã ou acorda o doente à noite?', opcoes: SIM_NAO },
+  { codigo: 'B1b', id: 'v2-b1-analgesico', categoria: 'DETALHE', pai: 'B1', valorMinimoPai: 1, texto: 'A dor continua mesmo depois de tomar o analgésico habitual?', textoCuidador: 'A dor continua mesmo depois de o doente tomar o analgésico habitual?', opcoes: SIM_NAO },
   { codigo: 'B1c', id: 'v2-b1-diferente', categoria: 'DETALHE', pai: 'B1', valorMinimoPai: 1, texto: 'É diferente das dores de cabeça que costuma ter?', textoCuidador: 'É diferente das dores de cabeça que o doente costuma ter?', opcoes: SIM_NAO },
   { codigo: 'B2', id: 'v2-b2-nauseas', categoria: 'SINTOMA', texto: 'Náuseas', opcoes: INTENSIDADE },
   { codigo: 'B3', id: 'v2-b3-vomitos', categoria: 'SINTOMA', texto: 'Vómitos', opcoes: INTENSIDADE },
@@ -89,7 +89,7 @@ export const PERGUNTAS_V2: PerguntaV2[] = [
   { codigo: 'B5', id: 'v2-b5-cansaco', categoria: 'SINTOMA', texto: 'Cansaço', opcoes: INTENSIDADE },
   { codigo: 'B6', id: 'v2-b6-visao', categoria: 'SINTOMA', texto: 'Visão turva ou dupla', opcoes: INTENSIDADE },
   { codigo: 'B6a', id: 'v2-b6-dupla', categoria: 'DETALHE', pai: 'B6', valorMinimoPai: 1, texto: 'Vê a dobrar (visão dupla)?', textoCuidador: 'O doente vê a dobrar (visão dupla)?', opcoes: SIM_NAO },
-  { codigo: 'B7', id: 'v2-b7-memoria', categoria: 'SINTOMA', texto: 'Memória e concentração', opcoes: INTENSIDADE },
+  { codigo: 'B7', id: 'v2-b7-memoria', categoria: 'SINTOMA', texto: 'Dificuldade de memória ou de concentração', opcoes: INTENSIDADE },
   { codigo: 'B8', id: 'v2-b8-falar', categoria: 'SINTOMA', texto: 'Dificuldade em falar ou em encontrar as palavras', opcoes: INTENSIDADE },
   { codigo: 'B9', id: 'v2-b9-compreender', categoria: 'SINTOMA', texto: 'Dificuldade em compreender o que lhe dizem', opcoes: INTENSIDADE },
   { codigo: 'B10', id: 'v2-b10-comportamento', categoria: 'SINTOMA', texto: 'Irritabilidade ou mudança de comportamento (os familiares costumam notar melhor)', textoCuidador: 'Irritabilidade ou mudança de comportamento', opcoes: INTENSIDADE },
@@ -98,7 +98,7 @@ export const PERGUNTAS_V2: PerguntaV2[] = [
   { codigo: 'B13', id: 'v2-b13-apetite', categoria: 'SINTOMA', texto: 'Falta de apetite', opcoes: INTENSIDADE },
   { codigo: 'B14', id: 'v2-b14-dormencia', categoria: 'SINTOMA', texto: 'Dormência ou formigueiros', opcoes: INTENSIDADE },
   { codigo: 'B15', id: 'v2-b15-diarreia', categoria: 'SINTOMA', texto: 'Diarreia', opcoes: INTENSIDADE },
-  { codigo: 'B15a', id: 'v2-b15-dejecoes', categoria: 'DETALHE', pai: 'B15', valorMinimoPai: 1, texto: 'Quantas dejeções a mais do que o habitual por dia?',
+  { codigo: 'B15a', id: 'v2-b15-dejecoes', categoria: 'DETALHE', pai: 'B15', valorMinimoPai: 1, texto: 'Por dia, quantas vezes a mais do que o habitual vai à casa de banho (fezes)?', textoCuidador: 'Por dia, quantas vezes a mais do que o habitual o doente vai à casa de banho (fezes)?',
     opcoes: [['n1', '1 a 3', 'N1', 1], ['n2', '4 a 6', 'N2', 2], ['n3', '7 ou mais', 'N3', 3]] },
   { codigo: 'B16', id: 'v2-b16-obstipacao', categoria: 'SINTOMA', texto: 'Obstipação', opcoes: INTENSIDADE },
   { codigo: 'B17', id: 'v2-b17-sono', categoria: 'SINTOMA', texto: 'Alterações do sono', opcoes: INTENSIDADE },
@@ -112,9 +112,9 @@ export const PERGUNTAS_V2: PerguntaV2[] = [
 
   // ---------- Bloco C — Função ----------
   { codigo: 'C1', id: 'v2-c1-andar', categoria: 'FUNCAO', texto: 'Marcha e equilíbrio',
-    opcoes: niveis('Normal', 'Anda sozinho mas instável', 'Precisa de apoio ou de bengala', 'Não consegue andar') },
+    opcoes: niveis('Normal', 'Anda sem ajuda, mas com desequilíbrio', 'Precisa de apoio ou de bengala', 'Não consegue andar') },
   { codigo: 'C2', id: 'v2-c2-forca', categoria: 'FUNCAO', texto: 'Força num braço ou numa perna',
-    opcoes: niveis('Normal', 'Um pouco mais fraco', 'Deixa cair objetos ou arrasta a perna', 'Não consegue mexer') },
+    opcoes: niveis('Normal', 'Um pouco mais fraca do que o habitual', 'Deixa cair objetos ou arrasta a perna', 'Não consegue mexer') },
   { codigo: 'C3', id: 'v2-c3-quedas', categoria: 'FUNCAO', texto: 'Quedas nos últimos 7 dias',
     opcoes: niveis('Nenhuma', '1 queda', '2 ou mais quedas') },
   { codigo: 'C4', id: 'v2-c4-bexiga', categoria: 'FUNCAO', texto: 'Controlo da bexiga',

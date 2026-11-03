@@ -10,40 +10,49 @@ function dataIsoValida(data: string): boolean {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === data;
 }
 
+// O diagnóstico e a medicação guardam só o código; a designação em português vem dos catálogos.
+const SQL_DIAGNOSTICO = `SELECT dg.*, c.designacao AS designacao_cid10
+  FROM DiagnosticoGB dg JOIN CodigoCID10 c ON c.codigo = dg.codigo_cid10`;
+const SQL_MEDICACAO = `SELECT m.*, atc.designacao AS nome
+  FROM Medicacao m JOIN CodigoATC atc ON atc.codigo = m.codigo_atc`;
+
 export class MedicoService {
   static atualizarDiagnostico(idDoente: string, idMedico: string, dados: {
     data_diagnostico: string;
-    localizacao_tumoral: string;
+    codigo_cid10: string;
     lateralidade: string;
     estatuto_idh: string;
     metilacao_mgmt: string;
     fase_clinica_atual: string;
   }) {
     if (!dados || typeof dados !== 'object') throw new Error('Dados do diagnóstico inválidos.');
-    const camposObrigatorios = ['data_diagnostico', 'localizacao_tumoral', 'lateralidade', 'estatuto_idh', 'metilacao_mgmt', 'fase_clinica_atual'] as const;
+    const camposObrigatorios = ['data_diagnostico', 'codigo_cid10', 'lateralidade', 'estatuto_idh', 'metilacao_mgmt', 'fase_clinica_atual'] as const;
     if (camposObrigatorios.some(campo => typeof dados[campo] !== 'string' || !dados[campo].trim())) {
       throw new Error('Preencha todos os campos do diagnóstico.');
     }
     if (!dataIsoValida(dados.data_diagnostico)) {
       throw new Error('A data do diagnóstico deve ter o formato AAAA-MM-DD.');
     }
+    if (!db.prepare('SELECT 1 FROM CodigoCID10 WHERE codigo = ?').get(dados.codigo_cid10.trim())) {
+      throw new Error('Escolha a localização a partir da lista de códigos CID-10.');
+    }
     const existente = db.prepare('SELECT id_diagnostico FROM DiagnosticoGB WHERE id_doente = ?').get(idDoente) as { id_diagnostico: string } | undefined;
     const idDiagnostico = existente?.id_diagnostico || crypto.randomUUID();
     const tx = db.transaction(() => {
       db.prepare(`INSERT INTO DiagnosticoGB
-        (id_diagnostico, id_doente, data_diagnostico, localizacao_tumoral, lateralidade, estatuto_idh, metilacao_mgmt, fase_clinica_atual)
+        (id_diagnostico, id_doente, data_diagnostico, codigo_cid10, lateralidade, estatuto_idh, metilacao_mgmt, fase_clinica_atual)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id_doente) DO UPDATE SET data_diagnostico = excluded.data_diagnostico,
-          localizacao_tumoral = excluded.localizacao_tumoral, lateralidade = excluded.lateralidade,
+          codigo_cid10 = excluded.codigo_cid10, lateralidade = excluded.lateralidade,
           estatuto_idh = excluded.estatuto_idh, metilacao_mgmt = excluded.metilacao_mgmt,
           fase_clinica_atual = excluded.fase_clinica_atual`)
-        .run(idDiagnostico, idDoente, dados.data_diagnostico, dados.localizacao_tumoral.trim(),
+        .run(idDiagnostico, idDoente, dados.data_diagnostico, dados.codigo_cid10.trim(),
           dados.lateralidade.trim(), dados.estatuto_idh.trim(), dados.metilacao_mgmt.trim(), dados.fase_clinica_atual.trim());
       this.registarFaseClinica(idDoente, dados.fase_clinica_atual.trim(), new Date().toISOString().slice(0, 10));
       registarAuditoria(idMedico, 'ATUALIZACAO_DIAGNOSTICO_RF07', `Diagnóstico atualizado para o processo ${idDoente}`);
     });
     tx();
-    return db.prepare('SELECT * FROM DiagnosticoGB WHERE id_doente = ?').get(idDoente);
+    return db.prepare(`${SQL_DIAGNOSTICO} WHERE dg.id_doente = ?`).get(idDoente);
   }
 
   static associarCuidador(idDoente: string, emailCuidador: string, grauParentesco: string, idAutor: string, consentimentoConfirmado: boolean) {
@@ -179,41 +188,43 @@ export class MedicoService {
   static readonly ESTADOS_MEDICACAO = ['ATIVA', 'SUSPENSA', 'TERMINADA'];
 
   static registarMedicacao(idDoente: string, idMedico: string, dados: {
-    nome: string; dose: string; via: string; posologia: string; indicacao?: string;
+    codigo_atc: string; dose: string; via: string; posologia?: string; indicacao?: string;
     data_inicio: string; data_fim?: string; estado?: string; observacoes?: string;
   }) {
     if (!dados || typeof dados !== 'object') throw new Error('Dados da medicação inválidos.');
     const texto = (valor: unknown, max: number) => typeof valor === 'string' && valor.trim().length > 0 && valor.trim().length <= max;
     const estado = dados.estado || 'ATIVA';
-    if (!texto(dados.nome, 120) || !texto(dados.dose, 60) || !texto(dados.posologia, 160)) {
-      throw new Error('Indique o medicamento, a dose e a posologia.');
+    if (!texto(dados.codigo_atc, 10) || !texto(dados.dose, 60)) {
+      throw new Error('Indique o medicamento e a dose.');
     }
+    const substancia = db.prepare('SELECT designacao FROM CodigoATC WHERE codigo = ?').get(dados.codigo_atc.trim()) as { designacao: string } | undefined;
+    if (!substancia) throw new Error('Escolha o medicamento a partir da lista de substâncias (código ATC).');
     if (!MedicoService.VIAS_MEDICACAO.includes(dados.via) || !MedicoService.ESTADOS_MEDICACAO.includes(estado)) {
       throw new Error('Via de administração ou estado da medicação inválidos.');
     }
     if (!dataIsoValida(dados.data_inicio) || (dados.data_fim && (!dataIsoValida(dados.data_fim) || dados.data_fim < dados.data_inicio))) {
       throw new Error('Datas da medicação inválidas. Use AAAA-MM-DD e uma data de fim igual ou posterior ao início.');
     }
-    if ((dados.indicacao && !texto(dados.indicacao, 160)) || (dados.observacoes && !texto(dados.observacoes, 500))) {
-      throw new Error('A indicação ou as observações são demasiado longas.');
+    if ((dados.posologia && !texto(dados.posologia, 160)) || (dados.indicacao && !texto(dados.indicacao, 160)) || (dados.observacoes && !texto(dados.observacoes, 500))) {
+      throw new Error('A posologia, a indicação ou as observações são demasiado longas.');
     }
     const id_medicacao = crypto.randomUUID();
     const tx = db.transaction(() => {
-      db.prepare(`INSERT INTO Medicacao (id_medicacao, id_doente, nome, dose, via, posologia, indicacao, data_inicio, data_fim,
+      db.prepare(`INSERT INTO Medicacao (id_medicacao, id_doente, codigo_atc, dose, via, posologia, indicacao, data_inicio, data_fim,
         estado, observacoes, id_medico_registo, data_hora_registo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-        id_medicacao, idDoente, dados.nome.trim(), dados.dose.trim(), dados.via, dados.posologia.trim(),
+        id_medicacao, idDoente, dados.codigo_atc.trim(), dados.dose.trim(), dados.via, dados.posologia?.trim() || null,
         dados.indicacao?.trim() || null, dados.data_inicio, dados.data_fim || null, estado,
         dados.observacoes?.trim() || null, idMedico, new Date().toISOString());
-      registarAuditoria(idMedico, 'REGISTO_MEDICACAO', `Medicação ${dados.nome.trim()} (${estado})`);
+      registarAuditoria(idMedico, 'REGISTO_MEDICACAO', `Medicação ${substancia.designacao} [ATC ${dados.codigo_atc.trim()}] (${estado})`);
     });
     tx();
-    return db.prepare('SELECT * FROM Medicacao WHERE id_medicacao = ?').get(id_medicacao);
+    return db.prepare(`${SQL_MEDICACAO} WHERE m.id_medicacao = ?`).get(id_medicacao);
   }
 
   // Suspender ou terminar uma medicação (ou retomá-la). Guarda a data de fim quando deixa de estar ativa.
   static alterarEstadoMedicacao(idDoente: string, idMedicacao: string, idMedico: string, estado: string, dataFim?: string) {
     if (!MedicoService.ESTADOS_MEDICACAO.includes(estado)) throw new Error('Estado da medicação inválido.');
-    const atual = db.prepare('SELECT * FROM Medicacao WHERE id_medicacao = ? AND id_doente = ?').get(idMedicacao, idDoente) as any;
+    const atual = db.prepare(`${SQL_MEDICACAO} WHERE m.id_medicacao = ? AND m.id_doente = ?`).get(idMedicacao, idDoente) as any;
     if (!atual) throw new Error('A medicação indicada não pertence a este processo clínico.');
     const fim = estado === 'ATIVA' ? null : (dataFim || new Date().toISOString().slice(0, 10));
     if (fim && (!dataIsoValida(fim) || fim < atual.data_inicio)) throw new Error('A data de fim tem de ser igual ou posterior ao início.');
@@ -222,7 +233,7 @@ export class MedicoService {
       registarAuditoria(idMedico, 'ALTERACAO_MEDICACAO', `Medicação ${atual.nome}: ${atual.estado} → ${estado}`);
     });
     tx();
-    return db.prepare('SELECT * FROM Medicacao WHERE id_medicacao = ?').get(idMedicacao);
+    return db.prepare(`${SQL_MEDICACAO} WHERE m.id_medicacao = ?`).get(idMedicacao);
   }
 
   static registarDecisaoAcompanhamento(idDoente: string, idMedico: string, dados: { id_alerta?: string; decisao_medica: string; fundamentacao_clinica: string }) {
@@ -258,10 +269,11 @@ export class MedicoService {
     `).get(idDoente) as any;
     if (!doente) throw new Error('Doente não encontrado.');
 
-    const diagnostico = db.prepare('SELECT * FROM DiagnosticoGB WHERE id_doente = ?').get(idDoente);
+    const diagnostico = db.prepare(`${SQL_DIAGNOSTICO} WHERE dg.id_doente = ?`).get(idDoente);
     const tratamentos = db.prepare('SELECT * FROM Tratamento WHERE id_doente = ? ORDER BY data_inicio DESC').all(idDoente);
     // Ativas primeiro; dentro de cada estado, as mais recentes primeiro.
-    const medicacoes = db.prepare(`SELECT m.*, u.nome as nome_medico FROM Medicacao m JOIN Utilizador u ON u.id_utilizador = m.id_medico_registo
+    const medicacoes = db.prepare(`SELECT m.*, atc.designacao AS nome, u.nome as nome_medico FROM Medicacao m
+      JOIN CodigoATC atc ON atc.codigo = m.codigo_atc JOIN Utilizador u ON u.id_utilizador = m.id_medico_registo
       WHERE m.id_doente = ? ORDER BY CASE m.estado WHEN 'ATIVA' THEN 0 WHEN 'SUSPENSA' THEN 1 ELSE 2 END, m.data_inicio DESC`).all(idDoente);
     const avaliacoesKps = db.prepare('SELECT * FROM AvaliacaoKarnofsky WHERE id_doente = ? ORDER BY data_avaliacao ASC, rowid ASC').all(idDoente) as any[];
     const kpsMaisRecente = avaliacoesKps.length > 0 ? avaliacoesKps[avaliacoesKps.length - 1] : null;

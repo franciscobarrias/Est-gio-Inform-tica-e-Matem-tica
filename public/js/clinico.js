@@ -75,11 +75,8 @@ function cartaoAlerta(a) {
     <p>${escapar(a.resumo_agravamento)}</p>
     <p class="muted pequeno">Regra: ${escapar(a.nome_regra)}${a.prioridade_algoritmo && a.prioridade_algoritmo !== a.prioridade
       ? ` · prioridade ajustada na triagem (o algoritmo indicou ${escapar(a.prioridade_algoritmo)})` : ''}</p>
-    ${a.id_alerta_anterior ? `<p class="muted pequeno">Escalonado a partir do alerta ${escapar(a.id_alerta_anterior)}.</p>` : ''}
-    ${a.submissoes_associadas?.length ? `<p class="muted pequeno"><strong>Registos associados:</strong> ${a.submissoes_associadas.map(s =>
-      `${dataCurta(s.data_referencia_sintomas)} · ${s.tipo_associacao === 'MOTIVO_REPETIDO' ? 'motivo repetido' :
-        s.tipo_associacao === 'MOTIVO_NOVO' ? 'motivo novo' :
-          s.tipo_associacao === 'ESCALONAMENTO' ? 'escalonamento' : 'origem'}`).join('; ')}</p>` : ''}
+    ${ligacaoAlertaAnterior(a)}
+    ${registosDoAlerta(a)}
     ${a.mensagem_doente ? `<p class="mensagem-doente"><strong>Mensagem do doente/cuidador:</strong> «${escapar(a.mensagem_doente)}»</p>` : ''}
     ${a.ultima_nota ? `<p class="nota"><strong>Nota de triagem</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>`
       : a.estado_atual === 'Pendente' ? `<p class="nota ${atraso ? 'nota-atraso' : 'muted'}">Ainda não avaliado pela enfermagem${atraso
@@ -87,6 +84,25 @@ function cartaoAlerta(a) {
     ${acoesAlertaDaPagina(a)}
   </article>`;
 }
+// Ligação ao alerta anterior do mesmo doente, em linguagem clínica (sem códigos internos).
+function ligacaoAlertaAnterior(a) {
+  if (!a.id_alerta_anterior || !a.anterior_data) return '';
+  const propria = (a.submissoes_associadas || []).find(s => s.id_submissao === a.id_submissao);
+  const anterior = `alerta de ${dataCurta(a.anterior_data)} (${escapar(a.anterior_prioridade)})`;
+  const texto = propria?.tipo_associacao === 'ESCALONAMENTO'
+    ? `Agrava o ${anterior}, que estava aberto nessa altura: a prioridade subiu de ${escapar(a.anterior_prioridade)} para ${escapar(a.prioridade_algoritmo || a.prioridade)}.`
+    : `Traz um motivo novo em relação ao ${anterior}, que estava aberto nessa altura.`;
+  return `<p class="muted pequeno">${texto}</p>`;
+}
+
+// Registos de sintomas ligados ao alerta: o que o gerou e os seguintes que repetiram o mesmo motivo.
+function registosDoAlerta(a) {
+  const repetidos = (a.submissoes_associadas || []).filter(s => s.tipo_associacao === 'MOTIVO_REPETIDO');
+  if (!repetidos.length) return '';
+  return `<p class="muted pequeno">O mesmo motivo voltou a aparecer ${repetidos.length === 1 ? 'no registo' : 'nos registos'} de
+    ${repetidos.map(s => dataCurta(s.data_referencia_sintomas)).join(', ')} (ligado${repetidos.length === 1 ? '' : 's'} a este alerta, sem criar alertas novos).</p>`;
+}
+
 const botaoAbrirProcesso = a => `<button type="button" class="secundario" data-abrir-doente="${escapar(a.id_doente)}">Abrir processo</button>`;
 
 function ligarAlertas() {
@@ -172,8 +188,8 @@ function renderizarResumo() {
   const p = processoAtual, d = p.diagnostico;
   $('resumoDiagnostico').innerHTML = d ? `<dl class="ficha">
       <dt>Data</dt><dd>${dataCurta(d.data_diagnostico)}</dd>
-      <dt>Localização</dt><dd>${escapar(d.localizacao_tumoral)} (${escapar(d.lateralidade)})</dd>
-      <dt>IDH</dt><dd>${escapar(d.estatuto_idh)}</dd>
+      <dt>Localização</dt><dd>${escapar(d.designacao_cid10)} (${escapar(d.lateralidade)})${codigoClinico('CID-10', d.codigo_cid10)}</dd>
+      <dt>Tipo de tumor</dt><dd>${tipoTumor(d)}</dd>
       <dt>MGMT</dt><dd>${escapar(d.metilacao_mgmt)}</dd>
       <dt>Fase clínica</dt><dd>${escapar(d.fase_clinica_atual)}</dd></dl>`
     : '<p class="muted">Diagnóstico ainda não registado.</p>';

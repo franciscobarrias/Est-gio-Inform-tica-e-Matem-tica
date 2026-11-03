@@ -97,7 +97,12 @@
       </div>
       <section class="card" style="margin-top:1rem" aria-labelledby="tScore">
         <h2 id="tScore">Score de evolução calculado pelo algoritmo</h2>
-        <p class="muted pequeno">Score ponderado de 0 a 100 de cada registo, comparado com a linha de base do doente. Acima da linha do limiar, o algoritmo assinala «agravamento global». Os registos com menos de 60% das perguntas respondidas não têm score. Limiares demonstrativos, ainda não validados clinicamente.</p>
+        <p class="muted pequeno">Score ponderado de 0 a 100 de cada registo, comparado com a linha de base do doente. Acima da linha do limiar, o algoritmo assinala «agravamento global». Os registos com menos de 60% das perguntas respondidas não têm score.</p>
+        <aside class="nota-metodo pequeno" aria-label="Sobre este score">
+          <strong>Sobre este score.</strong> É um indicador desenvolvido neste projeto para apoiar a triagem. Combina as respostas ao questionário de sintomas
+          e compara cada registo com o histórico do próprio doente, segundo regras documentadas e testadas em simulação. Como ainda não passou
+          por um estudo de validação clínica, serve para chamar a atenção para mudanças ao longo do tempo e deve ser lido em conjunto com a avaliação do profissional.
+        </aside>
         <div id="chartScore"></div>
       </section>
       <section class="card" style="margin-top:1rem">
@@ -123,6 +128,7 @@
   <footer class="rodape">Protótipo académico com dados fictícios · Serviço de Neurocirurgia, ULS São João · Projeto RISE-Health</footer>
 
   <script src="js/comum.js"></script>
+  <script src="js/pesquisa.js"></script>
   <script src="js/clinico.js"></script>
   <script src="js/enfermeiro.js"></script>
 </body>

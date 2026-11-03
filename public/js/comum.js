@@ -107,10 +107,16 @@ function mostrarMensagem(mensagem, tipo = '') {
 const nomeDoenteAtivo = () => processoAtual?.doente?.nome || 'o doente';
 
 // Executa uma ação, mostra o resultado e volta a carregar o processo (e o que a página precisar).
+// Último botão carregado: depois de guardar com sucesso, o formulário recolhível onde ele está fecha-se.
+let ultimoBotaoCarregado = null;
+document.addEventListener('click', evento => { ultimoBotaoCarregado = evento.target.closest('button'); }, true);
+
 async function executarAcao(acao, mensagem, depois) {
   mostrarMensagem('');
+  const formulario = ultimoBotaoCarregado?.closest('details.formulario-medico');
   try {
     await acao();
+    if (formulario) formulario.open = false;
     mostrarMensagem(`${mensagem} (${nomeDoenteAtivo()})`, 'success');
     await carregarProcesso();
     if (depois) await depois();
@@ -239,6 +245,7 @@ async function carregarProcesso() {
     processoAtual = await pedidoApi(urlDoente('processo'));
     renderizarIdentidade();
     desenharKps(processoAtual.avaliacoesKps);
+    assinalarSintomasComDados(processoAtual.submissoes);
     desenharSintomas(processoAtual.submissoes);
     desenharQuadroComparativo(processoAtual.submissoes);
     renderizarHistorico(processoAtual.submissoes);
@@ -281,14 +288,31 @@ function renderizarIdentidade() {
 // ---------- Diagnóstico e medicação ----------
 // Igual para todos os perfis; o médico tem também os formulários de registo (medico.js).
 // Se a página definir acoesMedicacaoDaPagina(m), cada medicação ganha uma coluna de ações.
+// Código normalizado mostrado discretamente por baixo da designação em português.
+function codigoClinico(sistema, codigo) {
+  return codigo ? `<span class="codigo-clinico" title="Código ${escapar(sistema)} guardado na base de dados">${escapar(sistema)} ${escapar(codigo)}</span>` : '';
+}
+
+// Tipo de tumor segundo a classificação da OMS de 2021 (CNS5), a partir do estatuto IDH registado.
+// O hífen não separável evita partir «IDH-wildtype» em duas linhas.
+function tipoTumor(d) {
+  const tipos = {
+    'IDH-wildtype': ['Glioblastoma, IDH\u2011wildtype', 'Grau 4 · OMS 2021'],
+    'IDH-mutante': ['Astrocitoma, IDH\u2011mutante', 'Grau 4 · OMS 2021'],
+    'Não determinado': ['Glioblastoma, SOE', 'IDH não determinado · OMS 2021']
+  };
+  const [nome, detalhe] = tipos[d.estatuto_idh] || ['Glioblastoma', ''];
+  return `${escapar(nome)}${detalhe ? `<span class="codigo-clinico">${escapar(detalhe)}</span>` : ''}`;
+}
+
 function renderizarDiagnosticoMedicacao() {
   if (!$('dmDiagnostico')) return;
   const p = processoAtual, d = p.diagnostico;
   $('dmDiagnostico').innerHTML = d ? `<dl class="faixa-dados">
-      <div><dt>Diagnóstico</dt><dd>Glioblastoma${d.estatuto_idh ? `, ${escapar(d.estatuto_idh)}` : ''}</dd></div>
+      <div><dt>Diagnóstico</dt><dd>${tipoTumor(d)}</dd></div>
       <div><dt>Data do diagnóstico</dt><dd>${dataCurta(d.data_diagnostico)}</dd></div>
-      <div><dt>Localização</dt><dd>${escapar(d.localizacao_tumoral)}${d.lateralidade ? ` (${escapar(d.lateralidade)})` : ''}</dd></div>
-      <div><dt>Metilação MGMT</dt><dd>${escapar(d.metilacao_mgmt || '—')}</dd></div>
+      <div><dt>Localização</dt><dd>${escapar(d.designacao_cid10)}${d.lateralidade ? ` (${escapar(d.lateralidade)})` : ''}${codigoClinico('CID-10', d.codigo_cid10)}</dd></div>
+      <div><dt>Metilação do promotor MGMT</dt><dd>${escapar(d.metilacao_mgmt || '—')}</dd></div>
       <div><dt>Fase clínica atual</dt><dd>${escapar(d.fase_clinica_atual || '—')}</dd></div></dl>`
     : '<p class="muted">O diagnóstico ainda não foi registado.</p>';
 
@@ -305,9 +329,9 @@ function renderizarDiagnosticoMedicacao() {
   const tabela = lista => `<div class="table-wrap"><table class="tabela-medicacao">
     <thead><tr><th>Medicamento</th><th>Dose</th><th>Como tomar</th><th>Para quê</th><th>Datas</th>${comAcoes ? '<th><span class="sr-only">Ações</span></th>' : ''}</tr></thead>
     <tbody>${lista.map(m => `<tr class="${m.estado !== 'ATIVA' ? 'inativa' : ''}">
-      <th scope="row">${escapar(m.nome)}${m.estado !== 'ATIVA' ? ` <span class="badge badge-neutro">${escapar(ESTADOS_MEDICACAO[m.estado] || m.estado)}</span>` : ''}</th>
+      <th scope="row">${escapar(m.nome)}${m.estado !== 'ATIVA' ? ` <span class="badge badge-neutro">${escapar(ESTADOS_MEDICACAO[m.estado] || m.estado)}</span>` : ''}${codigoClinico('ATC', m.codigo_atc)}</th>
       <td>${escapar(m.dose)}<div class="muted pequeno">${escapar(VIAS_MEDICACAO[m.via] || m.via)}</div></td>
-      <td>${escapar(m.posologia)}${m.observacoes ? `<div class="muted pequeno">${escapar(m.observacoes)}</div>` : ''}</td>
+      <td>${escapar(m.posologia || '—')}${m.observacoes ? `<div class="muted pequeno">${escapar(m.observacoes)}</div>` : ''}</td>
       <td>${escapar(m.indicacao || '—')}</td>
       <td class="pequeno">Desde ${dataCurta(m.data_inicio)}${m.data_fim ? `<br>até ${dataCurta(m.data_fim)}` : ''}</td>
       ${comAcoes ? `<td>${acoesMedicacaoDaPagina(m)}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
@@ -325,17 +349,33 @@ function desenharLinha({ pontos, yMax, marcas, limiar, cor, titulo, degraus = fa
   const x = i => pontos.length === 1 ? (esq + dir) / 2 : esq + i * (dir - esq) / (pontos.length - 1);
   const y = v => base - v * (base - topo) / yMax;
   const passo = Math.max(1, Math.ceil(pontos.length / 8));
+  // Segmentos desenhados [x1, y1, x2, y2], para os números dos pontos não ficarem por cima das linhas.
+  const linhasDoGrafico = pontos.slice(1).flatMap((p, k) => degraus
+    ? [[x(k), y(pontos[k].v), x(k + 1), y(pontos[k].v)], [x(k + 1), y(pontos[k].v), x(k + 1), y(p.v)]]
+    : [[x(k), y(pontos[k].v), x(k + 1), y(p.v)]]);
+  if (limiar) linhasDoGrafico.push([esq, y(limiar.v), dir, y(limiar.v)]);
   return `<svg class="chart" viewBox="0 0 ${L} ${A}" role="img" aria-label="${escapar(titulo)}: ${pontos.map(p => `${dataCurta(p.data)} ${escapar(p.rotulo)}`).join('; ')}">
     ${marcas.map(m => `<line x1="${esq}" y1="${y(m.v)}" x2="${dir}" y2="${y(m.v)}" stroke="#ecdfd2"/><text x="${esq - 8}" y="${y(m.v) + 4}" text-anchor="end" font-size="12" fill="#6b5d52">${escapar(m.t)}</text>`).join('')}
-    ${limiar ? `<line x1="${esq}" y1="${y(limiar.v)}" x2="${dir}" y2="${y(limiar.v)}" stroke="#b54708" stroke-dasharray="6 4" stroke-width="1.5"/><text x="${zona ? esq + 6 : dir}" y="${zona ? y(limiar.v) + 15 : y(limiar.v) - 6}" text-anchor="${zona ? 'start' : 'end'}" font-size="11" fill="#b54708">${escapar(limiar.t)}</text>` : ''}
+    ${limiar ? `<line x1="${esq}" y1="${y(limiar.v)}" x2="${dir}" y2="${y(limiar.v)}" stroke="#b54708" stroke-dasharray="6 4" stroke-width="1.5"/>` : ''}
     ${zona ? `<rect x="${esq}" y="${y(zona.ate)}" width="${dir - esq}" height="${base - y(zona.ate)}" fill="${zona.cor}"/>` : ''}
     ${pontos.length > 1 ? `<polyline points="${pontos.map((p, i) => degraus && i > 0
       // Em degraus: o valor mantém-se até à avaliação seguinte (o KPS não muda entre consultas).
       ? `${x(i)},${y(pontos[i - 1].v)} ${x(i)},${y(p.v)}` : `${x(i)},${y(p.v)}`).join(' ')}" fill="none" stroke="${cor}" stroke-width="3"/>` : ''}
-    ${mostrarValores ? pontos.map((p, i) => `<text x="${i === pontos.length - 1 ? x(i) - 9 : x(i) + 9}" y="${y(p.v) - 9}" text-anchor="${i === pontos.length - 1 ? 'end' : 'start'}" font-size="13" font-weight="700" fill="${cor}">${escapar(p.v)}</text>`).join('') : ''}
+    ${mostrarValores ? pontos.map((p, i) => {
+      // Cada número procura o primeiro sítio, à volta do ponto, que não toque em nenhuma linha do gráfico.
+      const largura = 8 * String(p.v).length, px = x(i), py = y(p.v), ultimo = i === pontos.length - 1;
+      const direita = [px + 9, px + 9 + largura], esquerda = [px - 9 - largura, px - 9];
+      const candidatos = (ultimo ? [esquerda] : [direita, esquerda]).flatMap(xs => [
+        { xs, ys: [py - 22, py - 9], ty: py - 9 }, { xs, ys: [py + 7, py + 20], ty: py + 20 }, { xs, ys: [py - 6, py + 7], ty: py + 5 }
+      ]).filter(c => c.ys[0] > topo - 14 && c.ys[1] < base - 2);
+      const livre = c => !linhasDoGrafico.some(([x1, y1, x2, y2]) =>
+        Math.max(x1, x2) >= c.xs[0] - 2 && Math.min(x1, x2) <= c.xs[1] + 2 && Math.max(y1, y2) >= c.ys[0] - 2 && Math.min(y1, y2) <= c.ys[1] + 2);
+      const sitio = candidatos.find(livre) || candidatos[0] || { xs: direita, ty: py - 9 };
+      return `<text x="${sitio.xs[0]}" y="${sitio.ty}" font-size="13" font-weight="700" fill="${cor}">${escapar(p.v)}</text>`;
+    }).join('') : ''}
     ${pontos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="5.5" fill="${cor}" stroke="#fff" stroke-width="2"><title>${dataCurta(p.data)}: ${escapar(p.rotulo)}</title></circle>`).join('')}
     ${pontos.map((p, i) => i % passo === 0 || i === pontos.length - 1 ? `<text x="${x(i)}" y="${base + 22}" text-anchor="middle" font-size="12" fill="#2b2420">${dataCurta(p.data).slice(0, 5)}</text>` : '').join('')}
-  </svg>`;
+  </svg>${limiar ? `<div class="legenda-score pequeno"><span><i class="l-limiar"></i>${escapar(limiar.t)}</span></div>` : ''}`;
 }
 function desenharKps(avaliacoes) {
   if (!$('chartKps')) return;
@@ -344,9 +384,34 @@ function desenharKps(avaliacoes) {
   const ultima = pontos[pontos.length - 1];
   $('chartKps').innerHTML = desenharLinha({ pontos, yMax: 100, cor: '#8f2f1f', titulo: 'Evolução do KPS', degraus: true, mostrarValores: true,
     zona: { ate: 70, cor: '#fef0c780' },
-    marcas: [0, 50, 70, 100].map(v => ({ v, t: String(v) })), limiar: { v: 70, t: '≤ 70 · cuidador obrigatório' } }) +
+    marcas: [0, 50, 70, 100].map(v => ({ v, t: String(v) })), limiar: { v: 70, t: 'KPS ≤ 70: cuidador obrigatório (zona sombreada)' } }) +
     `<p class="muted pequeno">O KPS é avaliado pelo médico nas consultas (${pontos.length} avaliação(ões) até agora), por isso o gráfico mostra degraus: o valor mantém-se até à avaliação seguinte. Mais recente: <strong>${ultima.v}/100</strong> em ${dataCurta(ultima.data)}.</p>`;
 }
+// Bolinha em cada sintoma da lista: verde se as respostas mudaram ao longo do tempo (o gráfico tem
+// informação), cinzenta se foram sempre iguais e vazia se não há respostas avaliáveis.
+let doenteDosSintomas = null;
+function assinalarSintomasComDados(submissoes) {
+  const select = $('perguntaGrafico');
+  if (!select) return;
+  for (const opcao of select.options) {
+    const respostas = submissoes.map(s => s.respostas.find(r => r.id_pergunta === opcao.value))
+      .filter(r => r && !r.motivo_nao_avaliavel && r.valor_numerico !== null && r.valor_numerico !== undefined);
+    const valores = new Set(respostas.map(r => Number(r.valor_numerico)));
+    const n = respostas.length, txt = `${n} resposta${n === 1 ? '' : 's'}`;
+    if (!n) { opcao.dataset.estado = 'vazio'; opcao.dataset.detalhe = 'sem respostas'; }
+    else if (valores.size === 1) { opcao.dataset.estado = 'igual'; opcao.dataset.detalhe = `${txt}, sempre «${rotuloCurto(respostas[0].rotulo)}»`; }
+    else { opcao.dataset.estado = 'varia'; opcao.dataset.detalhe = `${txt}, com alterações`; }
+  }
+  // Ao abrir outro doente, começa no primeiro sintoma que tem alterações.
+  const idDoente = processoAtual?.doente?.id_doente;
+  if (idDoente !== doenteDosSintomas) {
+    doenteDosSintomas = idDoente;
+    const comAlteracoes = [...select.options].find(o => o.dataset.estado === 'varia');
+    if (comAlteracoes) select.value = comAlteracoes.value;
+  }
+  select.dispatchEvent(new Event('opcoes-atualizadas'));
+}
+
 function desenharSintomas(submissoes) {
   if (!$('chartSintomas')) return;
   const idPergunta = $('perguntaGrafico').value;
@@ -447,9 +512,12 @@ function desenharScore(avaliacoes) {
 }
 
 // Liga o seletor de sintoma do gráfico e preenche-o com as perguntas do formulário ativo.
+// Nome curto do sintoma para a lista (sem as explicações entre parênteses).
+const nomeSintoma = enunciado => String(enunciado || '').replace(/\s*\([^)]*\)\s*$/, '');
+
 function prepararEvolucao() {
   $('perguntaGrafico').innerHTML = perguntasComEscala().map(pergunta =>
-    `<option value="${escapar(pergunta.id_pergunta)}">${escapar(pergunta.enunciado)}</option>`).join('');
+    `<option value="${escapar(pergunta.id_pergunta)}">${escapar(nomeSintoma(pergunta.enunciado))}</option>`).join('');
   $('perguntaGrafico').addEventListener('change', () => { if (processoAtual) desenharSintomas(processoAtual.submissoes); });
 }
 
@@ -519,6 +587,12 @@ async function iniciarPagina({ perfis, separadores, semBarraDoente = [], separad
     formAtivo = await pedidoApi('/api/formularios/ativo');
     if ($('perguntaGrafico')) prepararEvolucao();
     $('doenteSelecionado').addEventListener('change', evento => selecionarDoente(evento.target.value));
+    tornarPesquisavel($('doenteSelecionado'), { placeholder: 'Nome ou n.º de processo…' });
+    if ($('perguntaGrafico')) {
+      tornarPesquisavel($('perguntaGrafico'), { placeholder: 'Escreva o sintoma…', mostrarEstado: true });
+      $('perguntaGrafico').closest('.pesquisa').insertAdjacentHTML('afterend', `<p class="legenda-estado pequeno muted">
+        <span><i class="ponto-info ponto-varia"></i>com alterações</span><span><i class="ponto-info ponto-igual"></i>sempre igual</span><span><i class="ponto-info ponto-vazio"></i>sem respostas</span></p>`);
+    }
     if (depoisDeCarregar) await depoisDeCarregar();
     if (idDoenteAtivo) await carregarProcesso();
     abrirSeparador(separadorInicial);

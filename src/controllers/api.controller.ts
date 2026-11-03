@@ -7,7 +7,7 @@ import { AlertaService } from '../services/alerta.service';
 import { FhirService } from '../services/fhir.service';
 
 
-const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, dg.fase_clinica_atual,
+const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.codigo_cid10, cid.designacao AS designacao_cid10, dg.fase_clinica_atual,
     (SELECT k.score_kps FROM AvaliacaoKarnofsky k WHERE k.id_doente = d.id_doente
       AND k.data_avaliacao <= date('now') AND k.data_avaliacao >= date('now', '-180 days')
       ORDER BY k.data_avaliacao DESC, k.rowid DESC LIMIT 1) AS ultimo_kps,
@@ -18,7 +18,8 @@ const SQL_LISTA_CLINICA = `SELECT d.*, u.nome, u.email, dg.localizacao_tumoral, 
       WHERE p.tipo_resposta = 'TEXTO_LIVRE' AND r.id_submissao = (SELECT s.id_submissao FROM SubmissaoMonitorizacao s
         WHERE s.id_doente = d.id_doente ORDER BY s.data_hora_submissao DESC LIMIT 1)) AS mensagem_ultimo_registo
   FROM Doente d JOIN Utilizador u ON d.id_doente = u.id_utilizador
-  LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente`;
+  LEFT JOIN DiagnosticoGB dg ON d.id_doente = dg.id_doente
+  LEFT JOIN CodigoCID10 cid ON cid.codigo = dg.codigo_cid10`;
 
 // Lista de doentes da equipa clínica: acrescenta se o registo de sintomas está em atraso.
 const comLembrete = (doentes: any[]) => doentes.map(d => {
@@ -38,6 +39,14 @@ export class ApiController {
 
   static obterFormularioAtivo(_req: Request, res: Response) {
     try { res.json(SintomaService.obterFormularioAtivo()); } catch (e: any) { res.status(400).json({ erro: e.message }); }
+  }
+
+  // Listas de códigos para os formulários do médico (localização CID-10 e substâncias ATC).
+  static obterCatalogosCodigos(_req: Request, res: Response) {
+    res.json({
+      cid10: db.prepare('SELECT codigo, designacao FROM CodigoCID10 ORDER BY codigo').all(),
+      atc: db.prepare('SELECT codigo, designacao FROM CodigoATC ORDER BY designacao').all()
+    });
   }
 
   static listarDoentes(req: Request, res: Response) {

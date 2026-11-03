@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
 import { garantirFormularioV2 } from './formulario-v2';
+import { CODIGOS_ATC, CODIGOS_CID10 } from './terminologias';
 
 const dbPath = path.resolve(process.env.DATABASE_PATH || path.resolve(__dirname, '../../data.db'));
 export const db = new Database(dbPath);
@@ -66,16 +67,29 @@ export function inicializarBaseDados(): void {
       FOREIGN KEY (id_cuidador) REFERENCES Cuidador(id_cuidador)
     );
 
+    -- Catálogos de códigos normalizados (ver terminologias.ts). Os registos clínicos guardam o código;
+    -- a designação em português vem daqui.
+    CREATE TABLE IF NOT EXISTS CodigoCID10 (
+      codigo TEXT PRIMARY KEY,
+      designacao TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS CodigoATC (
+      codigo TEXT PRIMARY KEY,
+      designacao TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS DiagnosticoGB (
       id_diagnostico TEXT PRIMARY KEY,
       id_doente TEXT UNIQUE NOT NULL,
       data_diagnostico TEXT NOT NULL,
-      localizacao_tumoral TEXT NOT NULL,
+      codigo_cid10 TEXT NOT NULL,
       lateralidade TEXT NOT NULL,
       estatuto_idh TEXT NOT NULL,
       metilacao_mgmt TEXT NOT NULL,
       fase_clinica_atual TEXT NOT NULL,
-      FOREIGN KEY (id_doente) REFERENCES Doente(id_doente)
+      FOREIGN KEY (id_doente) REFERENCES Doente(id_doente),
+      FOREIGN KEY (codigo_cid10) REFERENCES CodigoCID10(codigo)
     );
 
     CREATE TABLE IF NOT EXISTS Tratamento (
@@ -239,10 +253,10 @@ export function inicializarBaseDados(): void {
     CREATE TABLE IF NOT EXISTS Medicacao (
       id_medicacao TEXT PRIMARY KEY,
       id_doente TEXT NOT NULL,
-      nome TEXT NOT NULL,
+      codigo_atc TEXT NOT NULL,
       dose TEXT NOT NULL,
       via TEXT NOT NULL CHECK(via IN ('ORAL', 'ENDOVENOSA', 'SUBCUTANEA', 'INTRAMUSCULAR', 'OUTRA')),
-      posologia TEXT NOT NULL,
+      posologia TEXT,
       indicacao TEXT,
       data_inicio TEXT NOT NULL,
       data_fim TEXT,
@@ -251,6 +265,7 @@ export function inicializarBaseDados(): void {
       id_medico_registo TEXT NOT NULL,
       data_hora_registo TEXT NOT NULL,
       FOREIGN KEY (id_doente) REFERENCES Doente(id_doente),
+      FOREIGN KEY (codigo_atc) REFERENCES CodigoATC(codigo),
       FOREIGN KEY (id_medico_registo) REFERENCES Medico(id_medico)
     );
 
@@ -348,6 +363,7 @@ export function inicializarBaseDados(): void {
     );
   `);
   verificarEsquema();
+  garantirCatalogosCodigos();
   garantirPerguntasFormularioDemonstracao();
   garantirFormularioV2(db);
 }
@@ -362,7 +378,9 @@ function verificarEsquema(): void {
     AlertaClinico: ['prioridade_algoritmo', 'id_alerta_anterior'],
     HistoricoAcaoAlerta: ['prioridade_anterior', 'prioridade_nova'],
     AlertaSubmissao: ['tipo_associacao'],
-    AvaliacaoAlgoritmo: ['versao_parametros', 'estado', 'erro']
+    AvaliacaoAlgoritmo: ['versao_parametros', 'estado', 'erro'],
+    DiagnosticoGB: ['codigo_cid10'],
+    Medicacao: ['codigo_atc']
   };
   const emFalta = Object.entries(obrigatorias).flatMap(([tabela, colunas]) => {
     const existentes = (db.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string }>).map(c => c.name);
@@ -376,6 +394,18 @@ function verificarEsquema(): void {
     throw new Error(`A base de dados ${dbPath} foi criada com uma estrutura antiga (falta: ${emFalta.join(', ')}). ` +
       'Pare o servidor e corra «npm run seed» para a criar de novo.');
   }
+}
+
+// Os catálogos acompanham o código-fonte: cada arranque acrescenta ou corrige as designações.
+function garantirCatalogosCodigos(): void {
+  const cid10 = db.prepare(`INSERT INTO CodigoCID10 (codigo, designacao) VALUES (?, ?)
+    ON CONFLICT(codigo) DO UPDATE SET designacao = excluded.designacao`);
+  const atc = db.prepare(`INSERT INTO CodigoATC (codigo, designacao) VALUES (?, ?)
+    ON CONFLICT(codigo) DO UPDATE SET designacao = excluded.designacao`);
+  db.transaction(() => {
+    for (const [codigo, designacao] of CODIGOS_CID10) cid10.run(codigo, designacao);
+    for (const [codigo, designacao] of CODIGOS_ATC) atc.run(codigo, designacao);
+  })();
 }
 
 export function garantirPerguntasFormularioDemonstracao(): void {
