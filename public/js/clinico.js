@@ -64,24 +64,73 @@ function renderizarAlertas() {
   $('listaAlertas').innerHTML = lista.length ? lista.map(cartaoAlerta).join('') : '<p class="muted">Não existem alertas neste filtro.</p>';
 }
 
+const INDICACOES_DOENTE = {
+  LIGAR_112: 'Ligar 112',
+  CONTACTAR_JA: 'Contactar a equipa de imediato',
+  CONTACTAR_HOJE: 'Contactar a equipa ainda hoje'
+};
+
+// Motivos do alerta: vêm estruturados da avaliação; nos alertas antigos, lêem-se do resumo em texto.
+function motivosDoAlerta(a) {
+  if (a.motivos?.length) return a.motivos;
+  const corpo = String(a.resumo_agravamento || '').replace(/\.\s*(Ajustes:.*)?Prioridade [^.]+\.\s*$/, '');
+  return corpo.split(/;\s*/).filter(Boolean).map(t => {
+    const m = t.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
+    return { texto: m ? m[1] : t, prioridade: m ? m[2] : a.prioridade, codigos: [] };
+  });
+}
+
+// Separa o texto do motivo das referências às perguntas, ex.: «… (B1, B3, B4/B6)».
+function linhaMotivo(m) {
+  const ref = String(m.texto).match(/^(.*?)\s*\(([A-D]\d+[a-z]?(?:[\/,]\s*[A-D]\d+[a-z]?)*)\)\s*$/);
+  const texto = ref ? ref[1] : m.texto;
+  const codigos = ref ? ref[2].split(/,\s*/) : (m.codigos || []);
+  const pergunta = codigo => formAtivo?.perguntas.find(p => p.codigo === codigo);
+  const etiqueta = codigo => {
+    const nomes = codigo.split('/').map(c => pergunta(c)?.enunciado).filter(Boolean).map(nomeCurtoPergunta);
+    const titulo = nomes.join(' ou ');
+    // Com um só código, mostra-se também o nome do sintoma (ex.: «B1 · Dor de cabeça»); nos sinais de alarme (A)
+    // o texto do motivo já descreve a pergunta, por isso fica só o código.
+    const comNome = codigos.length === 1 && titulo && !codigo.startsWith('A');
+    return `<abbr class="motivo-codigo" title="${escapar(titulo)}">${escapar(codigo)}${comNome ? ` · ${escapar(titulo)}` : ''}</abbr>`;
+  };
+  return `<li class="motivo">
+      <span class="motivo-nivel p-${escapar(m.prioridade)}">${escapar(m.prioridade)}</span>
+      <span class="motivo-texto">${escapar(texto)}</span>
+      <span class="motivo-codigos">${codigos.map(etiqueta).join('')}</span>
+    </li>`;
+}
+const nomeCurtoPergunta = t => String(t).replace(/\s*\([^)]*\)\s*$/, '');
+
 function cartaoAlerta(a) {
   const atraso = atrasoTriagem(a);
+  const ajuste = String(a.resumo_agravamento || '').match(/Ajustes:\s*(.+?)\.\s*Prioridade/)?.[1];
+  const detalhes = [
+    ['Regra', escapar(a.nome_regra)],
+    a.instrucoes?.length ? ['Indicação dada ao doente', a.instrucoes.map(c => escapar(INDICACOES_DOENTE[c] || c)).join('; ')] : null,
+    ajuste ? ['Prioridade agravada por', escapar(ajuste)] : null,
+    a.prioridade_algoritmo && a.prioridade_algoritmo !== a.prioridade
+      ? ['Prioridade na triagem', `${escapar(a.prioridade)} <span class="muted">(algoritmo: ${escapar(a.prioridade_algoritmo)})</span>`] : null
+  ].filter(Boolean);
+  const nota = a.ultima_nota
+    ? `<div class="alerta-nota"><div class="alerta-nota-cab">Nota de triagem · ${escapar(a.autor_ultima_nota)}${a.data_ultima_nota ? ` · ${dataHora(a.data_ultima_nota)}` : ''}</div>
+        <p>${escapar(a.ultima_nota)}</p></div>`
+    : a.estado_atual === 'Pendente'
+      ? `<div class="alerta-nota ${atraso ? 'nota-atraso' : 'sem-nota'}"><p>Ainda não avaliado pela enfermagem${atraso
+          ? `: <strong>sem triagem há ${duracao(atraso.horas)}</strong> (prazo de ${duracao(atraso.prazo)} nesta prioridade)` : ''}.</p></div>` : '';
   return `<article class="alerta p-${escapar(a.prioridade)}${atraso ? ' atrasado' : ''}" aria-label="Alerta ${escapar(a.prioridade)} de ${escapar(a.nome_doente)}">
-    <div class="alerta-cabecalho">
-      <div><span class="prioridade p-${escapar(a.prioridade)}">${escapar(a.prioridade)}</span>
-        <span class="alerta-doente">${escapar(a.nome_doente)}</span> <span class="muted pequeno">${escapar(a.numero_processo_clinico)}</span></div>
-      <div class="pequeno"><span class="estado e-${escapar(a.estado_atual)}">${escapar(a.estado_atual)}</span> <span class="muted">${dataHora(a.data_hora_geracao)}</span></div>
-    </div>
-    <p>${escapar(a.resumo_agravamento)}</p>
-    <p class="muted pequeno">Regra: ${escapar(a.nome_regra)}${a.prioridade_algoritmo && a.prioridade_algoritmo !== a.prioridade
-      ? ` · prioridade ajustada na triagem (o algoritmo indicou ${escapar(a.prioridade_algoritmo)})` : ''}</p>
+    <header class="alerta-topo">
+      <span class="prioridade p-${escapar(a.prioridade)}">${escapar(a.prioridade)}</span>
+      <div class="alerta-quem"><span class="alerta-doente">${escapar(a.nome_doente)}</span><span class="alerta-processo">${escapar(a.numero_processo_clinico)}</span></div>
+      <div class="alerta-meta"><span class="estado e-${escapar(a.estado_atual)}">${escapar(a.estado_atual)}</span><time datetime="${escapar(a.data_hora_geracao)}">${dataHora(a.data_hora_geracao)}</time></div>
+    </header>
+    <ul class="alerta-motivos" aria-label="Motivos do alerta">${motivosDoAlerta(a).map(linhaMotivo).join('')}</ul>
+    <dl class="alerta-detalhes">${detalhes.map(([t, v]) => `<div><dt>${t}</dt><dd>${v}</dd></div>`).join('')}</dl>
     ${ligacaoAlertaAnterior(a)}
     ${registosDoAlerta(a)}
-    ${a.mensagem_doente ? `<p class="mensagem-doente"><strong>Mensagem do doente/cuidador:</strong> «${escapar(a.mensagem_doente)}»</p>` : ''}
-    ${a.ultima_nota ? `<p class="nota"><strong>Nota de triagem</strong> (${escapar(a.autor_ultima_nota)}): ${escapar(a.ultima_nota)}</p>`
-      : a.estado_atual === 'Pendente' ? `<p class="nota ${atraso ? 'nota-atraso' : 'muted'}">Ainda não avaliado pela enfermagem${atraso
-        ? `: <strong>sem triagem há ${duracao(atraso.horas)}</strong>, para um prazo de ${duracao(atraso.prazo)} nesta prioridade` : ''}.</p>` : ''}
-    ${acoesAlertaDaPagina(a)}
+    ${a.mensagem_doente ? `<div class="alerta-nota mensagem"><div class="alerta-nota-cab">Mensagem do doente ou cuidador</div><p>«${escapar(a.mensagem_doente)}»</p></div>` : ''}
+    ${nota}
+    <footer class="alerta-acoes">${acoesAlertaDaPagina(a)}</footer>
   </article>`;
 }
 // Ligação ao alerta anterior do mesmo doente, em linguagem clínica (sem códigos internos).
@@ -92,14 +141,14 @@ function ligacaoAlertaAnterior(a) {
   const texto = propria?.tipo_associacao === 'ESCALONAMENTO'
     ? `Agrava o ${anterior}, que estava aberto nessa altura: a prioridade subiu de ${escapar(a.anterior_prioridade)} para ${escapar(a.prioridade_algoritmo || a.prioridade)}.`
     : `Traz um motivo novo em relação ao ${anterior}, que estava aberto nessa altura.`;
-  return `<p class="muted pequeno">${texto}</p>`;
+  return `<p class="alerta-ligacao">${texto}</p>`;
 }
 
 // Registos de sintomas ligados ao alerta: o que o gerou e os seguintes que repetiram o mesmo motivo.
 function registosDoAlerta(a) {
   const repetidos = (a.submissoes_associadas || []).filter(s => s.tipo_associacao === 'MOTIVO_REPETIDO');
   if (!repetidos.length) return '';
-  return `<p class="muted pequeno">O mesmo motivo voltou a aparecer ${repetidos.length === 1 ? 'no registo' : 'nos registos'} de
+  return `<p class="alerta-ligacao">O mesmo motivo voltou a aparecer ${repetidos.length === 1 ? 'no registo' : 'nos registos'} de
     ${repetidos.map(s => dataCurta(s.data_referencia_sintomas)).join(', ')} (ligado${repetidos.length === 1 ? '' : 's'} a este alerta, sem criar alertas novos).</p>`;
 }
 

@@ -56,7 +56,8 @@ function realcarPesquisa(texto, consulta) {
 let contadorPesquisa = 0;
 
 // Liga uma caixa de texto a uma lista de sugestões. aoEscolher(opcao) é chamado quando se escolhe uma.
-function criarListaPesquisa(input, { obterOpcoes, aoEscolher, aoSair, semResultados }) {
+// limparAoFocar: ao entrar na caixa, o texto atual passa a sugestão (placeholder) para se poder escrever logo.
+function criarListaPesquisa(input, { obterOpcoes, aoEscolher, aoSair, semResultados, limparAoFocar = false }) {
   const id = `lista-pesquisa-${++contadorPesquisa}`;
   const lista = document.createElement('ul');
   lista.id = id; lista.className = 'pesquisa-lista'; lista.setAttribute('role', 'listbox'); lista.hidden = true;
@@ -76,8 +77,9 @@ function criarListaPesquisa(input, { obterOpcoes, aoEscolher, aoSair, semResulta
     consultaAtual = consulta;
     visiveis = ordenarPorSemelhanca(obterOpcoes(), consulta);
     lista.innerHTML = visiveis.length
-      ? visiveis.map((o, i) => `<li role="option" id="${id}-${i}" aria-selected="false" data-indice="${i}"${o.estado ? ' class="com-estado"' : ''}>${o.estado
+      ? visiveis.map((o, i) => `<li role="option" id="${id}-${i}" aria-selected="false" data-indice="${i}"${o.estado ? ' class="com-estado"' : o.detalhe ? ' class="com-detalhe"' : ''}>${o.estado
           ? `<i class="ponto-info ponto-${escapar(o.estado)}" aria-hidden="true"></i><span class="op-texto">${realcarPesquisa(o.texto, consulta)}</span><span class="op-detalhe">${escapar(o.detalhe || '')}</span>`
+          : o.detalhe ? `<span class="op-texto">${realcarPesquisa(o.texto, consulta)}</span><span class="op-sub">${escapar(o.detalhe)}</span>`
           : realcarPesquisa(o.texto, consulta)}</li>`).join('')
       : (semResultados ? `<li class="pesquisa-vazia" aria-disabled="true">${escapar(semResultados)}</li>` : '');
     if (!lista.innerHTML) return fechar();
@@ -87,7 +89,11 @@ function criarListaPesquisa(input, { obterOpcoes, aoEscolher, aoSair, semResulta
   const escolher = indice => { const o = visiveis[indice]; if (!o) return; aoEscolher(o); fechar(); };
 
   input.addEventListener('input', () => abrir(input.value));
-  input.addEventListener('focus', () => { input.select(); abrir(''); });
+  const placeholderOriginal = input.placeholder;
+  input.addEventListener('focus', () => {
+    if (limparAoFocar && input.value) { input.placeholder = input.value; input.value = ''; }
+    abrir('');
+  });
   input.addEventListener('keydown', evento => {
     if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
       evento.preventDefault();
@@ -106,13 +112,14 @@ function criarListaPesquisa(input, { obterOpcoes, aoEscolher, aoSair, semResulta
     evento.preventDefault();
     if (li) escolher(Number(li.dataset.indice));
   });
-  input.addEventListener('blur', () => { fechar(); if (aoSair) aoSair(visiveis, consultaAtual); });
+  input.addEventListener('blur', () => { fechar(); if (aoSair) aoSair(visiveis, consultaAtual); input.placeholder = placeholderOriginal; });
   return { fechar };
 }
 
 // Transforma um <select> numa caixa de pesquisa. O select continua a ser a fonte do valor.
 // mostrarEstado: cada <option> pode ter data-estado (varia/igual/vazio) e data-detalhe, mostrados como bolinha e texto.
-function tornarPesquisavel(select, { placeholder = 'Escreva para pesquisar…', mostrarEstado = false } = {}) {
+// mostrarDetalhe: data-detalhe aparece como segunda linha de cada opção (ex.: KPS e alertas do doente).
+function tornarPesquisavel(select, { placeholder = 'Escreva para pesquisar…', mostrarEstado = false, mostrarDetalhe = false } = {}) {
   if (!select || select.dataset.pesquisavel) return;
   select.dataset.pesquisavel = '1';
   const caixa = document.createElement('div');
@@ -127,7 +134,8 @@ function tornarPesquisavel(select, { placeholder = 'Escreva para pesquisar…', 
   if (rotulo) rotulo.htmlFor = input.id;
 
   const opcoes = () => [...select.options].filter(o => o.value !== '').map(o => ({
-    valor: o.value, texto: o.text, ...(mostrarEstado ? { estado: o.dataset.estado, detalhe: o.dataset.detalhe } : {})
+    valor: o.value, texto: o.text,
+    ...(mostrarEstado ? { estado: o.dataset.estado, detalhe: o.dataset.detalhe } : mostrarDetalhe ? { detalhe: o.dataset.detalhe } : {})
   }));
   // A bolinha da opção escolhida também aparece dentro da caixa.
   const ponto = mostrarEstado ? document.createElement('i') : null;
@@ -149,10 +157,10 @@ function tornarPesquisavel(select, { placeholder = 'Escreva para pesquisar…', 
   criarListaPesquisa(input, {
     obterOpcoes: opcoes,
     semResultados: 'Nenhuma opção corresponde ao que escreveu.',
+    limparAoFocar: true,
     aoEscolher: o => escolherValor(o.valor),
     // Ao sair: se o texto foi apagado, limpa; se só há uma opção parecida, escolhe-a; senão repõe a escolha anterior.
     aoSair: (visiveis, consulta) => {
-      if (!input.value.trim() && [...select.options].some(o => o.value === '')) return escolherValor('');
       if (input.value !== textoSelecionado() && consulta.trim() && visiveis.length && (visiveis.length === 1 || visiveis[0].pontos >= 90)) {
         return escolherValor(visiveis[0].valor);
       }
