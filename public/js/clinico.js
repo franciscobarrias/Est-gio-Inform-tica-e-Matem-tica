@@ -126,6 +126,7 @@ function cartaoAlerta(a) {
     </header>
     <ul class="alerta-motivos" aria-label="Motivos do alerta">${motivosDoAlerta(a).map(linhaMotivo).join('')}</ul>
     <dl class="alerta-detalhes">${detalhes.map(([t, v]) => `<div><dt>${t}</dt><dd>${v}</dd></div>`).join('')}</dl>
+    ${ligacaoAlertaSeguinte(a)}
     ${ligacaoAlertaAnterior(a)}
     ${registosDoAlerta(a)}
     ${a.mensagem_doente ? `<div class="alerta-nota mensagem"><div class="alerta-nota-cab">Mensagem do doente ou cuidador</div><p>«${escapar(a.mensagem_doente)}»</p></div>` : ''}
@@ -133,6 +134,15 @@ function cartaoAlerta(a) {
     <footer class="alerta-acoes">${acoesAlertaDaPagina(a)}</footer>
   </article>`;
 }
+// Num alerta que já tem um alerta mais recente do mesmo doente, avisa para ver esse primeiro.
+function ligacaoAlertaSeguinte(a) {
+  if (!a.seguinte_data) return '';
+  const seguinte = `alerta de ${dataCurta(a.seguinte_data)} (${escapar(a.seguinte_prioridade)})`;
+  return a.estado_atual === 'Concluído'
+    ? `<p class="alerta-ligacao">Foi seguido pelo ${seguinte}.</p>`
+    : `<p class="alerta-seguido"><strong>Foi seguido pelo ${seguinte}.</strong> Veja esse alerta primeiro: tem a informação mais recente do doente.</p>`;
+}
+
 // Ligação ao alerta anterior do mesmo doente, em linguagem clínica (sem códigos internos).
 function ligacaoAlertaAnterior(a) {
   if (!a.id_alerta_anterior || !a.anterior_data) return '';

@@ -65,6 +65,25 @@ function acoesMedicacaoDaPagina(m) {
   return '';
 }
 
+// Tratamentos: concluir com um clique, ou editar no mesmo formulário do registo.
+function acoesTratamentoDaPagina(t) {
+  const id = escapar(t.id_tratamento);
+  return (t.estado !== 'CONCLUIDO' ? `<button type="button" class="secundario" data-trat-concluir="${id}">Concluir</button>` : '')
+    + `<button type="button" class="secundario" data-trat-editar="${id}">Editar</button>`;
+}
+let tratamentoEmEdicao = null;
+function modoFormularioTratamento(tratamento) {
+  tratamentoEmEdicao = tratamento?.id_tratamento || null;
+  $('resumoFormTratamento').textContent = tratamento ? 'Editar tratamento' : '+ Registar tratamento';
+  $('guardarTratamento').textContent = tratamento ? 'Guardar alterações' : 'Registar tratamento';
+  $('cancelarEdicaoTratamento').classList.toggle('hidden', !tratamento);
+  $('tratTipo').value = tratamento?.tipo || 'CIRURGIA';
+  $('tratEstado').value = tratamento?.estado || 'PLANEADO';
+  $('tratInicio').value = tratamento?.data_inicio || '';
+  $('tratFim').value = tratamento?.data_fim || '';
+  $('tratDescricao').value = tratamento?.descricao_esquema || '';
+}
+
 // ---------- Desenho do processo ----------
 function definirValorSelect(select, valor) {
   if (valor && ![...select.options].some(o => o.value === valor)) select.add(new Option(valor, valor));
@@ -84,7 +103,7 @@ function renderizarGestao() {
     ultimaKps.data_avaliacao >= new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10) &&
     ultimaKps.data_avaliacao <= new Date().toISOString().slice(0, 10);
   $('inputKps').value = avaliacaoKpsVigente ? String(ultimaKps.score_kps) : '';
-  $('avisoKps').classList.toggle('hidden', !$('inputKps').value || Number($('inputKps').value) > 70);
+  atualizarAvisoKps();
   const plano = p.planos.find(pl => pl.estado === 'ATIVO');
   $('planoAtualTexto').textContent = plano ? `Atualmente: um registo a cada ${plano.periodicidade_dias} dia(s), definido em ${dataCurta(plano.data_definicao)}.` : 'Sem plano definido.';
   if (plano) $('inputPeriodicidade').value = plano.periodicidade_dias;
@@ -99,7 +118,10 @@ function renderizarGestao() {
     `<option value="${escapar(a.id_alerta)}">${escapar(a.prioridade)} · ${escapar(a.estado_atual)} · ${dataHora(a.data_hora_geracao)}</option>`).join('');
   const c = p.cuidadores || [];
   $('cuidadoresAtuais').innerHTML = c.length
-    ? `<p class="notice pequeno">Cuidador(es) já associado(s): ${c.map(x => `${escapar(x.nome)} (${escapar(PARENTESCO[x.grau_parentesco] || x.grau_parentesco)})`).join(', ')}</p>` : '';
+    ? `<p class="pequeno muted" style="margin-bottom:.35rem">Cuidador(es) com autorização:</p>
+      <ul class="lista-cuidadores">${c.map(x => `<li><span><strong>${escapar(x.nome)}</strong> · ${escapar(PARENTESCO[x.grau_parentesco] || x.grau_parentesco)}
+        <span class="muted pequeno">desde ${dataCurta(x.data_inicio)}</span></span>
+        <button type="button" class="secundario" data-revogar="${escapar(x.id_associacao)}" data-nome="${escapar(x.nome)}">Retirar autorização</button></li>`).join('')}</ul>` : '';
 }
 
 // ---------- Ações da gestão clínica ----------
@@ -128,16 +150,30 @@ async function carregarCatalogosCodigos() {
   sugerirEnquantoEscreve($('grauParentesco'), sugestoesDaDatalist('listaParentesco'));
 }
 
+// Com KPS ≤ 70 o questionário passa a ser preenchido pelo cuidador. Se o doente não tiver nenhum,
+// avisa-se o médico, porque o doente deixaria de conseguir registar sintomas.
+const doenteSemCuidador = () => !(processoAtual?.cuidadores || []).length;
+function atualizarAvisoKps() {
+  const valor = $('inputKps').value, baixo = valor !== '' && Number(valor) <= 70;
+  $('avisoKps').classList.toggle('hidden', !baixo);
+  $('avisoKps').classList.toggle('aviso-forte', baixo && doenteSemCuidador());
+  $('avisoKps').textContent = baixo && doenteSemCuidador()
+    ? 'Com KPS ≤ 70, o questionário passa a ser preenchido pelo cuidador. Este doente não tem cuidador associado e não vai conseguir registar sintomas: associe um cuidador em «Associar cuidador autorizado».'
+    : 'Com KPS ≤ 70, a participação do cuidador autorizado passa a ser obrigatória no preenchimento.';
+}
+
 function ligarGestao() {
   $('inputKps').innerHTML = '<option value="">Não registar avaliação</option>' +
     KPS.map(([v, d]) => `<option value="${v}">${v} — ${d}</option>`).join('');
-  $('inputKps').addEventListener('change', () => $('avisoKps').classList.toggle(
-    'hidden', !$('inputKps').value || Number($('inputKps').value) > 70
-  ));
+  $('inputKps').addEventListener('change', atualizarAvisoKps);
 
-  $('guardarKps').addEventListener('click', () => executarAcao(
-    () => pedidoApi(urlDoente('kps'), { method: 'POST', body: JSON.stringify({ score_kps: $('inputKps').value }) }),
-    'Avaliação KPS registada.', atualizarTudo));
+  $('guardarKps').addEventListener('click', () => {
+    const semCuidador = $('inputKps').value !== '' && Number($('inputKps').value) <= 70 && doenteSemCuidador();
+    executarAcao(
+      () => pedidoApi(urlDoente('kps'), { method: 'POST', body: JSON.stringify({ score_kps: $('inputKps').value }) }),
+      semCuidador ? 'Avaliação KPS registada. Atenção: o doente não tem cuidador associado e não vai conseguir registar sintomas.' : 'Avaliação KPS registada.',
+      atualizarTudo);
+  });
 
   $('guardarPlano').addEventListener('click', () => executarAcao(
     () => pedidoApi(urlDoente('planos'), { method: 'POST', body: JSON.stringify({ periodicidade_dias: $('inputPeriodicidade').value }) }),
@@ -150,13 +186,38 @@ function ligarGestao() {
     }) }),
     'Diagnóstico atualizado.', atualizarTudo));
 
-  $('guardarTratamento').addEventListener('click', () => executarAcao(async () => {
-    await pedidoApi(urlDoente('tratamentos'), { method: 'POST', body: JSON.stringify({
-      tipo: $('tratTipo').value, estado: $('tratEstado').value, data_inicio: $('tratInicio').value,
-      data_fim: $('tratFim').value || undefined, descricao_esquema: $('tratDescricao').value
-    }) });
-    $('tratDescricao').value = ''; $('tratInicio').value = ''; $('tratFim').value = '';
-  }, 'Tratamento registado.', atualizarTudo));
+  $('guardarTratamento').addEventListener('click', () => {
+    const emEdicao = tratamentoEmEdicao;
+    executarAcao(async () => {
+      const dados = {
+        tipo: $('tratTipo').value, estado: $('tratEstado').value, data_inicio: $('tratInicio').value,
+        data_fim: $('tratFim').value || (emEdicao ? null : undefined), descricao_esquema: $('tratDescricao').value
+      };
+      await pedidoApi(emEdicao ? urlDoente(`tratamentos/${encodeURIComponent(emEdicao)}`) : urlDoente('tratamentos'),
+        { method: emEdicao ? 'PUT' : 'POST', body: JSON.stringify(dados) });
+      modoFormularioTratamento(null);
+    }, emEdicao ? 'Tratamento atualizado.' : 'Tratamento registado.', atualizarTudo);
+  });
+  $('cancelarEdicaoTratamento').addEventListener('click', () => {
+    modoFormularioTratamento(null);
+    $('cancelarEdicaoTratamento').closest('details').open = false;
+  });
+  $('dmTratamentos').addEventListener('click', evento => {
+    const concluir = evento.target.closest('[data-trat-concluir]');
+    const editar = evento.target.closest('[data-trat-editar]');
+    if (concluir) {
+      executarAcao(() => pedidoApi(urlDoente(`tratamentos/${encodeURIComponent(concluir.dataset.tratConcluir)}`), {
+        method: 'PUT', body: JSON.stringify({ estado: 'CONCLUIDO' })
+      }), 'Tratamento concluído.', atualizarTudo);
+    } else if (editar) {
+      const tratamento = (processoAtual?.tratamentos || []).find(t => t.id_tratamento === editar.dataset.tratEditar);
+      if (!tratamento) return;
+      modoFormularioTratamento(tratamento);
+      const formulario = $('resumoFormTratamento').closest('details');
+      formulario.open = true;
+      formulario.scrollIntoView({ block: 'center' });
+    }
+  });
 
   $('medInicio').value = new Date().toISOString().slice(0, 10);
   $('guardarMedicacao').addEventListener('click', () => executarAcao(async () => {
@@ -190,6 +251,14 @@ function ligarGestao() {
     }) });
     $('emailCuidador').value = ''; $('grauParentesco').value = ''; $('consentimentoCuidador').checked = false;
   }, 'Cuidador autorizado associado.', atualizarTudo));
+
+  $('cuidadoresAtuais').addEventListener('click', evento => {
+    const botao = evento.target.closest('[data-revogar]');
+    if (!botao) return;
+    if (!window.confirm(`Retirar a autorização de ${botao.dataset.nome}? Deixa de ver o processo e de poder registar sintomas em nome do doente.`)) return;
+    executarAcao(() => pedidoApi(urlDoente(`cuidadores/${encodeURIComponent(botao.dataset.revogar)}`), { method: 'DELETE' }),
+      `Autorização de ${botao.dataset.nome} retirada.`, atualizarTudo);
+  });
 
   const obterFhir = () => pedidoApi(`/api/fhir/Patient/${encodeURIComponent(idDoenteAtivo)}/$everything`);
   $('abrirFhir').addEventListener('click', async () => {

@@ -77,6 +77,21 @@ export class MedicoService {
     return { id_associacao: idAssociacao, id_doente: idDoente, id_cuidador: idCuidador, grau_parentesco: grauParentesco.trim(), autorizacao_validada: true };
   }
 
+  // Retira a autorização de um cuidador (RF03, UC03). A associação fica no histórico com a data de fim;
+  // a partir daí o cuidador deixa de ver o processo e de poder registar em nome do doente.
+  static revogarCuidador(idDoente: string, idAssociacao: string, idMedico: string) {
+    const associacao = db.prepare(`SELECT id_cuidador FROM DoenteCuidador
+      WHERE id_associacao = ? AND id_doente = ? AND ativa = 1`).get(idAssociacao, idDoente) as { id_cuidador: string } | undefined;
+    if (!associacao) throw new Error('Este cuidador já não está associado a este doente.');
+    const agora = new Date().toISOString();
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE DoenteCuidador SET ativa = 0, data_fim = ? WHERE id_associacao = ?').run(agora, idAssociacao);
+      registarAuditoria(idMedico, 'REVOGACAO_CUIDADOR_RF03', `Autorização do cuidador ${associacao.id_cuidador} retirada para o doente ${idDoente}.`);
+    });
+    tx();
+    return { id_associacao: idAssociacao, ativa: false, data_fim: agora };
+  }
+
   static registarAvaliacaoKarnofsky(idDoente: string, idMedico: string, scoreKps: number) {
     if (!Number.isInteger(scoreKps) || scoreKps < 0 || scoreKps > 100 || scoreKps % 10 !== 0) {
       throw new Error('O score KPS deve situar-se entre 0 e 100 (múltiplos de 10).');
@@ -122,7 +137,7 @@ export class MedicoService {
       VALUES (?, ?, ?, ?)`).run(crypto.randomUUID(), idDoente, faseClinica, dataInicio);
   }
 
-  static registarTratamento(idDoente: string, idMedico: string, dados: { tipo: string; estado: string; data_inicio: string; data_fim?: string; descricao_esquema: string }) {
+  private static validarTratamento(dados: { tipo: string; estado: string; data_inicio: string; data_fim?: string | null; descricao_esquema: string }) {
     if (!dados || typeof dados !== 'object') throw new Error('Dados do tratamento inválidos.');
     const tiposValidos = ['CIRURGIA', 'QUIMIOTERAPIA', 'RADIOTERAPIA', 'OUTRO'];
     const estadosValidos = ['PLANEADO', 'EM_CURSO', 'CONCLUIDO', 'SUSPENSO'];
@@ -132,6 +147,10 @@ export class MedicoService {
         (dados.data_fim && dados.data_fim < dados.data_inicio)) {
       throw new Error('Dados do tratamento inválidos. Verifique o tipo, estado, datas e descrição.');
     }
+  }
+
+  static registarTratamento(idDoente: string, idMedico: string, dados: { tipo: string; estado: string; data_inicio: string; data_fim?: string; descricao_esquema: string }) {
+    this.validarTratamento(dados);
     const id_tratamento = crypto.randomUUID();
     const tx = db.transaction(() => {
       db.prepare(`INSERT INTO Tratamento VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id_tratamento, idDoente, dados.tipo, dados.estado, dados.data_inicio, dados.data_fim || null, dados.descricao_esquema.trim());
@@ -139,6 +158,39 @@ export class MedicoService {
     });
     tx();
     return { id_tratamento, ...dados };
+  }
+
+  // Atualizar um tratamento (RF07): mudar o estado, pôr a data de fim ou corrigir um erro.
+  // Os campos não enviados mantêm-se. Ao concluir ou suspender sem data de fim, usa-se a data de hoje.
+  static atualizarTratamento(idDoente: string, idTratamento: string, idMedico: string, alteracoes: {
+    tipo?: string; estado?: string; data_inicio?: string; data_fim?: string | null; descricao_esquema?: string;
+  }) {
+    if (!alteracoes || typeof alteracoes !== 'object') throw new Error('Dados do tratamento inválidos.');
+    const atual = db.prepare('SELECT * FROM Tratamento WHERE id_tratamento = ? AND id_doente = ?').get(idTratamento, idDoente) as any;
+    if (!atual) throw new Error('O tratamento indicado não pertence a este processo clínico.');
+    const novo = {
+      tipo: alteracoes.tipo ?? atual.tipo,
+      estado: alteracoes.estado ?? atual.estado,
+      data_inicio: alteracoes.data_inicio ?? atual.data_inicio,
+      data_fim: alteracoes.data_fim === undefined ? atual.data_fim : (alteracoes.data_fim || null),
+      descricao_esquema: (alteracoes.descricao_esquema ?? atual.descricao_esquema)?.trim()
+    };
+    if (['CONCLUIDO', 'SUSPENSO'].includes(novo.estado) && !novo.data_fim) {
+      const hoje = new Date().toISOString().slice(0, 10);
+      novo.data_fim = hoje < novo.data_inicio ? novo.data_inicio : hoje;
+    }
+    this.validarTratamento(novo);
+    const mudancas = (['tipo', 'estado', 'data_inicio', 'data_fim', 'descricao_esquema'] as const)
+      .filter(campo => (atual[campo] ?? null) !== (novo[campo] ?? null))
+      .map(campo => `${campo}: ${atual[campo] ?? '—'} → ${novo[campo] ?? '—'}`);
+    if (!mudancas.length) return { id_tratamento: idTratamento, ...novo };
+    const tx = db.transaction(() => {
+      db.prepare(`UPDATE Tratamento SET tipo = ?, estado = ?, data_inicio = ?, data_fim = ?, descricao_esquema = ?
+        WHERE id_tratamento = ?`).run(novo.tipo, novo.estado, novo.data_inicio, novo.data_fim, novo.descricao_esquema, idTratamento);
+      registarAuditoria(idMedico, 'ATUALIZACAO_TRATAMENTO_RF07', `Tratamento ${idTratamento}: ${mudancas.join('; ')}`);
+    });
+    tx();
+    return { id_tratamento: idTratamento, ...novo };
   }
 
   // ---------- Novo doente (criado pelo médico, que fica como médico responsável) ----------

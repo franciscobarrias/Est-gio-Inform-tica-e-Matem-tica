@@ -464,25 +464,27 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.deepEqual(alertasGerados[0].instrucoes, ['LIGAR_112']);
   const avaliacaoPersistida = db.prepare(`SELECT score, cobertura, linha_de_base, versao_parametros,
     prioridade_algoritmo, motivos_json
-    FROM AvaliacaoAlgoritmo WHERE id_submissao = ? AND versao_parametros = '4.0'`).get(id_submissao) as {
+    FROM AvaliacaoAlgoritmo WHERE id_submissao = ? AND versao_parametros = '1.0'`).get(id_submissao) as {
       score: number | null; cobertura: number; linha_de_base: number | null;
       versao_parametros: string; prioridade_algoritmo: string; motivos_json: string;
     };
-  assert.equal(avaliacaoPersistida.versao_parametros, '4.0');
+  assert.equal(avaliacaoPersistida.versao_parametros, '1.0');
   assert.equal(avaliacaoPersistida.prioridade_algoritmo, 'Crítica');
   assert.match(JSON.parse(avaliacaoPersistida.motivos_json)[0].texto, /Dor de cabeça súbita/);
   assert.throws(() => db.prepare(`UPDATE AvaliacaoAlgoritmo SET score = score
-    WHERE id_submissao = ? AND versao_parametros = '4.0'`).run(id_submissao), /imutável/);
+    WHERE id_submissao = ? AND versao_parametros = '1.0'`).run(id_submissao), /imutável/);
   assert.throws(() => db.prepare(`UPDATE MotivoEvidencia SET texto = texto
-    WHERE id_submissao = ? AND versao_parametros = '4.0'`).run(id_submissao), /imutável/);
+    WHERE id_submissao = ? AND versao_parametros = '1.0'`).run(id_submissao), /imutável/);
   assert.throws(() => db.prepare(`UPDATE InstrucaoEmitida SET codigo = codigo
-    WHERE id_submissao = ? AND versao_parametros = '4.0'`).run(id_submissao), /imutável/);
+    WHERE id_submissao = ? AND versao_parametros = '1.0'`).run(id_submissao), /imutável/);
 
   const submissaoRepetida = SintomaService.submeterMonitorizacao(idDoente, idCuidador, 'CUIDADOR', {
     id_formulario: formulario.id_formulario,
     data_referencia_sintomas: hoje,
     respostas: [{ id_pergunta: 'v2-a2-cefaleia-subita', id_opcao: opcao('v2-a2-cefaleia-subita', 'SIM') }]
   });
+  // O primeiro alerta de um doente (sem alerta aberto antes) é «original», não «motivo novo».
+  if (!alertasGerados[0].id_alerta_anterior) assert.equal(alertasGerados[0].tipo_associacao, 'ORIGINAL');
   assert.equal(submissaoRepetida.alertasGerados[0].id_alerta, alertasGerados[0].id_alerta);
   assert.equal(submissaoRepetida.alertasGerados[0].duplicado, true);
   const ligacoes = db.prepare(`SELECT COUNT(*) AS total FROM AlertaSubmissao WHERE id_alerta = ?`)
@@ -503,6 +505,9 @@ test('v2: grava o alerta com a instrução e rejeita detalhes sem a pergunta pri
   assert.equal(associacao.tipo_associacao, 'MOTIVO_NOVO');
   const alertaListado = AlertaService.listarAlertas().find((alerta: any) => alerta.id_alerta === motivoNovo.id_alerta);
   assert.ok(alertaListado && alertaListado.submissoes_associadas.length >= 1);
+  // O alerta anterior fica a saber que foi seguido por um mais recente.
+  const anteriorListado = AlertaService.listarAlertas().find((alerta: any) => alerta.id_alerta === alertasGerados[0].id_alerta);
+  assert.ok(anteriorListado?.seguinte_data);
 
   const bundle = FhirService.exportarBundleFhir(idDoente);
   assert.ok(bundle.entry.every((entrada: any) =>
@@ -524,7 +529,7 @@ test('uma falha do motor não reverte a submissão e fica registada como avalia�
     assert.ok(db.prepare('SELECT 1 FROM SubmissaoMonitorizacao WHERE id_submissao = ?').get(resultado.id_submissao));
     assert.match(resultado.erroAvaliacao || '', /não está configurada ou ativa/);
     const avaliacao = db.prepare(`SELECT estado, erro FROM AvaliacaoAlgoritmo
-      WHERE id_submissao = ? AND versao_parametros = '4.0'`).get(resultado.id_submissao) as {
+      WHERE id_submissao = ? AND versao_parametros = '1.0'`).get(resultado.id_submissao) as {
         estado: string; erro: string;
       };
     assert.equal(avaliacao.estado, 'ERRO');
@@ -623,4 +628,48 @@ test('o médico cria um doente com palavra-passe temporária, que fica a seu car
   assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, email: 'outro@example.invalid' }), /n\.º de processo/);
   assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, email: 'x@example.invalid', numero_processo_clinico: 'PC-1', data_nascimento: '2999-01-01' }), /data de nascimento/);
   assert.throws(() => MedicoService.criarDoente(idMedico, { ...dados, email: 'y@example.invalid', numero_processo_clinico: 'PC-777', sexo: 'X' }), /sexo/);
+});
+
+test('o médico retira a autorização de um cuidador e o acesso termina logo', () => {
+  const cuidador = { id_utilizador: idCuidador, nome: 'Cuidador', email: 'cuidador@chsj.pt', perfil: 'CUIDADOR' as const };
+  const associacao = db.prepare(`SELECT id_associacao FROM DoenteCuidador
+    WHERE id_doente = ? AND id_cuidador = ? AND ativa = 1`).get(idDoente, idCuidador) as { id_associacao: string };
+  assert.ok(associacao);
+  assert.equal(AuthService.podeAcederDoente(cuidador, idDoente), true);
+
+  const revogada = MedicoService.revogarCuidador(idDoente, associacao.id_associacao, idMedico);
+  assert.equal(revogada.ativa, false);
+  assert.equal(AuthService.podeAcederDoente(cuidador, idDoente), false);
+  const linha = db.prepare('SELECT ativa, data_fim FROM DoenteCuidador WHERE id_associacao = ?')
+    .get(associacao.id_associacao) as { ativa: number; data_fim: string | null };
+  assert.equal(linha.ativa, 0);
+  assert.ok(linha.data_fim);
+  // Não se retira duas vezes, nem a partir de outro doente.
+  assert.throws(() => MedicoService.revogarCuidador(idDoente, associacao.id_associacao, idMedico), /já não está associado/);
+
+  // Voltar a associar devolve o acesso (a associação antiga fica no histórico).
+  MedicoService.associarCuidador(idDoente, 'cuidador@chsj.pt', 'FAMILIAR', idMedico, true);
+  assert.equal(AuthService.podeAcederDoente(cuidador, idDoente), true);
+});
+
+test('o médico conclui e corrige um tratamento (RF07)', () => {
+  const novo = MedicoService.registarTratamento(idDoente, idMedico, {
+    tipo: 'QUIMIOTERAPIA', estado: 'EM_CURSO', data_inicio: '2026-09-01', descricao_esquema: 'Temozolomida adjuvante, 6 ciclos'
+  }) as { id_tratamento: string };
+  // Concluir sem indicar a data de fim põe a data de hoje.
+  const concluido = MedicoService.atualizarTratamento(idDoente, novo.id_tratamento, idMedico, { estado: 'CONCLUIDO' });
+  assert.equal(concluido.estado, 'CONCLUIDO');
+  assert.equal(concluido.data_fim, new Date().toISOString().slice(0, 10));
+  // Corrigir um erro: a descrição e a data de fim mudam, o resto mantém-se.
+  const corrigido = MedicoService.atualizarTratamento(idDoente, novo.id_tratamento, idMedico, {
+    data_fim: '2026-10-15', descricao_esquema: 'Temozolomida adjuvante, 4 ciclos'
+  });
+  assert.equal(corrigido.tipo, 'QUIMIOTERAPIA');
+  assert.equal(corrigido.data_fim, '2026-10-15');
+  const guardado = db.prepare('SELECT estado, data_fim, descricao_esquema FROM Tratamento WHERE id_tratamento = ?')
+    .get(novo.id_tratamento) as { estado: string; data_fim: string; descricao_esquema: string };
+  assert.deepEqual({ ...guardado }, { estado: 'CONCLUIDO', data_fim: '2026-10-15', descricao_esquema: 'Temozolomida adjuvante, 4 ciclos' });
+  // Validações: datas incoerentes e tratamentos de outro doente são recusados.
+  assert.throws(() => MedicoService.atualizarTratamento(idDoente, novo.id_tratamento, idMedico, { data_fim: '2026-08-01' }), /inválidos/);
+  assert.throws(() => MedicoService.atualizarTratamento('user-doente-002', novo.id_tratamento, idMedico, { estado: 'SUSPENSO' }), /não pertence/);
 });

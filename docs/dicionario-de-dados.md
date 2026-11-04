@@ -232,7 +232,7 @@ Catálogo versionado dos questionários.
 |---|---|---|
 | `id_formulario` | TEXT, PK | Identificador estável do formulário. |
 | `nome` | TEXT, NN | Nome apresentado. |
-| `versao` | INTEGER, NN | Versão do questionário. |
+| `versao` | INTEGER, NN | Versão do questionário (no protótipo existe uma única versão, 1). |
 | `estado` | TEXT, NN, CHECK | `ATIVO` ou `INATIVO`. O arranque ativa o formulário v2 e desativa os restantes. |
 
 ### `PerguntaFormulario`
@@ -301,7 +301,7 @@ Uma linha por pergunta respondida numa submissão. O índice único `(id_submiss
 
 ## Questionário de monitorização v2
 
-A versão ativa tem o identificador `form-gbm-v2`, definido em `src/database/formulario-v2.ts`. Os códigos são armazenados em `PerguntaFormulario.codigo`; os textos exatos e as opções estão nessa fonte, que é a definição normativa do formulário. A coluna `id_pergunta` é a chave persistida e não deve ser substituída pelo código funcional.
+O questionário ativo tem o identificador `form-gbm-v2` (o «v2» é apenas histórico; no protótipo existe uma única versão, 1), definido em `src/database/formulario-v2.ts`. Os códigos são armazenados em `PerguntaFormulario.codigo`; os textos exatos e as opções estão nessa fonte, que é a definição normativa do formulário. A coluna `id_pergunta` é a chave persistida e não deve ser substituída pelo código funcional.
 
 | Código(s) | Categoria | Conteúdo |
 |---|---|---|
@@ -334,7 +334,7 @@ Catálogo descritivo associado aos alertas. As regras executáveis e pesos atuai
 | `tipo_regra` | TEXT, NN | Código de agrupamento. |
 | `criterio_documentado` | TEXT, NN | Descrição do critério. |
 | `referencia_literatura` | TEXT, NN | Referência ou nota documental; não implica validação clínica. |
-| `versao` | TEXT, NN | Versão documental da regra. |
+| `versao` | TEXT, NN | Versão documental da regra (no protótipo, `1.0`, a mesma de `VERSAO_PARAMETROS`). |
 | `validada_clinicamente` | INTEGER, NN, DF `1` | Flag de validação declarada (`0`/`1`); os limiares desta aplicação são demonstrativos e não validados clinicamente. |
 | `ativa` | INTEGER, NN, DF `1` | Flag de ativação (`0`/`1`). |
 
@@ -345,7 +345,7 @@ Resultado de uma execução do motor sobre uma submissão e uma versão de parâ
 | Campo | Tipo e restrições | Significado |
 |---|---|---|
 | `id_submissao` | TEXT, NN, PK composta, FK → `SubmissaoMonitorizacao.id_submissao` | Submissão avaliada. |
-| `versao_parametros` | TEXT, NN, PK composta | Identificador da versão do motor/parâmetros. Permite avaliações distintas da mesma submissão. |
+| `versao_parametros` | TEXT, NN, PK composta | Versão das regras e parâmetros do motor (no protótipo, `1.0`). Fica guardada para que os resultados antigos continuem rastreáveis se as regras mudarem. |
 | `score` | REAL, NULL | Score calculado quando a camada comparativa pode ser avaliada. |
 | `cobertura` | REAL, NULL | Fração de cobertura das respostas avaliáveis. |
 | `linha_de_base` | REAL, NULL | Mediana de score de referência, quando disponível. É dado derivado. |

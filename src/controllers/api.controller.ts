@@ -160,6 +160,16 @@ export class ApiController {
     } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
 
+  static revogarCuidador(req: Request, res: Response) {
+    try {
+      if (req.user!.perfil !== 'MEDICO' || !AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
+        res.status(403).json({ erro: 'Só o médico responsável pode retirar a autorização de um cuidador.' });
+        return;
+      }
+      res.json(MedicoService.revogarCuidador(req.params.idDoente, req.params.idAssociacao, req.user!.id_utilizador));
+    } catch (e: any) { res.status(400).json({ erro: e.message }); }
+  }
+
   static definirPlano(req: Request, res: Response) {
     if (!AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
       res.status(403).json({ erro: 'Sem autorização para atualizar este processo clínico.' });
@@ -197,6 +207,16 @@ export class ApiController {
       return;
     }
     try { res.status(201).json(MedicoService.registarTratamento(req.params.idDoente, req.user!.id_utilizador, req.body)); } catch (e: any) { res.status(400).json({ erro: e.message }); }
+  }
+
+  static atualizarTratamento(req: Request, res: Response) {
+    if (!AuthService.podeAcederDoente(req.user!, req.params.idDoente)) {
+      res.status(403).json({ erro: 'Sem autorização para atualizar este processo clínico.' });
+      return;
+    }
+    try {
+      res.json(MedicoService.atualizarTratamento(req.params.idDoente, req.params.idTratamento, req.user!.id_utilizador, req.body));
+    } catch (e: any) { res.status(400).json({ erro: e.message }); }
   }
 
   static listarAlertas(req: Request, res: Response) {

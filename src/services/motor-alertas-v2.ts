@@ -67,7 +67,9 @@ export const SUBIDA_SCORE_MINIMA = 5;    // mínimo demonstrativo; requer valida
 export const COBERTURA_MINIMA = 0.6;     // fração do peso total que tem de estar respondida
 export const REGISTOS_LINHA_DE_BASE = 3; // a linha de base é a mediana dos 3 primeiros registos
 export const JANELA_MINIMA_DIAS = 7;     // evita sobreposição da recordação dos sintomas
-export const VERSAO_PARAMETROS = '4.0';
+// Versão das regras e parâmetros do cálculo. Cada avaliação guarda-a, para que os resultados antigos
+// continuem rastreáveis se as regras mudarem. No protótipo existe uma única versão.
+export const VERSAO_PARAMETROS = '1.0';
 
 // Valor de uma resposta, ou null se não foi respondida ou se "não consegue avaliar".
 export function valorDe(respostas: RespostasPorCodigo, codigo: string): number | null {

@@ -1,5 +1,5 @@
 /*
- * Formulário de monitorização, versão 2 (proposta para validação médica).
+ * Formulário de monitorização (proposta para validação médica). O «v2» do nome é apenas histórico.
  *
  * Organização (ver o documento "Proposta de questionário para validação médica"):
  *   Bloco A — Sinais de alarme (sim / não, últimas 24 horas)
@@ -138,7 +138,7 @@ export const REGRAS_V2 = [
 export function garantirFormularioV2(db: any): void {
   const tx = db.transaction(() => {
     db.prepare(`INSERT OR IGNORE INTO Formulario (id_formulario, nome, versao, estado)
-      VALUES (?, 'Questionário de monitorização GBM', 2, 'ATIVO')`).run(ID_FORMULARIO_V2);
+      VALUES (?, 'Questionário de monitorização GBM', 1, 'ATIVO')`).run(ID_FORMULARIO_V2);
     db.prepare(`UPDATE Formulario SET estado = 'INATIVO' WHERE id_formulario != ?`).run(ID_FORMULARIO_V2);
     db.prepare(`UPDATE Formulario SET estado = 'ATIVO' WHERE id_formulario = ?`).run(ID_FORMULARIO_V2);
 
@@ -184,7 +184,7 @@ export function garantirFormularioV2(db: any): void {
 
     const inserirRegra = db.prepare(`INSERT OR IGNORE INTO RegraAlerta
       (id_regra, nome, tipo_regra, criterio_documentado, referencia_literatura, versao, validada_clinicamente, ativa)
-      VALUES (?, ?, ?, ?, 'Proposta de questionário para validação médica', '2.0', 0, 1)`);
+      VALUES (?, ?, ?, ?, 'Proposta de questionário para validação médica', '1.0', 0, 1)`);
     REGRAS_V2.forEach(([id, nome, tipo, criterio]) => inserirRegra.run(id, nome, tipo, criterio));
     const atualizarRegra = db.prepare(`UPDATE RegraAlerta SET criterio_documentado = ? WHERE id_regra = ?`);
     REGRAS_V2.forEach(([id, , , criterio]) => atualizarRegra.run(criterio, id));

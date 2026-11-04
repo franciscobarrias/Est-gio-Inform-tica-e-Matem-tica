@@ -215,7 +215,8 @@ export class AlertaService {
       VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendente', ?, ?)
     `).run(id_alerta, idSubmissao, idRegra, dataHora, origemGatilho, prioridade, prioridade,
       resumoAgravamento, existente?.id_alerta ?? null);
-    const tipoAssociacao: TipoAssociacao = motivoNovo ? 'MOTIVO_NOVO' : escalonamento ? 'ESCALONAMENTO' : 'ORIGINAL';
+    // Sem alerta aberto é o original; com alerta aberto, a subida de prioridade prevalece sobre o motivo novo.
+    const tipoAssociacao: TipoAssociacao = !existente ? 'ORIGINAL' : escalonamento ? 'ESCALONAMENTO' : 'MOTIVO_NOVO';
     db.prepare(`INSERT INTO AlertaSubmissao (id_alerta, id_submissao, tipo_associacao) VALUES (?, ?, ?)`)
       .run(id_alerta, idSubmissao, tipoAssociacao);
     return {
@@ -242,7 +243,12 @@ export class AlertaService {
                ORDER BY h.data_hora_acao DESC LIMIT 1) as data_ultima_nota,
              (SELECT r.texto FROM RespostaMonitorizacao r JOIN PerguntaFormulario p ON p.id_pergunta = r.id_pergunta
                WHERE r.id_submissao = a.id_submissao AND p.tipo_resposta = 'TEXTO_LIVRE' LIMIT 1) as mensagem_doente,
-             ant.data_hora_geracao as anterior_data, ant.prioridade as anterior_prioridade, ant.estado_atual as anterior_estado
+             ant.data_hora_geracao as anterior_data, ant.prioridade as anterior_prioridade, ant.estado_atual as anterior_estado,
+             -- Alerta que veio a seguir a este (o mais recente que o indica como anterior).
+             (SELECT seg.data_hora_geracao FROM AlertaClinico seg WHERE seg.id_alerta_anterior = a.id_alerta
+               ORDER BY seg.data_hora_geracao DESC LIMIT 1) as seguinte_data,
+             (SELECT seg.prioridade FROM AlertaClinico seg WHERE seg.id_alerta_anterior = a.id_alerta
+               ORDER BY seg.data_hora_geracao DESC LIMIT 1) as seguinte_prioridade
       FROM AlertaClinico a
       LEFT JOIN AlertaClinico ant ON ant.id_alerta = a.id_alerta_anterior
       JOIN RegraAlerta r ON a.id_regra = r.id_regra

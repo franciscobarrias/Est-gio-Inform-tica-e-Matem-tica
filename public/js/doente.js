@@ -85,7 +85,7 @@ function htmlPergunta(pergunta) {
 }
 
 function renderizarFormulario() {
-  $('tituloFormulario').textContent = `${formAtivo.nome} (versão ${formAtivo.versao})`;
+  $('tituloFormulario').textContent = formAtivo.nome;
   const notas = respondeCuidador() ? NOTAS_BLOCO_CUIDADOR : NOTAS_BLOCO;
   if (respondeCuidador()) {
     $('introFormulario').textContent = 'Está a responder pelo doente indicado acima, com base no que observou e no que ele lhe disse. '

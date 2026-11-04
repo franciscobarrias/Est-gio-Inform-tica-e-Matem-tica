@@ -213,7 +213,18 @@ function abrirSeparador(id, focar = false) {
 // ---------- Doente em consulta ----------
 async function carregarDoentes() {
   pacientes = await pedidoApi('/api/doentes');
-  if (!pacientes.length) throw new Error('Não existem processos de doentes atribuídos a esta conta.');
+  if (!pacientes.length) {
+    // Um cuidador cuja autorização foi retirada (ou ainda não foi dada) vê uma explicação em vez de uma página vazia.
+    if (!ehClinico()) {
+      document.querySelector('aside.menu-lateral')?.classList.add('hidden');
+      document.querySelector('main').innerHTML = `<section class="card" style="max-width:640px;margin:2rem auto">
+        <h2>Sem doentes associados</h2>
+        <p>Esta conta não tem, neste momento, nenhum doente associado. Se era cuidador de um doente, a autorização pode ter sido retirada pelo médico responsável.</p>
+        <p class="muted pequeno">Se achar que se trata de um engano, contacte a equipa de Neurocirurgia.</p></section>`;
+      throw new Error('Esta conta não tem doentes associados.');
+    }
+    throw new Error('Não existem processos de doentes atribuídos a esta conta.');
+  }
   // O médico e o enfermeiro começam sem doente escolhido: escolhem-no na lista de doentes.
   if (!pacientes.some(p => p.id_doente === idDoenteAtivo)) idDoenteAtivo = ehClinico() ? null : pacientes[0].id_doente;
   preencherSeletorDoentes();
@@ -280,6 +291,7 @@ function renderizarIdentidade() {
     ${campos.length ? `<dl class="identificacao">${campos.map(([t, v]) => `<div><dt>${t}</dt><dd title="${v}">${v}</dd></div>`).join('')}</dl>` : ''}
     <div class="chips">
       <span class="chip ${cuidadorObrig ? 'chip-alerta' : ''}"><strong>KPS ${escapar(doente.ultimo_kps)}</strong>${cuidadorObrig ? ' · cuidador obrigatório' : ''}</span>
+      ${ehClinico() && cuidadorObrig && !(p.cuidadores || []).length ? `<span class="chip chip-alerta" title="Com KPS ≤ 70 o questionário é preenchido pelo cuidador; sem cuidador associado, o doente não consegue registar sintomas."><strong>Sem cuidador associado</strong> · o doente não consegue registar sintomas</span>` : ''}
       ${d.fase_clinica_atual ? `<span class="chip">Fase: <strong>${escapar(d.fase_clinica_atual)}</strong></span>` : ''}
       ${ehClinico() ? `<span class="chip ${abertos ? 'chip-alerta' : 'chip-ok'}">${abertos ? `<strong>${abertos}</strong> alerta(s) por concluir` : 'Sem alertas por concluir'}</span>` : ''}
       <span class="chip ${p.lembrete.lembreteAtivo ? 'chip-alerta' : 'chip-ok'}">${escapar(semCodigoRequisito(p.lembrete.mensagem))}</span>
@@ -322,7 +334,8 @@ function renderizarDiagnosticoMedicacao() {
       <strong>${escapar(TIPOS_TRATAMENTO[x.tipo] || x.tipo)}</strong>
       <span class="badge ${x.estado === 'EM_CURSO' ? 'badge-alerta' : 'badge-neutro'}">${escapar(ESTADOS_TRATAMENTO[x.estado] || x.estado)}</span>
       <div class="muted pequeno">${x.data_fim && x.data_fim !== x.data_inicio ? `${dataCurta(x.data_inicio)} a ${dataCurta(x.data_fim)}` : x.data_fim ? dataCurta(x.data_inicio) : `Desde ${dataCurta(x.data_inicio)}`}</div>
-      <div>${escapar(x.descricao_esquema)}</div></li>`).join('')}</ol>`
+      <div>${escapar(x.descricao_esquema)}</div>
+      ${typeof acoesTratamentoDaPagina === 'function' ? `<div class="acoes acoes-tratamento">${acoesTratamentoDaPagina(x)}</div>` : ''}</li>`).join('')}</ol>`
     : '<p class="muted">Sem tratamentos registados.</p>';
 
   const meds = p.medicacoes || [];

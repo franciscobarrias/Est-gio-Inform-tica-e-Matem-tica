@@ -13,8 +13,10 @@ router.post('/doentes/:idDoente/submissoes', autenticarJWT, ApiController.submet
 router.post('/doentes/:idDoente/kps', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarKps);
 router.put('/doentes/:idDoente/diagnostico', autenticarJWT, exigirPerfis('MEDICO'), ApiController.atualizarDiagnostico);
 router.post('/doentes/:idDoente/cuidadores', autenticarJWT, exigirPerfis('MEDICO'), ApiController.associarCuidador);
+router.delete('/doentes/:idDoente/cuidadores/:idAssociacao', autenticarJWT, exigirPerfis('MEDICO'), ApiController.revogarCuidador);
 router.post('/doentes/:idDoente/planos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.definirPlano);
 router.post('/doentes/:idDoente/tratamentos', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarTratamento);
+router.put('/doentes/:idDoente/tratamentos/:idTratamento', autenticarJWT, exigirPerfis('MEDICO'), ApiController.atualizarTratamento);
 router.post('/doentes/:idDoente/medicacoes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarMedicacao);
 router.put('/doentes/:idDoente/medicacoes/:idMedicacao', autenticarJWT, exigirPerfis('MEDICO'), ApiController.alterarEstadoMedicacao);
 router.post('/doentes/:idDoente/decisoes', autenticarJWT, exigirPerfis('MEDICO'), ApiController.registarDecisao);

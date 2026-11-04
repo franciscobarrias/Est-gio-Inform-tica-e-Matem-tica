@@ -106,7 +106,7 @@
     <section id="painel-tratamentos" role="tabpanel" class="hidden" aria-labelledby="tab-tratamentos">
       <section class="card"><h2>Tratamentos</h2><div id="dmTratamentos"></div>
         <details class="formulario-medico">
-          <summary>+ Registar tratamento</summary>
+          <summary id="resumoFormTratamento">+ Registar tratamento</summary>
           <div class="linha-campos">
             <div><label for="tratTipo">Tipo</label>
               <select id="tratTipo"><option value="CIRURGIA">Cirurgia</option><option value="QUIMIOTERAPIA">Quimioterapia</option><option value="RADIOTERAPIA">Radioterapia</option><option value="OUTRO">Outro</option></select></div>
@@ -116,7 +116,8 @@
             <div><label for="tratFim">Data de fim (opcional)</label><input id="tratFim" type="date" /></div>
           </div>
           <label for="tratDescricao">Descrição do esquema</label><input id="tratDescricao" type="text" maxlength="500" />
-          <button id="guardarTratamento" type="button">Registar tratamento</button>
+          <div class="acoes"><button id="guardarTratamento" type="button">Registar tratamento</button>
+            <button id="cancelarEdicaoTratamento" type="button" class="secundario hidden">Cancelar edição</button></div>
         </details>
       </section>
       <section class="card"><h2>Medicação</h2><div id="dmMedicacao"></div>
