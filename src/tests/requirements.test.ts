@@ -64,9 +64,10 @@ test('guarda hashes individuais e migra credenciais antigas após autenticação
   const hashAntigo = require('crypto').scryptSync('123456', 'salt_gbm_chsj', 64).toString('hex');
   db.prepare('UPDATE Utilizador SET password_hash = ? WHERE id_utilizador = ?').run(hashAntigo, idMedico);
   assert.equal(AuthService.login('medico1@chsj.min-saude.pt', '123456').utilizador.perfil, 'MEDICO');
-  assert.equal(AuthService.login('medico@chsj.pt', '123456').utilizador.perfil, 'MEDICO');
   assert.equal(AuthService.login('enfermeiro1@chsj.min-saude.pt', '123456').utilizador.perfil, 'ENFERMEIRO');
-  assert.equal(AuthService.login('enfermeiro@chsj.pt', '123456').utilizador.perfil, 'ENFERMEIRO');
+  // Não há emails alternativos: um email que não existe é recusado, mesmo com a palavra-passe certa.
+  assert.throws(() => AuthService.login('medico@chsj.pt', '123456'), /Credenciais inválidas/);
+  assert.throws(() => AuthService.login('enfermeiro@chsj.pt', '123456'), /Credenciais inválidas/);
   const hashMigrado = db.prepare('SELECT password_hash FROM Utilizador WHERE id_utilizador = ?').get(idMedico) as { password_hash: string };
   assert.ok(hashMigrado.password_hash.startsWith('scrypt$'));
   assert.throws(() => AuthService.login('medico1@chsj.min-saude.pt', 'errada'), /Credenciais inválidas/);

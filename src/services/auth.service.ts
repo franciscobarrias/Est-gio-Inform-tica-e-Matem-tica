@@ -3,13 +3,6 @@ import jwt from 'jsonwebtoken';
 import { db, registarAuditoria } from '../database/dados-locais';
 import { JWT_SECRET, UtilizadorAutenticado } from '../middleware/auth.middleware';
 
-const EMAILS_ALTERNATIVOS: Record<string, string> = {
-  'medico1@chsj.min-saude.pt': 'medico@chsj.pt',
-  'medico@chsj.pt': 'medico1@chsj.min-saude.pt',
-  'enfermeiro1@chsj.min-saude.pt': 'enfermeiro@chsj.pt',
-  'enfermeiro@chsj.pt': 'enfermeiro1@chsj.min-saude.pt'
-};
-
 export class AuthService {
   static gerarHashPassword(password: string): string {
     const salt = crypto.randomBytes(16).toString('hex');
@@ -35,16 +28,12 @@ export class AuthService {
     if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
       throw new Error('Introduza o email e a palavra-passe.');
     }
-    const procurarUtilizador = db.prepare(`
+    // Cada conta entra apenas com o seu próprio email.
+    const user = db.prepare(`
       SELECT id_utilizador, nome, email, perfil, estado_conta, password_hash
       FROM Utilizador
       WHERE email = ?
-    `);
-    const emailNormalizado = email.trim().toLowerCase();
-    const user = (procurarUtilizador.get(emailNormalizado) ??
-      (EMAILS_ALTERNATIVOS[emailNormalizado]
-        ? procurarUtilizador.get(EMAILS_ALTERNATIVOS[emailNormalizado])
-        : undefined)) as any;
+    `).get(email.trim().toLowerCase()) as any;
 
     if (!user || user.estado_conta !== 'ATIVA' || !this.verificarPassword(password, user.password_hash)) {
       throw new Error('Credenciais inválidas ou conta inativa (RF01).');
@@ -84,4 +73,4 @@ export class AuthService {
     }
     return false;
   }
-}
+}

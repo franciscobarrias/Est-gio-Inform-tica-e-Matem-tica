@@ -36,7 +36,7 @@ npm run dev
 
 **Atenção:** `npm run seed` apaga o ficheiro da base de dados (`data.db`, ou o indicado em `DATABASE_PATH` ou `--database`) e cria-o de novo com dados sintéticos. Pare o servidor antes de o correr. Não o use numa base de dados que pretenda conservar.
 
-Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Os profissionais aparecem como «Médico 1», «Enfermeiro 1», etc., para não coincidirem com profissionais reais. Contas principais: `medico1@chsj.min-saude.pt` (Médico 1), `enfermeiro1@chsj.min-saude.pt` (Enfermeiro 1), `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os endereços `medico@chsj.pt` e `enfermeiro@chsj.pt` também são aceites para compatibilidade com bases já existentes. Os restantes doentes entram com endereços de demonstração `@example.invalid`.
+Os nomes, números de processo e datas são **fictícios** e não correspondem a pessoas reais. A palavra-passe de todas as contas é `123456`. Os profissionais aparecem como «Médico 1», «Enfermeiro 1», etc., para não coincidirem com profissionais reais. Contas principais: `medico1@chsj.min-saude.pt` (Médico 1), `enfermeiro1@chsj.min-saude.pt` (Enfermeiro 1), `cuidador@chsj.pt` (Luísa Ferreira, cuidadora de António Ferreira) e `doente@chsj.pt` (António Ferreira). Os restantes doentes entram com endereços de demonstração `@example.invalid`.
 
 | N.º | Doente | Cenário de demonstração |
 |---|---|---|
