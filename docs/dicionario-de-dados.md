@@ -156,8 +156,8 @@ Linha temporal de tratamentos associados diretamente ao doente.
 |---|---|---|
 | `id_tratamento` | TEXT, PK | Identificador do tratamento. |
 | `id_doente` | TEXT, NN, FK → `Doente.id_doente` | Doente tratado. |
-| `tipo` | TEXT, NN | Tipo de tratamento; texto sem enumeração SQL. |
-| `estado` | TEXT, NN | Estado do tratamento; texto sem enumeração SQL. |
+| `tipo` | TEXT, NN, CHECK | `CIRURGIA`, `QUIMIOTERAPIA`, `RADIOTERAPIA` ou `OUTRO`. |
+| `estado` | TEXT, NN, CHECK | `PLANEADO`, `EM_CURSO`, `CONCLUIDO` ou `SUSPENSO`. |
 | `data_inicio` | TEXT, NN | Início do tratamento. |
 | `data_fim` | TEXT, NULL | Fim, quando conhecido. |
 | `descricao_esquema` | TEXT, NN | Descrição do esquema terapêutico. |
@@ -246,7 +246,7 @@ Definição de uma pergunta e, se aplicável, da sua condição de apresentaçã
 | `categoria` | TEXT, NN | Categoria/bloco funcional; por exemplo, `ALARME`, `SINTOMA`, `FUNCAO`, `AUTONOMIA` ou `DETALHE`. Não existe CHECK SQL. |
 | `enunciado` | TEXT, NN | Texto apresentado ao doente. |
 | `tipo_resposta` | TEXT, NN | Tipo de entrada; por exemplo, seleção ou texto livre. |
-| `obrigatoria` | INTEGER, NN, DF `1` | Flag de obrigatoriedade. O formulário v2 é submetível parcialmente e as suas perguntas são inseridas como não obrigatórias. |
+| `obrigatoria` | INTEGER, NN, DF `0` | Flag de obrigatoriedade. O questionário aceita registos parciais (RF15), por isso nenhuma pergunta é obrigatória. |
 | `ordem` | INTEGER, NN | Ordem de apresentação dentro do formulário. |
 | `ativa` | INTEGER, NN, DF `1` | Flag que indica se a pergunta está ativa. |
 | `codigo` | TEXT, NULL | Código funcional (A1, B1, C1, D1, etc.) usado em relatórios e regras. |
@@ -335,7 +335,7 @@ Catálogo descritivo associado aos alertas. As regras executáveis e pesos atuai
 | `criterio_documentado` | TEXT, NN | Descrição do critério. |
 | `referencia_literatura` | TEXT, NN | Referência ou nota documental; não implica validação clínica. |
 | `versao` | TEXT, NN | Versão documental da regra (no protótipo, `1.0`, a mesma de `VERSAO_PARAMETROS`). |
-| `validada_clinicamente` | INTEGER, NN, DF `1` | Flag de validação declarada (`0`/`1`); os limiares desta aplicação são demonstrativos e não validados clinicamente. |
+| `validada_clinicamente` | INTEGER, NN, DF `0` | Flag de validação declarada (`0`/`1`). Por omissão é `0`: os limiares desta aplicação são demonstrativos e não validados clinicamente. |
 | `ativa` | INTEGER, NN, DF `1` | Flag de ativação (`0`/`1`). |
 
 ### `AvaliacaoAlgoritmo`
@@ -353,8 +353,8 @@ Resultado de uma execução do motor sobre uma submissão e uma versão de parâ
 | `limiar_score` | REAL, NULL | Limiar usado na comparação. |
 | `dados_nao_avaliaveis` | TEXT, NN, DF `[]` | JSON com itens/respostas não avaliáveis. |
 | `motivos_json` | TEXT, NN, DF `[]` | JSON legado/compacto com motivos; os motivos normalizados também estão em `MotivoEvidencia`. |
-| `prioridade_algoritmo` | TEXT, NULL | Prioridade produzida pelo motor; `NULL` quando não há motivo que gere prioridade. Não é a prioridade humana após triagem. |
-| `tipo_regra` | TEXT, NULL | Tipo de regra principal associado, quando aplicável. |
+| `prioridade_algoritmo` | TEXT, NULL, CHECK | Prioridade produzida pelo motor (`Baixa`, `Média`, `Alta` ou `Crítica`); `NULL` quando não há motivo que gere prioridade. Não é a prioridade humana após triagem. |
+| `tipo_regra` | TEXT, NULL, CHECK | Tipo de regra principal associado, quando aplicável: `SINAL_ALARME_V2`, `COMBINACAO_V2`, `SCORE_EVOLUCAO_V2` ou `DADOS_INSUFICIENTES_V2`. |
 | `contexto_linha_base` | TEXT, NN, DF `{}` | JSON do contexto usado para selecionar registos comparáveis. |
 | `data_hora_avaliacao` | TEXT, NN | Instante em que o motor foi executado. |
 | `estado` | TEXT, NN, DF `CONCLUIDA`, CHECK | `CONCLUIDA` ou `ERRO`. |
@@ -370,8 +370,8 @@ Motivo individual que fundamenta uma avaliação. PK composta `(id_submissao, ve
 | `versao_parametros` | TEXT, NN, PK composta | Versão da avaliação. |
 | `ordem` | INTEGER, NN, PK composta | Posição do motivo na avaliação. |
 | `texto` | TEXT, NN | Explicação legível do motivo. |
-| `prioridade` | TEXT, NN | Prioridade atribuída ao motivo. |
-| `tipo` | TEXT, NN | Tipo específico do motivo. |
+| `prioridade` | TEXT, NN, CHECK | Prioridade atribuída ao motivo: `Baixa`, `Média`, `Alta` ou `Crítica`. |
+| `tipo` | TEXT, NN, CHECK | Tipo de regra do motivo: `SINAL_ALARME_V2`, `COMBINACAO_V2`, `SCORE_EVOLUCAO_V2` ou `DADOS_INSUFICIENTES_V2`. |
 | `codigos_json` | TEXT, NN | JSON com códigos/perguntas que constituem a evidência. |
 
 ### `InstrucaoEmitida`
@@ -399,7 +399,7 @@ Alerta apresentado para triagem. A prioridade guardada em `prioridade` pode ser 
 | `prioridade` | TEXT, NN, CHECK | Prioridade atual: `Baixa`, `Média`, `Alta` ou `Crítica`. |
 | `estado_atual` | TEXT, NN, CHECK | `Pendente`, `Em análise`, `Encaminhado` ou `Concluído`. |
 | `resumo_agravamento` | TEXT, NN | Resumo para triagem. |
-| `prioridade_algoritmo` | TEXT, NULL | Prioridade inicial do motor, distinta da prioridade atual. |
+| `prioridade_algoritmo` | TEXT, NULL, CHECK | Prioridade inicial do motor (`Baixa`, `Média`, `Alta` ou `Crítica`), distinta da prioridade atual. |
 | `id_alerta_anterior` | TEXT, NULL, FK autorreferente → `AlertaClinico.id_alerta` | Alerta anterior ligado a um escalonamento. |
 
 ### `AlertaSubmissao`

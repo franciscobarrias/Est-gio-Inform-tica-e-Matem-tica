@@ -673,3 +673,14 @@ test('o médico conclui e corrige um tratamento (RF07)', () => {
   assert.throws(() => MedicoService.atualizarTratamento(idDoente, novo.id_tratamento, idMedico, { data_fim: '2026-08-01' }), /inválidos/);
   assert.throws(() => MedicoService.atualizarTratamento('user-doente-002', novo.id_tratamento, idMedico, { estado: 'SUSPENSO' }), /não pertence/);
 });
+
+test('a base de dados recusa valores fora das listas permitidas (CHECK)', () => {
+  assert.throws(() => db.prepare(`INSERT INTO Tratamento VALUES ('t-check-1', ?, 'HOMEOPATIA', 'EM_CURSO', '2026-01-01', NULL, 'x')`).run(idDoente), /CHECK/);
+  assert.throws(() => db.prepare(`INSERT INTO Tratamento VALUES ('t-check-2', ?, 'CIRURGIA', 'TALVEZ', '2026-01-01', NULL, 'x')`).run(idDoente), /CHECK/);
+  const colunas = (tabela: string) => (db.prepare(`SELECT sql FROM sqlite_master WHERE name = ?`).get(tabela) as { sql: string }).sql;
+  assert.match(colunas('AvaliacaoAlgoritmo'), /prioridade_algoritmo TEXT CHECK/);
+  assert.match(colunas('AvaliacaoAlgoritmo'), /tipo_regra TEXT CHECK/);
+  assert.match(colunas('MotivoEvidencia'), /prioridade TEXT NOT NULL CHECK/);
+  assert.match(colunas('MotivoEvidencia'), /tipo TEXT NOT NULL CHECK/);
+  assert.match(colunas('AlertaClinico'), /prioridade_algoritmo TEXT CHECK/);
+});

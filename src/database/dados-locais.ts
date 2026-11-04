@@ -95,8 +95,8 @@ export function inicializarBaseDados(): void {
     CREATE TABLE IF NOT EXISTS Tratamento (
       id_tratamento TEXT PRIMARY KEY,
       id_doente TEXT NOT NULL,
-      tipo TEXT NOT NULL,
-      estado TEXT NOT NULL,
+      tipo TEXT NOT NULL CHECK (tipo IN ('CIRURGIA', 'QUIMIOTERAPIA', 'RADIOTERAPIA', 'OUTRO')),
+      estado TEXT NOT NULL CHECK (estado IN ('PLANEADO', 'EM_CURSO', 'CONCLUIDO', 'SUSPENSO')),
       data_inicio TEXT NOT NULL,
       data_fim TEXT,
       descricao_esquema TEXT NOT NULL,
@@ -138,7 +138,7 @@ export function inicializarBaseDados(): void {
       categoria TEXT NOT NULL,
       enunciado TEXT NOT NULL,
       tipo_resposta TEXT NOT NULL,
-      obrigatoria INTEGER NOT NULL DEFAULT 1,
+      obrigatoria INTEGER NOT NULL DEFAULT 0,  -- nenhuma pergunta é obrigatória (RF15)
       ordem INTEGER NOT NULL,
       ativa INTEGER NOT NULL DEFAULT 1,
       codigo TEXT,                      -- A1, B3, ... (usado pelo motor de alertas)
@@ -203,7 +203,7 @@ export function inicializarBaseDados(): void {
       criterio_documentado TEXT NOT NULL,
       referencia_literatura TEXT NOT NULL,
       versao TEXT NOT NULL,
-      validada_clinicamente INTEGER NOT NULL DEFAULT 1,
+      validada_clinicamente INTEGER NOT NULL DEFAULT 0,  -- só passa a 1 depois de validada pela equipa clínica
       ativa INTEGER NOT NULL DEFAULT 1
     );
 
@@ -214,7 +214,7 @@ export function inicializarBaseDados(): void {
       data_hora_geracao TEXT NOT NULL,
       origem_gatilho TEXT NOT NULL,
       prioridade TEXT NOT NULL CHECK(prioridade IN ('Baixa', 'Média', 'Alta', 'Crítica')),
-      prioridade_algoritmo TEXT,        -- a que o algoritmo deu (a enfermagem pode ajustar a prioridade)
+      prioridade_algoritmo TEXT CHECK (prioridade_algoritmo IS NULL OR prioridade_algoritmo IN ('Baixa', 'Média', 'Alta', 'Crítica')),  -- a que o algoritmo deu (a enfermagem pode ajustar a prioridade)
       estado_atual TEXT NOT NULL CHECK(estado_atual IN ('Pendente', 'Em análise', 'Encaminhado', 'Concluído')),
       resumo_agravamento TEXT NOT NULL,
       id_alerta_anterior TEXT,          -- alerta aberto anterior, quando este o escalona ou traz um motivo novo
@@ -294,8 +294,8 @@ export function inicializarBaseDados(): void {
       limiar_score REAL,
       dados_nao_avaliaveis TEXT NOT NULL DEFAULT '[]',
       motivos_json TEXT NOT NULL DEFAULT '[]',
-      prioridade_algoritmo TEXT,
-      tipo_regra TEXT,
+      prioridade_algoritmo TEXT CHECK (prioridade_algoritmo IS NULL OR prioridade_algoritmo IN ('Baixa', 'Média', 'Alta', 'Crítica')),
+      tipo_regra TEXT CHECK (tipo_regra IS NULL OR tipo_regra IN ('SINAL_ALARME_V2', 'COMBINACAO_V2', 'SCORE_EVOLUCAO_V2', 'DADOS_INSUFICIENTES_V2')),
       contexto_linha_base TEXT NOT NULL DEFAULT '{}',
       data_hora_avaliacao TEXT NOT NULL,
       estado TEXT NOT NULL DEFAULT 'CONCLUIDA' CHECK (estado IN ('CONCLUIDA', 'ERRO')),
@@ -312,8 +312,8 @@ export function inicializarBaseDados(): void {
       versao_parametros TEXT NOT NULL,
       ordem INTEGER NOT NULL,
       texto TEXT NOT NULL,
-      prioridade TEXT NOT NULL,
-      tipo TEXT NOT NULL,
+      prioridade TEXT NOT NULL CHECK (prioridade IN ('Baixa', 'Média', 'Alta', 'Crítica')),
+      tipo TEXT NOT NULL CHECK (tipo IN ('SINAL_ALARME_V2', 'COMBINACAO_V2', 'SCORE_EVOLUCAO_V2', 'DADOS_INSUFICIENTES_V2')),
       codigos_json TEXT NOT NULL,
       PRIMARY KEY (id_submissao, versao_parametros, ordem),
       FOREIGN KEY (id_submissao, versao_parametros) REFERENCES AvaliacaoAlgoritmo(id_submissao, versao_parametros)

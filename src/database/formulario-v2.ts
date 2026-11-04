@@ -20,9 +20,9 @@
 export const ID_FORMULARIO_V2 = 'form-gbm-v2';
 
 // [sufixo do id, rótulo mostrado, valor codificado, valor numérico]
-type Opcao = [string, string, string, number];
+type Opcao = [string, string, string, number | null];
 
-const NAO_CONSIGO: Opcao = ['nao-avaliavel', 'Não consigo avaliar', 'IMPOSSIVEL_AVALIAR', 0];
+const NAO_CONSIGO: Opcao = ['nao-avaliavel', 'Não consigo avaliar', 'IMPOSSIVEL_AVALIAR', null]; // vazio: não é o mesmo que «Não tive» (0)
 const SIM_NAO: Opcao[] = [['nao', 'Não', 'NAO', 0], ['sim', 'Sim', 'SIM', 1]];
 const INTENSIDADE: Opcao[] = [
   ['ausente', 'Não tive', 'AUSENTE', 0],
