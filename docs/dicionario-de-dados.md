@@ -4,7 +4,7 @@
 
 Este documento descreve o esquema SQLite implementado pela aplicação Express/TypeScript. O esquema completo é criado em `src/database/dados-locais.ts`. Não há migrações: como o protótipo só usa dados sintéticos, quando a estrutura muda a base é recriada com `npm run seed`. A ligação usa `better-sqlite3` com chaves estrangeiras ativas.
 
-O modelo canónico tem **27 tabelas**. Os nomes de tabela e coluna são os nomes físicos, em `PascalCase` e `snake_case`, respetivamente. Os tipos SQLite (`TEXT`, `INTEGER`, `REAL`) são afinidades: datas, horas, enumerações e JSON também são armazenados como texto. Salvo indicação, não existe validação SQL de formato para estes textos.
+O modelo canónico tem **28 tabelas**. Os nomes de tabela e coluna são os nomes físicos, em `PascalCase` e `snake_case`, respetivamente. Os tipos SQLite (`TEXT`, `INTEGER`, `REAL`) são afinidades: datas, horas, enumerações e JSON também são armazenados como texto. Salvo indicação, não existe validação SQL de formato para estes textos.
 
 * `PK`: chave primária; `FK`: chave estrangeira; `UQ`: valor único; `NN`: `NOT NULL`; `DF`: valor predefinido; `CHECK`: domínio imposto pela base de dados.
 * Várias chaves primárias `TEXT` foram declaradas sem `NOT NULL` explícito. Embora sejam identificadores obrigatórios no modelo e na aplicação, o SQLite pode aceitar `NULL` em algumas chaves primárias não inteiras. Não se deve interpretar a ausência de `NN` como garantia SQL de não nulidade.
@@ -27,7 +27,7 @@ O modelo canónico tem **27 tabelas**. Os nomes de tabela e coluna são os nomes
 
 Os registos clínicos guardam códigos de terminologias reconhecidas e não texto livre; a designação em português vem destes catálogos.
 Os catálogos são preenchidos a partir de `src/database/terminologias.ts` sempre que a base é inicializada. Na exportação FHIR,
-a `Condition` leva o código SNOMED CT do glioblastoma (`393563007`) e o código CID-10 da localização, e cada `MedicationStatement` leva o código ATC.
+a `Condition` leva o código SNOMED CT do glioblastoma (`393563007`) e o código CID-10 da localização.
 
 ### `CodigoCID10`
 
@@ -116,9 +116,9 @@ Associação entre um doente e um cuidador. O histórico é preservado através 
 | `id_cuidador` | TEXT, NN, FK → `Cuidador.id_cuidador` | Cuidador associado. |
 | `grau_parentesco` | TEXT, NN | Relação declarada com o doente. |
 | `data_inicio` | TEXT, NN | Início da associação. |
-| `data_fim` | TEXT, NULL | Fim, se conhecida; `NULL` enquanto não registada. |
+| `data_fim` | TEXT, NULL | Fim da associação; preenchida quando o médico retira a autorização. `NULL` enquanto a associação está ativa. |
 | `autorizacao_validada` | INTEGER, NN, DF `1` | Regista se a autorização do doente foi validada (`0`/`1`). |
-| `ativa` | INTEGER, NN, DF `1` | Indica se a associação está ativa (`0`/`1`). |
+| `ativa` | INTEGER, NN, DF `1` | Indica se a associação está ativa (`0`/`1`). Passa a `0` quando o médico retira a autorização; a linha não é apagada. |
 
 ## Processo clínico
 
@@ -159,7 +159,7 @@ Linha temporal de tratamentos associados diretamente ao doente.
 | `tipo` | TEXT, NN, CHECK | `CIRURGIA`, `QUIMIOTERAPIA`, `RADIOTERAPIA` ou `OUTRO`. |
 | `estado` | TEXT, NN, CHECK | `PLANEADO`, `EM_CURSO`, `CONCLUIDO` ou `SUSPENSO`. |
 | `data_inicio` | TEXT, NN | Início do tratamento. |
-| `data_fim` | TEXT, NULL | Fim, quando conhecido. |
+| `data_fim` | TEXT, NULL | Fim, quando conhecido. Se o tratamento passar a `CONCLUIDO` ou `SUSPENSO` sem data de fim, a aplicação usa a data do dia. |
 | `descricao_esquema` | TEXT, NN | Descrição do esquema terapêutico. |
 
 ### `AvaliacaoKarnofsky`
@@ -219,7 +219,7 @@ Regista a decisão profissional separadamente da recomendação algorítmica.
 | `id_medico` | TEXT, NN, FK → `Medico.id_medico` | Médico responsável pela decisão. |
 | `id_alerta` | TEXT, NULL, FK → `AlertaClinico.id_alerta` | Alerta associado; `NULL` para decisão não ligada a alerta. |
 | `data_hora_decisao` | TEXT, NN | Instante da decisão. |
-| `decisao_medica` | TEXT, NN | Ação/decisão tomada. |
+| `decisao_medica` | TEXT, NN | Decisão tomada: «Manter seguimento previsto», «Necessidade de avaliação adicional» ou «Proposta de antecipação de consulta» (validado pela aplicação). |
 | `fundamentacao_clinica` | TEXT, NN | Fundamentação registada. |
 
 ## Questionários e respostas
@@ -400,7 +400,7 @@ Alerta apresentado para triagem. A prioridade guardada em `prioridade` pode ser 
 | `estado_atual` | TEXT, NN, CHECK | `Pendente`, `Em análise`, `Encaminhado` ou `Concluído`. |
 | `resumo_agravamento` | TEXT, NN | Resumo para triagem. |
 | `prioridade_algoritmo` | TEXT, NULL, CHECK | Prioridade inicial do motor (`Baixa`, `Média`, `Alta` ou `Crítica`), distinta da prioridade atual. |
-| `id_alerta_anterior` | TEXT, NULL, FK autorreferente → `AlertaClinico.id_alerta` | Alerta anterior ligado a um escalonamento. |
+| `id_alerta_anterior` | TEXT, NULL, FK autorreferente → `AlertaClinico.id_alerta` | Alerta anterior, ainda em aberto, a que este alerta foi ligado (por agravamento ou motivo novo), evitando duplicações. |
 
 ### `AlertaSubmissao`
 
@@ -474,14 +474,3 @@ Registo de eventos de auditoria da aplicação. Os detalhes são texto descritiv
 * A linha de base é a mediana dos primeiros três scores elegíveis e comparáveis do contexto. O limiar atual é `max(5, 0,1 × S₀, 2 × MAD)` com MAD não escalada e cobertura mínima de 60%. Estes são parâmetros demonstrativos, não validados clinicamente.
 * A fase clínica histórica está em `FaseClinica`; a fase aplicável ao registo é determinada pela data de referência. Contexto de score também considera cirurgia e alterações KPS relevantes, sem uma coluna física dedicada a «linha de base».
 * A exportação FHIR constrói `Patient`, `Condition` e `Observation` a partir dos dados atuais. Estes recursos não são tabelas persistidas pelo esquema canónico.
-
-## Artefactos locais fora do esquema canónico
-
-Foi observada no ficheiro local `data.db` a existência das tabelas `FhirPatientSync` e `FhirSyncState`. Não estão declaradas em `src/database`, não são referenciadas pelo código atual e não são criadas pelo código; podem ser resíduos de uma experiência anterior. São listadas para explicar a diferença entre uma base local existente e uma base criada apenas pelo código atual, mas **não fazem parte do modelo suportado**:
-
-| Tabela | Campos observados na base local | Observação |
-|---|---|---|
-| `FhirPatientSync` | `server_url` (TEXT, PK composta), `fhir_patient_id` (TEXT, PK composta), `id_doente` (TEXT, FK → `Doente.id_doente`, UQ por servidor/doente), `last_updated` (TEXT) | Mapeamento de paciente por servidor, sem consumidor no código atual. |
-| `FhirSyncState` | `server_url` (TEXT, PK), `last_updated` (TEXT) | Estado de sincronização por servidor, sem consumidor no código atual. |
-
-Não remover estas tabelas de uma base existente sem verificar a origem e a eventual necessidade de compatibilidade.
