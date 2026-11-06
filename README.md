@@ -73,7 +73,7 @@ Os nomes, números de processo e datas são **fictícios** e não correspondem a
 - Identificação do doente no topo de todas as páginas: nome, n.º de processo, data de nascimento e idade, sexo, médico responsável e cuidador. O cuidador vê «Está a registar por…».
 - Interface por separadores (Alertas, Doentes, Resumo clínico, Diagnóstico e medicação, Evolução, Registos do doente e Gestão clínica). O médico e a enfermagem começam sem doente escolhido: escolhem-no no separador **Doentes** (pesquisa por nome ou n.º de processo; primeiro os que têm alertas por concluir ou registos em atraso) ou a partir de um alerta.
 - Exportação autenticada em JSON FHIR R4 num Bundle do tipo `collection`, limitada a Patient, Condition com `clinicalStatus` e `subject` obrigatórios, e Observations de lateralidade/IDH/MGMT, KPS e score. O construtor centraliza a criação e valida os elementos obrigatórios destes recursos; o [mapeamento FHIR R4](./docs/mapeamento-fhir-r4.xlsx) serve como referência, não como entrada automática do construtor.
-- Interface responsiva, utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
+- Interface responsiva para telemóveis, tablets e computadores, com navegação horizontal e tabelas deslocáveis em ecrãs estreitos; utilizável por teclado e sem dependência de bibliotecas de gráficos externas.
 
 ## Estrutura da interface
 

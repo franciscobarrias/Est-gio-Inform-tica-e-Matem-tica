@@ -330,9 +330,9 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--pri
   text-transform:uppercase; letter-spacing:.05em; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 @media (max-width:900px) {
-  .app-layout { grid-template-columns:1fr; gap:1rem; margin-top:1rem; }
-  .menu-lateral { position:static; padding:.4rem; }
-  .menu-lateral nav { flex-direction:row; overflow-x:auto; scrollbar-width:none; }
+  .app-layout { grid-template-columns:minmax(0,1fr); gap:1rem; margin-top:1rem; }
+  .menu-lateral { position:static; min-width:0; padding:.4rem; }
+  .menu-lateral nav { min-width:0; max-width:100%; flex-direction:row; overflow-x:auto; scrollbar-width:none; }
   .menu-lateral button[role="tab"] { width:auto; padding:.55rem .75rem; }
   .menu-titulo { display:none; }
 }
@@ -480,3 +480,58 @@ code.senha { font-size:1rem; padding:.1rem .4rem; background:#fff; border:1px da
 .lista-cuidadores button { padding:.35rem .7rem; font-size:.85rem; white-space:nowrap; flex:none; }
 .acoes-tratamento { margin-top:.35rem; }
 .acoes-tratamento button { padding:.3rem .65rem; font-size:.82rem; }
+
+/* Ajustes para telemóveis */
+@media (max-width:600px) {
+  header.topo { padding:.55rem .75rem; gap:.5rem; }
+  .marca { gap:.5rem; }
+  .marca-arvore { width:32px; }
+  .marca-sub { display:none; }
+  .marca-nome { font-size:1.05rem; }
+  button.sair { padding:.4rem .55rem; font-size:.8rem; }
+
+  main { margin-top:.75rem; padding:0 .75rem; }
+  .app-layout { margin-top:.75rem; padding:0 .65rem; gap:.75rem; }
+  .app-layout > main, .card, .grid-2 > *, .linha-campos > * { min-width:0; }
+  .menu-lateral { padding:.3rem; }
+  .menu-lateral nav { gap:.15rem; }
+  .menu-lateral button[role="tab"] { min-height:44px; padding:.55rem .65rem; }
+  .menu-lateral button[role="tab"] .rotulo { overflow:visible; }
+
+  .card { padding:1rem; margin-bottom:.75rem; }
+  .barra-doente { padding:.9rem .9rem 1rem; margin-bottom:.75rem; }
+  .barra-doente .seletor { grid-column:1; grid-row:auto; }
+  .barra-doente .identidade > * { grid-column:1; grid-row:auto; }
+  .identidade h1 { font-size:1.2rem; }
+  .chip { max-width:100%; }
+  .chip strong, .alerta-processo, .alerta-detalhes dd { overflow-wrap:anywhere; }
+
+  input, select, textarea { font-size:16px; }
+  button { min-height:44px; }
+  .acoes { align-items:stretch; }
+  .acoes button { flex:1 1 auto; }
+  .opcoes-radio.curtas { flex-direction:column; gap:.4rem; }
+  .opcoes-radio.curtas label { min-width:0; }
+  .barra-guardar { align-items:stretch; padding-bottom:calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+  .barra-guardar button { width:100%; }
+
+  .table-wrap, #quadroComparativo { max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; contain:paint; }
+  table { max-width:none; }
+  th, td { padding:.45rem .5rem; }
+  dl.ficha { grid-template-columns:1fr; gap:0; }
+  dl.ficha dd { margin-bottom:.4rem; }
+  .lista-cuidadores li { align-items:flex-start; flex-wrap:wrap; }
+  .lista-cuidadores button { min-height:40px; }
+  .alerta > * { margin-left:.8rem; margin-right:.8rem; }
+  .alerta-topo, .alerta-acoes { padding-left:.8rem; padding-right:.8rem; }
+}
+
+@media (max-width:380px) {
+  .app-layout { padding:0 .5rem; }
+  .card { padding:.85rem; }
+  .menu-lateral button[role="tab"] { padding:.5rem; gap:.4rem; }
+  .menu-lateral button[role="tab"] .icone { width:18px; height:18px; }
+  .barra-doente { padding:.8rem .8rem .9rem; }
+  #ecraLogin { margin:1rem auto !important; }
+  .login-marca img { width:100px; }
+}
