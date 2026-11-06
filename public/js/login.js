@@ -8,10 +8,22 @@ if (sessaoExistente?.token && PAGINA_DO_PERFIL[sessaoExistente.utilizador?.perfi
   location.href = PAGINA_DO_PERFIL[sessaoExistente.utilizador.perfil];
 }
 
-document.querySelectorAll('[data-email]').forEach(botao => botao.addEventListener('click', () => {
+const botoesPerfil = [...document.querySelectorAll('[data-email]')];
+function atualizarPerfilSelecionado() {
+  botoesPerfil.forEach(botao => {
+    const selecionado = botao.dataset.email === $('email').value;
+    botao.classList.toggle('selecionado', selecionado);
+    botao.setAttribute('aria-pressed', String(selecionado));
+  });
+}
+
+botoesPerfil.forEach(botao => botao.addEventListener('click', () => {
   $('email').value = botao.dataset.email;
   $('password').value = '123456';
+  atualizarPerfilSelecionado();
 }));
+$('email').addEventListener('input', atualizarPerfilSelecionado);
+atualizarPerfilSelecionado();
 
 $('formLogin').addEventListener('submit', async evento => {
   evento.preventDefault();
