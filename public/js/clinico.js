@@ -39,9 +39,9 @@ function renderizarAlertas() {
   const filtros = filtrosDaPagina();
   $('filtrosAlertas').innerHTML = filtros.map(([id, nome, fn]) =>
     `<button type="button" data-filtro="${id}" aria-pressed="${filtroAlertas === id}">${nome} (${alertas.filter(fn).length})</button>`).join('');
-  const porTratar = alertas.filter(alertaPorTratarDaPagina).length;
+  const totalAlertas = alertas.length;
   const contador = $('contadorAlertas');
-  if (contador) { contador.textContent = porTratar; contador.classList.toggle('hidden', !porTratar); contador.setAttribute('aria-label', `${porTratar} por tratar`); }
+  if (contador) { contador.textContent = totalAlertas; contador.classList.toggle('hidden', !totalAlertas); contador.setAttribute('aria-label', `${totalAlertas} alertas`); }
   const atrasados = alertas.filter(atrasoTriagem);
   $('avisoAtrasos').innerHTML = atrasados.length ? `<div class="aviso-atraso" role="alert">
       <strong>${atrasados.length} alerta(s) sem triagem para além do prazo previsto</strong>
